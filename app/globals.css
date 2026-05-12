@@ -1,73 +1,54 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f5efe5;
-  --bg-soft: #fbf7f1;
-  --panel: rgba(255, 255, 255, 0.82);
-  --ink: #1c1917;
-  --muted: #6b6258;
-  --line: rgba(28, 25, 23, 0.1);
-  --brand: #0f766e;
-  --brand-strong: #115e59;
-  --shell-muted: #98a4b7;
-  --shadow-soft: 0 18px 60px rgba(26, 20, 14, 0.08);
-  --shadow-float: 0 24px 80px rgba(15, 23, 42, 0.16);
-  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", "Trebuchet MS", sans-serif;
+  --bg: #f5f5f7;
+  --panel: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --brand: #0066cc;
+  --brand-strong: #0055b3;
+  --brand-soft: rgba(0, 102, 204, 0.08);
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.10);
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
-html {
-  background:
-    radial-gradient(circle at top, rgba(245, 158, 11, 0.08), transparent 30%),
-    linear-gradient(180deg, #fcfaf6 0%, #f5efe5 100%);
-}
-
-body {
+html, body {
+  background: var(--bg);
   min-height: 100vh;
   color: var(--ink);
   font-family: var(--font-sans);
-  background:
-    radial-gradient(circle at 20% 0%, rgba(15, 118, 110, 0.08), transparent 22%),
-    radial-gradient(circle at 100% 10%, rgba(245, 158, 11, 0.12), transparent 28%),
-    linear-gradient(180deg, #fcfaf6 0%, #f5efe5 100%);
 }
 
 ::selection {
-  background: rgba(15, 118, 110, 0.2);
+  background: rgba(0, 102, 204, 0.15);
 }
 
 .font-display {
   font-family: var(--font-display);
 }
 
+/* Admin sidebar shell */
 .app-shell {
-  background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 24%),
-    linear-gradient(180deg, #1a212c 0%, #121821 100%);
+  background: #1a1a1f;
 }
 
+/* Sidebar inner panel */
+.shell-panel {
+  background: #222228;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* White content card */
+.admin-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+/* Landing glass panels — same as admin-panel, just an alias */
 .app-panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(18px);
-}
-
-.admin-panel {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: var(--shadow-soft);
-}
-
-.shell-panel {
-  background: linear-gradient(180deg, rgba(24, 31, 42, 0.96), rgba(15, 21, 31, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow-float);
-}
-
-.subtle-grid {
-  background-image:
-    linear-gradient(to right, rgba(28, 25, 23, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(28, 25, 23, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
 }

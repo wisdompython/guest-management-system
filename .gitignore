@@ -19,16 +19,16 @@ backend/.env
 backend/core/.env
 
 # ── Node / Next.js ────────────────────────────────────────────────────────────
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/build/
-frontend/.env.local
-frontend/.env*.local
-frontend/.vercel/
-frontend/*.tsbuildinfo
-frontend/next-env.d.ts
-frontend/coverage/
+node_modules/
+.next/
+out/
+build/
+.env.local
+.env*.local
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
 
 # ── Logs ─────────────────────────────────────────────────────────────────────
 npm-debug.log*
