@@ -1,0 +1,60 @@
+# ── Virtual environment ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Python bytecode ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Distribution / packaging ──────────────────────────────────────────────────
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+wheels/
+
+# ── Django ────────────────────────────────────────────────────────────────────
+*.sqlite3
+core/media/
+core/staticfiles/
+core/static_collected/
+
+# Migrations are intentionally committed — do not add migrations/ here
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+# .env.example is safe to commit — keep it out of this list
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# ── Type checking ─────────────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
