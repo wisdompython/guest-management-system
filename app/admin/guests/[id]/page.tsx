@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { api, Guest } from '@/lib/api'
 
 const TICKET_COLORS: Record<string, string> = {
-  vvip: 'bg-purple-100 text-purple-700',
+  vvip: 'bg-fuchsia-100 text-fuchsia-700',
   vip:  'bg-amber-100 text-amber-700',
-  general: 'bg-gray-100 text-gray-600',
+  general: 'bg-stone-100 text-stone-600',
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
@@ -67,15 +67,15 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-sm text-gray-400">Loading…</p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
       </div>
     )
   }
 
   if (!guest) {
     return (
-      <div className="px-8 py-8">
+      <div className="px-6 py-6 lg:px-8 lg:py-8">
         <p className="text-sm text-red-500">{error || 'Guest not found.'}</p>
       </div>
     )
@@ -86,100 +86,103 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
   const checkedIn = guest.status === 'checked_in'
 
   return (
-    <div className="px-8 py-8 max-w-5xl">
+    <div className="px-6 py-6 lg:px-8 lg:py-8 max-w-5xl">
 
-      {/* Back + header */}
-      <div className="flex items-center gap-4 mb-8">
+      {/* Header banner */}
+      <div className="mb-8 rounded-[28px] bg-[#f4f7ff] px-6 py-6">
         <button
           onClick={() => router.push('/admin/guests')}
-          className="text-sm text-gray-400 hover:text-gray-700 transition-colors"
+          className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand)] mb-3 block transition-opacity hover:opacity-70"
         >
-          ← Guests
+          ← Guest directory
         </button>
-        <div className="h-4 w-px bg-gray-200" />
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{guest.full_name}</h1>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${TICKET_COLORS[guest.ticket_type]}`}>
-              {guest.ticket_type.toUpperCase()}
-            </span>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-              checkedIn ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {checkedIn ? 'Checked In' : 'Registered'}
-            </span>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <h1 className="font-display text-4xl text-[var(--ink)]">{guest.full_name}</h1>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TICKET_COLORS[guest.ticket_type]}`}>
+                {guest.ticket_type.toUpperCase()}
+              </span>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                checkedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-600'
+              }`}>
+                {checkedIn ? 'Checked In' : 'Registered'}
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">{guest.event_name}</p>
           </div>
-          <p className="text-sm text-gray-400 mt-0.5">{guest.event_name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRegenerateAssets}
-            disabled={regenerating}
-            className="text-sm font-semibold border border-gray-200 hover:border-gray-400 text-gray-600 disabled:opacity-50 rounded-lg px-4 py-2 transition-colors"
-          >
-            {regenerating ? 'Regenerating…' : 'Regenerate Assets'}
-          </button>
-          {!checkedIn && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleCheckIn}
-              disabled={checkingIn}
-              className="text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg px-5 py-2 transition-colors"
+              onClick={handleRegenerateAssets}
+              disabled={regenerating}
+              className="rounded-full border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-[var(--ink)] transition hover:bg-stone-50 disabled:opacity-50"
             >
-              {checkingIn ? 'Checking in…' : 'Check In Guest'}
+              {regenerating ? 'Regenerating…' : 'Regenerate Assets'}
             </button>
-          )}
+            {!checkedIn && (
+              <button
+                onClick={handleCheckIn}
+                disabled={checkingIn}
+                className="rounded-full bg-[var(--brand)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60"
+              >
+                {checkingIn ? 'Checking in…' : 'Check In Guest'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+        <div className="mb-6 rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
       )}
 
       <div className="grid lg:grid-cols-2 gap-6">
 
         {/* Left — Guest info */}
-        <div className="space-y-6">
+        <div className="space-y-5">
 
           {/* Details card */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">Guest Details</h2>
-            <dl className="space-y-4">
+          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+            <div className="border-b border-stone-100 px-6 py-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Guest Details</h2>
+            </div>
+            <dl className="divide-y divide-stone-100">
               {[
-                { label: 'Full Name',    value: guest.full_name },
-                { label: 'Phone',        value: guest.phone_number },
-                { label: 'Email',        value: guest.email || '—' },
-                { label: 'Event',        value: guest.event_name || '—' },
-                { label: 'Ticket Type',  value: guest.ticket_type.toUpperCase() },
-                { label: 'Table',        value: guest.table_number || '—' },
-                { label: 'Seat',         value: guest.seat_number || '—' },
-                { label: 'Registered',   value: new Date(guest.registered_at).toLocaleString() },
-                { label: 'Checked In',   value: guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : '—' },
+                { label: 'Full Name',   value: guest.full_name },
+                { label: 'Phone',       value: guest.phone_number },
+                { label: 'Email',       value: guest.email || '—' },
+                { label: 'Event',       value: guest.event_name || '—' },
+                { label: 'Ticket',      value: guest.ticket_type.toUpperCase() },
+                { label: 'Table',       value: guest.table_number || '—' },
+                { label: 'Seat',        value: guest.seat_number || '—' },
+                { label: 'Registered',  value: new Date(guest.registered_at).toLocaleString() },
+                { label: 'Checked In',  value: guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : '—' },
               ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-start gap-4">
-                  <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0 w-28">{label}</dt>
-                  <dd className="text-sm text-gray-800 text-right">{value}</dd>
+                <div key={label} className="flex items-start justify-between gap-4 px-6 py-3.5">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)] w-28 flex-shrink-0">{label}</dt>
+                  <dd className="text-sm text-[var(--ink)] text-right">{value}</dd>
                 </div>
               ))}
             </dl>
           </div>
 
-          {/* WhatsApp status card */}
-          <div className={`rounded-2xl border p-5 flex items-center gap-4 ${
+          {/* WhatsApp status */}
+          <div className={`rounded-[22px] border p-5 flex items-center gap-4 ${
             guest.whatsapp_sent
-              ? 'bg-green-50 border-green-100'
-              : 'bg-gray-50 border-gray-100'
+              ? 'bg-emerald-50 border-emerald-100'
+              : 'bg-stone-50 border-stone-200'
           }`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 ${
-              guest.whatsapp_sent ? 'bg-green-100' : 'bg-gray-200'
+              guest.whatsapp_sent ? 'bg-emerald-100' : 'bg-stone-200'
             }`}>
               💬
             </div>
             <div>
-              <p className={`text-sm font-semibold ${guest.whatsapp_sent ? 'text-green-700' : 'text-gray-500'}`}>
+              <p className={`text-sm font-semibold ${guest.whatsapp_sent ? 'text-emerald-700' : 'text-[var(--muted)]'}`}>
                 {guest.whatsapp_sent ? 'Pass sent via WhatsApp' : 'WhatsApp pass not sent yet'}
               </p>
               {guest.whatsapp_sent_at && (
-                <p className="text-xs text-green-600 mt-0.5">
+                <p className="text-xs text-emerald-600 mt-0.5">
                   Sent {new Date(guest.whatsapp_sent_at).toLocaleString()}
                 </p>
               )}
@@ -188,19 +191,19 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {/* Right — Pass + QR */}
-        <div className="space-y-6">
+        <div className="space-y-5">
 
           {/* Personalised pass */}
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Personalised Pass</h2>
+          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Personalised Pass</h2>
               {passUrl && (
                 <a
                   href={passUrl}
                   download
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-indigo-600 hover:underline"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand)] hover:underline"
                 >
                   Download ↓
                 </a>
@@ -211,30 +214,28 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
                 <img
                   src={passUrl}
                   alt={`${guest.full_name} pass`}
-                  className="w-full rounded-xl border border-gray-100 object-contain"
+                  className="w-full rounded-[18px] border border-stone-100 object-contain"
                 />
               ) : (
-                <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-                  <p className="text-sm text-gray-400">No pass generated yet.</p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    This happens when the event has no design template uploaded.
-                  </p>
+                <div className="rounded-[18px] border-2 border-dashed border-stone-200 py-16 text-center">
+                  <p className="text-sm text-[var(--muted)]">No pass generated yet.</p>
+                  <p className="text-xs text-stone-300 mt-1">Upload a design template to the event first.</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* QR Code */}
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">QR Code</h2>
+          <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">QR Code</h2>
               {qrUrl && (
                 <a
                   href={qrUrl}
                   download
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-indigo-600 hover:underline"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand)] hover:underline"
                 >
                   Download ↓
                 </a>
@@ -246,18 +247,18 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
                   <img
                     src={qrUrl}
                     alt="QR Code"
-                    className="w-48 h-48 rounded-xl border border-gray-100"
+                    className="w-48 h-48 rounded-[18px] border border-stone-100"
                   />
                   <div className="text-center">
-                    <p className="text-xs text-gray-400 font-mono break-all leading-relaxed">
+                    <p className="text-xs text-[var(--muted)] font-mono break-all leading-relaxed">
                       ID: {guest.id}
                     </p>
-                    <p className="text-xs text-gray-300 mt-1">Scan encodes event, name &amp; ID</p>
+                    <p className="text-xs text-stone-300 mt-1">Scan encodes event, name &amp; ID</p>
                   </div>
                 </>
               ) : (
-                <div className="rounded-xl border-2 border-dashed border-gray-200 w-full py-12 text-center">
-                  <p className="text-sm text-gray-400">No QR code generated yet.</p>
+                <div className="rounded-[18px] border-2 border-dashed border-stone-200 w-full py-12 text-center">
+                  <p className="text-sm text-[var(--muted)]">No QR code generated yet.</p>
                 </div>
               )}
             </div>

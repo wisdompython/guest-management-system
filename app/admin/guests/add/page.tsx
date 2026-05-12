@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Event, CreateGuestPayload } from '@/lib/api'
 
+const field = 'w-full rounded-[14px] border border-stone-200 bg-white px-4 py-3 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-stone-400'
+const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-2'
+
 export default function AddGuestPage() {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
@@ -18,9 +21,9 @@ export default function AddGuestPage() {
     e.preventDefault()
     setError('')
     setSubmitting(true)
-
     const form = e.currentTarget
-    const getValue = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement).value
+    const getValue = (name: string) =>
+      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement).value
 
     const payload: CreateGuestPayload = {
       full_name:    getValue('full_name'),
@@ -42,60 +45,42 @@ export default function AddGuestPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-2xl">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Add Guest</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Register a single guest manually.</p>
+    <div className="px-6 py-6 lg:px-8 lg:py-8">
+      <div className="mb-8 rounded-[28px] bg-[#eef7f5] px-6 py-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand)]">Guest directory</p>
+        <h1 className="mt-3 font-display text-4xl text-[var(--ink)]">Add Guest</h1>
+        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">Register a single guest and assign them to an event.</p>
       </div>
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+        <div className="mb-6 rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white border border-gray-100 rounded-2xl p-8 space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="full_name"
-              type="text"
-              required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+      <form onSubmit={handleSubmit} className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+        <div className="border-b border-stone-100 px-6 py-5">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">Guest information</h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">Fields marked * are required.</p>
+        </div>
+
+        <div className="grid gap-5 p-6 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className={label}>Full Name *</label>
+            <input name="full_name" type="text" required placeholder="e.g. Adaeze Okonkwo" className={field} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Phone Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="phone_number"
-              type="tel"
-              required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <label className={label}>Phone Number *</label>
+            <input name="phone_number" type="tel" required placeholder="+234 800 000 0000" className={field} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input
-              name="email"
-              type="email"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <label className={label}>Email</label>
+            <input name="email" type="email" placeholder="optional" className={field} />
           </div>
 
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Event <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="event"
-              required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+          <div className="sm:col-span-2">
+            <label className={label}>Event *</label>
+            <select name="event" required className={field}>
               <option value="">Select an event…</option>
               {events.map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -104,12 +89,8 @@ export default function AddGuestPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ticket Type</label>
-            <select
-              name="ticket_type"
-              defaultValue="general"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+            <label className={label}>Ticket Type</label>
+            <select name="ticket_type" defaultValue="general" className={field}>
               <option value="general">General</option>
               <option value="vip">VIP</option>
               <option value="vvip">VVIP</option>
@@ -117,36 +98,28 @@ export default function AddGuestPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Table Number</label>
-            <input
-              name="table_number"
-              type="text"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <label className={label}>Table Number</label>
+            <input name="table_number" type="text" placeholder="optional" className={field} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Seat Number</label>
-            <input
-              name="seat_number"
-              type="text"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <label className={label}>Seat Number</label>
+            <input name="seat_number" type="text" placeholder="optional" className={field} />
           </div>
         </div>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 border-t border-stone-100 px-6 py-5">
           <button
             type="submit"
             disabled={submitting}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+            className="flex-1 rounded-full bg-[var(--brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60"
           >
             {submitting ? 'Adding…' : 'Add Guest'}
           </button>
           <button
             type="button"
             onClick={() => router.push('/admin/guests')}
-            className="flex-1 border border-gray-200 hover:border-gray-400 text-gray-700 font-semibold rounded-lg py-2.5 text-sm transition-colors"
+            className="flex-1 rounded-full border border-stone-200 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-stone-50"
           >
             Cancel
           </button>

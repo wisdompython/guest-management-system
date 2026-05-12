@@ -1,1 +1,73 @@
 @import "tailwindcss";
+
+:root {
+  --bg: #f5efe5;
+  --bg-soft: #fbf7f1;
+  --panel: rgba(255, 255, 255, 0.82);
+  --ink: #1c1917;
+  --muted: #6b6258;
+  --line: rgba(28, 25, 23, 0.1);
+  --brand: #0f766e;
+  --brand-strong: #115e59;
+  --shell-muted: #98a4b7;
+  --shadow-soft: 0 18px 60px rgba(26, 20, 14, 0.08);
+  --shadow-float: 0 24px 80px rgba(15, 23, 42, 0.16);
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", "Trebuchet MS", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+html {
+  background:
+    radial-gradient(circle at top, rgba(245, 158, 11, 0.08), transparent 30%),
+    linear-gradient(180deg, #fcfaf6 0%, #f5efe5 100%);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(15, 118, 110, 0.08), transparent 22%),
+    radial-gradient(circle at 100% 10%, rgba(245, 158, 11, 0.12), transparent 28%),
+    linear-gradient(180deg, #fcfaf6 0%, #f5efe5 100%);
+}
+
+::selection {
+  background: rgba(15, 118, 110, 0.2);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 24%),
+    linear-gradient(180deg, #1a212c 0%, #121821 100%);
+}
+
+.app-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px);
+}
+
+.admin-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: var(--shadow-soft);
+}
+
+.shell-panel {
+  background: linear-gradient(180deg, rgba(24, 31, 42, 0.96), rgba(15, 21, 31, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-float);
+}
+
+.subtle-grid {
+  background-image:
+    linear-gradient(to right, rgba(28, 25, 23, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(28, 25, 23, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
