@@ -7,6 +7,9 @@ import QrZoneSelector, { QrZone } from '@/components/QrZoneSelector'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
+const field = 'w-full rounded-[14px] border border-stone-200 bg-white px-4 py-3 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-stone-400'
+const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-2'
+
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -101,15 +104,15 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-sm text-gray-400">Loading event…</p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-sm text-[var(--muted)]">Loading event…</p>
       </div>
     )
   }
 
   if (!event) {
     return (
-      <div className="px-8 py-8">
+      <div className="px-6 py-6 lg:px-8 lg:py-8">
         <p className="text-sm text-red-500">{error || 'Event not found.'}</p>
       </div>
     )
@@ -118,145 +121,131 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const localDateValue = event.date ? new Date(event.date).toISOString().slice(0, 16) : ''
 
   return (
-    <div className="px-8 py-8 max-w-3xl">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Edit Event</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{event.name}</p>
+    <div className="px-6 py-6 lg:px-8 lg:py-8 max-w-3xl">
+      <div className="mb-8 rounded-[28px] bg-[#eef7f5] px-6 py-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand)]">Event setup</p>
+        <h1 className="mt-3 font-display text-4xl text-[var(--ink)]">Edit Event</h1>
+        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{event.name}</p>
       </div>
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+        <div className="mb-6 rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white border border-gray-100 rounded-2xl p-8 space-y-6">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Event Details</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Event Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="name"
-              type="text"
-              required
-              defaultValue={event.name}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+          <div className="border-b border-stone-100 px-6 py-5">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Event Details</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Date & Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="date"
-                type="datetime-local"
-                required
-                defaultValue={localDateValue}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+          <div className="grid gap-5 p-6 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className={label}>Event Name *</label>
+              <input name="name" type="text" required defaultValue={event.name} className={field} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Venue</label>
-              <input
-                name="venue"
-                type="text"
-                defaultValue={event.venue}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-            <textarea
-              name="description"
-              rows={2}
-              defaultValue={event.description}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            />
+            <div>
+              <label className={label}>Date & Time *</label>
+              <input name="date" type="datetime-local" required defaultValue={localDateValue} className={field} />
+            </div>
+
+            <div>
+              <label className={label}>Venue</label>
+              <input name="venue" type="text" defaultValue={event.venue} placeholder="optional" className={field} />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className={label}>Description</label>
+              <textarea
+                name="description"
+                rows={2}
+                defaultValue={event.description}
+                placeholder="optional"
+                className={`${field} resize-none`}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-2xl p-8 space-y-6">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-1">Pass Design & QR Zone</h2>
-            <p className="text-xs text-gray-400">
+        <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+          <div className="border-b border-stone-100 px-6 py-5">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Pass Design & QR Zone</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">
               Leave the file picker empty to keep the existing design. Upload a new file to replace it.
             </p>
           </div>
 
-          {event.design_template && !newFileChosen && (
-            <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
-              <span className="text-xs font-medium text-gray-500">Current design:</span>
-              <a
-                href={event.design_template}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-indigo-600 hover:underline font-medium truncate"
-              >
-                {event.design_template.split('/').pop()}
-              </a>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              {newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)'}
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              onChange={handleFileChange}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-            />
-          </div>
-
-          {previewUrl && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${qrZone ? 'bg-green-500 text-white' : 'bg-amber-100 text-amber-600'}`}>
-                  {qrZone ? '✓' : '!'}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">
-                    {qrZone ? 'QR zone is set' : 'No QR zone set'}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {newFileChosen
-                      ? 'New design uploaded — draw a new QR zone below.'
-                      : 'Drag to redraw the zone, or leave it as-is.'}
-                  </p>
-                </div>
+          <div className="space-y-5 p-6">
+            {event.design_template && !newFileChosen && (
+              <div className="flex items-center gap-3 rounded-[12px] border border-stone-100 bg-stone-50 px-4 py-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Current:</span>
+                <a
+                  href={event.design_template}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-[var(--brand)] hover:underline truncate"
+                >
+                  {event.design_template.split('/').pop()}
+                </a>
               </div>
+            )}
 
-              <QrZoneSelector imageUrl={previewUrl} zone={qrZone} onChange={handleZoneChange} />
-
-              {!qrZone && (
-                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                  <span>⚠</span>
-                  No QR zone — the QR code will fall back to the bottom-right corner.
-                </div>
-              )}
+            <div>
+              <label className={label}>
+                {newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)'}
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={handleFileChange}
+                className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
+              />
             </div>
-          )}
+
+            {previewUrl && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${qrZone ? 'bg-emerald-500 text-white' : 'bg-amber-100 text-amber-600'}`}>
+                    {qrZone ? '✓' : '!'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--ink)]">
+                      {qrZone ? 'QR zone is set' : 'No QR zone set'}
+                    </p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {newFileChosen
+                        ? 'New design uploaded — draw a new QR zone below.'
+                        : 'Drag to redraw the zone, or leave it as-is.'}
+                    </p>
+                  </div>
+                </div>
+
+                <QrZoneSelector imageUrl={previewUrl} zone={qrZone} onChange={handleZoneChange} />
+
+                {!qrZone && (
+                  <div className="flex items-center gap-2 rounded-[12px] border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                    <span>⚠</span>
+                    No QR zone — the QR code will fall back to the bottom-right corner.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 pb-2">
           <button
             type="submit"
             disabled={submitting}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+            className="flex-1 rounded-full bg-[var(--brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60"
           >
             {submitting ? 'Saving…' : 'Save Changes'}
           </button>
           <button
             type="button"
             onClick={() => router.push('/admin/events')}
-            className="flex-1 border border-gray-200 hover:border-gray-400 text-gray-700 font-semibold rounded-lg py-2.5 text-sm transition-colors"
+            className="flex-1 rounded-full border border-stone-200 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-stone-50"
           >
             Cancel
           </button>
