@@ -41,6 +41,14 @@ export const api = {
     request<Event>('/events/', { method: 'POST', body: JSON.stringify(data) }),
   deleteEvent: (id: number) =>
     request<void>(`/events/${id}/`, { method: 'DELETE' }),
+
+  // Fonts
+  getFonts: () =>
+    request<{ results: Font[] } | Font[]>('/fonts/').then((data) =>
+      Array.isArray(data) ? data : data.results ?? []
+    ),
+  deleteFont: (id: number) =>
+    request<void>(`/fonts/${id}/`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
@@ -91,6 +99,21 @@ export interface Event {
   qr_zone_y: number | null;
   qr_zone_w: number | null;
   qr_zone_h: number | null;
+  name_zone_x: number | null;
+  name_zone_y: number | null;
+  name_zone_w: number | null;
+  name_zone_h: number | null;
+  name_font: number | null;
+  name_font_name: string | null;
+  name_font_color: string;
+  name_font_size_fraction: number;
   guest_count: number;
   created_at: string;
+}
+
+export interface Font {
+  id: number;
+  name: string;
+  file: string;
+  uploaded_at: string;
 }

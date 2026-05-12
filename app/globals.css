@@ -1,19 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --bg:           #fafaf8;
+  /* ── Exact tones from the reference image ── */
+  --bg:           #f0f2f5;        /* page background: light blue-grey */
   --panel:        #ffffff;
-  --ink:          #1a1a1a;
-  --ink-2:        #3a3a3a;
-  --muted:        #6b6b6b;
-  --muted-2:      #9a9a9a;
-  --line:         #e4e4e0;
-  --brand:        #6D8196;
-  --brand-strong: #4f6275;
-  --brand-glow:   rgba(109,129,150,0.20);
-  --sidebar:      #1e1e1e;
-  --font-sans:    var(--loaded-sans, 'Segoe UI', system-ui, sans-serif);
-  --font-display: var(--loaded-display, 'Iowan Old Style', Georgia, serif);
+  --ink:          #0d1117;        /* near-black headings */
+  --ink-2:        #1c2a3a;
+  --muted:        #5a6a7a;
+  --muted-2:      #8a9ab0;
+  --line:         #dde3ea;
+
+  --brand:        #1a3ed4;        /* cobalt blue — primary CTA, active nav */
+  --brand-strong: #1430a8;
+  --brand-soft:   #e8edfb;        /* light blue tint for badges/pills */
+
+  --sidebar:      #0f1b2d;        /* dark navy sidebar */
+  --sidebar-2:    #162436;        /* slightly lighter for hover */
+  --sidebar-line: rgba(255,255,255,0.07);
+
+  --success:      #16a34a;
+  --success-bg:   #dcfce7;
+  --warn:         #b45309;
+  --warn-bg:      #fef3c7;
+  --danger:       #dc2626;
+  --danger-bg:    #fee2e2;
+
+  --font-sans:    var(--loaded-sans, 'Inter', 'Segoe UI', system-ui, sans-serif);
+  --font-display: var(--loaded-display, 'Inter', 'Segoe UI', system-ui, sans-serif);
 }
 
 html, body {
@@ -22,10 +35,11 @@ html, body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: rgba(109,129,150,0.18);
+  background: rgba(26, 62, 212, 0.15);
 }
 
 .font-display {
@@ -36,8 +50,8 @@ html, body {
 .app-shell { background: var(--sidebar); }
 
 .shell-panel {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--sidebar-line);
 }
 
 /* Admin content card */
@@ -46,9 +60,9 @@ html, body {
   border: 1px solid var(--line);
 }
 
-/* Gradient text utility */
+/* Gradient text */
 .grad-text {
-  background: linear-gradient(120deg, #6D8196 0%, #a0b4c4 50%, #6D8196 100%);
+  background: linear-gradient(120deg, #1a3ed4 0%, #4f7fff 50%, #1a3ed4 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
