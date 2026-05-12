@@ -1,0 +1,14 @@
+services:
+
+  frontend:
+    build:
+      context: .
+    ports:
+      - "3003:3003"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    command: npx next dev -p 3003
