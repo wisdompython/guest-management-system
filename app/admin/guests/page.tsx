@@ -40,41 +40,43 @@ export default function GuestsPage() {
   }
 
   return (
-    <div className="px-6 py-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-4 rounded-[28px] bg-[#fff6e8] px-6 py-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="px-6 py-8 lg:px-8 lg:py-10">
+
+      <div className="mb-8 flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand)]">Guest directory</p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--ink)]">Guests</h1>
-          <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{count} total guests across registration, pass delivery, and check-in.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Guest directory</p>
+          <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Guests</h1>
+          <p className="mt-1 text-sm text-[var(--muted)]">{count} total</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link
             href="/admin/guests/add"
-            className="rounded-full border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:bg-stone-50"
+            className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]"
           >
             Add Guest
           </Link>
           <Link
             href="/admin/guests/bulk-upload"
-            className="rounded-full bg-[var(--brand)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)]"
+            className="rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)]"
           >
             Bulk Upload
           </Link>
         </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-3 rounded-[24px] border border-stone-200 bg-white px-4 py-4">
+      {/* Filters */}
+      <div className="mb-5 flex flex-wrap gap-2">
         <input
           type="text"
-          placeholder="Search name, phone..."
+          placeholder="Search name, phone…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-56 rounded-full border border-stone-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-full border border-stone-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         >
           <option value="">All Statuses</option>
           <option value="registered">Registered</option>
@@ -83,7 +85,7 @@ export default function GuestsPage() {
         <select
           value={ticketFilter}
           onChange={(e) => setTicketFilter(e.target.value)}
-          className="rounded-full border border-stone-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         >
           <option value="">All Tickets</option>
           <option value="general">General</option>
@@ -93,77 +95,77 @@ export default function GuestsPage() {
         {(search || statusFilter || ticketFilter) && (
           <button
             onClick={() => { setSearch(''); setStatusFilter(''); setTicketFilter('') }}
-            className="rounded-full px-2 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]"
+            className="rounded-full px-3 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
           >
-            Clear filters
+            Clear
           </button>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
         {loading ? (
-          <div className="py-16 text-center text-sm text-[var(--muted)]">Loading...</div>
+          <div className="py-16 text-center text-sm text-[var(--muted)]">Loading…</div>
         ) : guests.length === 0 ? (
           <div className="py-16 text-center text-sm text-[var(--muted)]">No guests found.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-stone-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-                <th className="px-5 py-3 text-left font-semibold">Name</th>
-                <th className="px-5 py-3 text-left font-semibold">Phone</th>
-                <th className="px-5 py-3 text-left font-semibold">Event</th>
-                <th className="px-5 py-3 text-left font-semibold">Ticket</th>
-                <th className="px-5 py-3 text-left font-semibold">Table</th>
-                <th className="px-5 py-3 text-left font-semibold">Status</th>
-                <th className="px-5 py-3 text-left font-semibold">WhatsApp</th>
-                <th className="px-5 py-3 text-left font-semibold">Pass</th>
-                <th className="px-5 py-3" />
+              <tr className="border-b border-[var(--line)] text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                <th className="px-6 py-3 text-left font-semibold">Name</th>
+                <th className="px-6 py-3 text-left font-semibold">Phone</th>
+                <th className="px-6 py-3 text-left font-semibold">Event</th>
+                <th className="px-6 py-3 text-left font-semibold">Ticket</th>
+                <th className="px-6 py-3 text-left font-semibold">Table</th>
+                <th className="px-6 py-3 text-left font-semibold">Status</th>
+                <th className="px-6 py-3 text-left font-semibold">WhatsApp</th>
+                <th className="px-6 py-3 text-left font-semibold">Pass</th>
+                <th className="px-6 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-[var(--line)]">
               {guests.map((g) => (
-                <tr key={g.id} className="transition-colors hover:bg-stone-50/70">
-                  <td className="whitespace-nowrap px-5 py-4 font-medium text-[var(--ink)]">
-                    <Link href={`/admin/guests/${g.id}`} className="transition-colors hover:text-[var(--brand)]">
+                <tr key={g.id} className="hover:bg-[var(--bg)]">
+                  <td className="whitespace-nowrap px-6 py-3.5 font-medium text-[var(--ink)]">
+                    <Link href={`/admin/guests/${g.id}`} className="transition hover:text-[var(--brand)]">
                       {g.full_name}
                     </Link>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-4 text-[var(--muted)]">{g.phone_number}</td>
-                  <td className="max-w-[120px] truncate px-5 py-4 text-[var(--muted)]">{g.event_name || '--'}</td>
-                  <td className="px-5 py-4">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      g.ticket_type === 'vvip' ? 'bg-fuchsia-100 text-fuchsia-700' :
-                      g.ticket_type === 'vip' ? 'bg-amber-100 text-amber-700' :
-                      'bg-stone-100 text-stone-700'
+                  <td className="whitespace-nowrap px-6 py-3.5 text-[var(--muted)]">{g.phone_number}</td>
+                  <td className="max-w-[120px] truncate px-6 py-3.5 text-[var(--muted)]">{g.event_name || '--'}</td>
+                  <td className="px-6 py-3.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      g.ticket_type === 'vvip' ? 'bg-purple-100 text-purple-700' :
+                      g.ticket_type === 'vip'  ? 'bg-amber-100 text-amber-700' :
+                      'bg-[var(--bg)] text-[var(--muted)]'
                     }`}>
                       {TICKET_LABELS[g.ticket_type]}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-[var(--muted)]">{g.table_number || '--'}</td>
-                  <td className="px-5 py-4">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  <td className="px-6 py-3.5 text-[var(--muted)]">{g.table_number || '--'}</td>
+                  <td className="px-6 py-3.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       g.status === 'checked_in'
                         ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-stone-100 text-stone-600'
+                        : 'bg-[var(--bg)] text-[var(--muted)]'
                     }`}>
                       {g.status === 'checked_in' ? 'Checked In' : 'Registered'}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-3.5">
                     {g.whatsapp_sent
                       ? <span className="text-xs font-medium text-emerald-600">Sent</span>
-                      : <span className="text-xs text-stone-400">Pending</span>}
+                      : <span className="text-xs text-[var(--muted)]">Pending</span>}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-3.5">
                     {g.pass_image
-                      ? <a href={g.pass_image} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand)] hover:underline">View</a>
-                      : <span className="text-xs text-stone-300">--</span>}
+                      ? <a href={g.pass_image} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand)] hover:underline">View</a>
+                      : <span className="text-xs text-[var(--line)]">--</span>}
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-6 py-3.5 text-right">
                     <button
                       onClick={() => handleDelete(g.id, g.full_name)}
                       disabled={deleting === g.id}
-                      className="text-xs font-semibold uppercase tracking-[0.16em] text-red-400 transition-colors hover:text-red-600 disabled:opacity-40"
+                      className="text-xs font-semibold uppercase tracking-[0.14em] text-red-400 transition hover:text-red-600 disabled:opacity-40"
                     >
                       Remove
                     </button>

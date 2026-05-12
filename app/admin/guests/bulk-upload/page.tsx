@@ -5,8 +5,8 @@ import { api, Event } from '@/lib/api'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
-const field = 'w-full rounded-[14px] border border-stone-200 bg-white px-4 py-3 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-2'
+const field = 'w-full rounded-[12px] border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
 interface UploadResult {
   upload_id: number
@@ -62,25 +62,26 @@ export default function BulkUploadPage() {
   }
 
   return (
-    <div className="px-6 py-6 lg:px-8 lg:py-8">
-      <div className="mb-8 rounded-[28px] bg-[#f0f4ff] px-6 py-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand)]">Team import</p>
-        <h1 className="mt-3 font-display text-4xl text-[var(--ink)]">Bulk Upload</h1>
-        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+    <div className="px-6 py-8 lg:px-8 lg:py-10">
+
+      <div className="mb-8 border-b border-[var(--line)] pb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Team import</p>
+        <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Bulk Upload</h1>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Import a guest list from CSV. Required columns:{' '}
-          <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs text-[var(--ink)]">full_name</code>,{' '}
-          <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs text-[var(--ink)]">phone_number</code>.
+          <code className="rounded bg-[var(--bg)] px-1.5 py-0.5 font-mono text-xs">full_name</code>,{' '}
+          <code className="rounded bg-[var(--bg)] px-1.5 py-0.5 font-mono text-xs">phone_number</code>.
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
+        <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>
       )}
 
       {result && (
-        <div className={`mb-6 rounded-[22px] border px-6 py-5 ${result.failed > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
-          <p className="font-semibold text-[var(--ink)] mb-3">Upload complete</p>
-          <div className="flex flex-wrap gap-6 text-sm mb-3">
+        <div className={`mb-5 rounded-[18px] border px-5 py-4 ${result.failed > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+          <p className="font-semibold text-[var(--ink)] mb-2">Upload complete</p>
+          <div className="flex flex-wrap gap-5 text-sm mb-2">
             <span className="text-emerald-700 font-semibold">✓ {result.successful} imported</span>
             {result.failed > 0 && <span className="text-red-600 font-semibold">✗ {result.failed} failed</span>}
             {result.asset_warnings.length > 0 && <span className="text-amber-600 font-semibold">⚠ {result.asset_warnings.length} asset warnings</span>}
@@ -96,12 +97,12 @@ export default function BulkUploadPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="overflow-hidden rounded-[28px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 px-6 py-5">
+      <form onSubmit={handleSubmit} className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
+        <div className="border-b border-[var(--line)] px-6 py-4">
           <h2 className="text-sm font-semibold text-[var(--ink)]">Upload details</h2>
         </div>
 
-        <div className="space-y-5 p-6">
+        <div className="space-y-4 p-6">
           <div>
             <label className={label}>Event *</label>
             <select name="event" required className={field}>
@@ -118,19 +119,19 @@ export default function BulkUploadPage() {
               name="csv_file"
               type="file"
               accept=".csv"
-              className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
+              className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
             />
-            <p className="mt-2 text-xs text-[var(--muted)]">
+            <p className="mt-1.5 text-xs text-[var(--muted)]">
               Optional columns: email, ticket_type (general / vip / vvip), table_number, seat_number
             </p>
           </div>
         </div>
 
-        <div className="border-t border-stone-100 px-6 py-5">
+        <div className="border-t border-[var(--line)] px-6 py-4">
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-full bg-[var(--brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60"
+            className="w-full rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60"
           >
             {submitting ? 'Uploading…' : 'Upload Guests'}
           </button>

@@ -21,80 +21,59 @@ export default function DashboardPage() {
   const withPass = guests.filter((g) => g.pass_image).length
 
   const stats = [
-    { label: 'Total Guests', value: loading ? '--' : guests.length, tone: 'from-[#f4d7a1] to-[#f8efe0]' },
-    { label: 'Checked In', value: loading ? '--' : checkedIn, tone: 'from-[#bfe4dd] to-[#eef8f6]' },
-    { label: 'Passes Generated', value: loading ? '--' : withPass, tone: 'from-[#c7d6f7] to-[#f4f7ff]' },
-    { label: 'WhatsApp Sent', value: loading ? '--' : whatsappSent, tone: 'from-[#ead5ff] to-[#fbf6ff]' },
+    { label: 'Total Guests',   value: loading ? '--' : guests.length },
+    { label: 'Checked In',     value: loading ? '--' : checkedIn },
+    { label: 'Passes Ready',   value: loading ? '--' : withPass },
+    { label: 'WhatsApp Sent',  value: loading ? '--' : whatsappSent },
   ]
 
   return (
-    <div className="px-6 py-6 lg:px-8 lg:py-8">
-      <div className="mb-8 flex flex-col gap-4 rounded-[28px] bg-[#f7f0e4] px-6 py-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[var(--brand)]">Operations overview</p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--ink)]">Dashboard</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--muted)]">A quick read on attendance, pass readiness, and the events your team is actively managing.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-3 text-sm text-[var(--muted)] sm:grid-cols-4">
-          <div>
-            <p className="font-display text-2xl text-[var(--ink)]">{events.length}</p>
-            <p>events</p>
-          </div>
-          <div>
-            <p className="font-display text-2xl text-[var(--ink)]">{checkedIn}</p>
-            <p>checked in</p>
-          </div>
-          <div>
-            <p className="font-display text-2xl text-[var(--ink)]">{withPass}</p>
-            <p>passes ready</p>
-          </div>
-          <div>
-            <p className="font-display text-2xl text-[var(--ink)]">{whatsappSent}</p>
-            <p>sent out</p>
-          </div>
-        </div>
+    <div className="px-6 py-8 lg:px-8 lg:py-10">
+
+      <div className="mb-8 pb-6" style={{ borderBottom: '1px solid var(--line)' }}>
+        <p className="text-xs font-semibold uppercase tracking-[0.28em]" style={{ color: 'var(--brand)' }}>Overview</p>
+        <h1 className="mt-2 font-display text-4xl" style={{ color: 'var(--ink-strong)' }}>Dashboard</h1>
       </div>
 
-      <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, tone }) => (
-          <div key={label} className={`rounded-[26px] border border-black/5 bg-gradient-to-br ${tone} px-5 py-5`}>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">{label}</p>
-            <p className="mt-4 font-display text-5xl leading-none text-[var(--ink)]">{value}</p>
+      {/* Stats */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map(({ label, value }) => (
+          <div key={label} className="rounded-[18px] px-5 py-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+            <p className="text-xs font-semibold uppercase tracking-[0.20em]" style={{ color: 'var(--muted)' }}>{label}</p>
+            <p className="mt-3 font-display text-5xl leading-none" style={{ color: 'var(--ink-strong)' }}>{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="mb-6 overflow-hidden rounded-[28px] border border-stone-200 bg-white">
-        <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--ink)]">Events in motion</h2>
-            <p className="text-sm text-[var(--muted)]">Recent events and how many guests they currently hold.</p>
-          </div>
-          <Link href="/admin/events" className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink)] transition hover:bg-stone-50">
+      {/* Events table */}
+      <div className="mb-5 overflow-hidden rounded-[20px]" style={{ border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Recent events</h2>
+          <Link href="/admin/events" className="text-xs font-semibold uppercase tracking-[0.16em] transition hover:opacity-70" style={{ color: 'var(--brand)' }}>
             View all
           </Link>
         </div>
         {loading ? (
-          <div className="py-10 text-center text-sm text-[var(--muted)]">Loading...</div>
+          <div className="py-12 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
         ) : events.length === 0 ? (
-          <div className="py-10 text-center text-sm text-[var(--muted)]">No events yet.</div>
+          <div className="py-12 text-center text-sm" style={{ color: 'var(--muted)' }}>No events yet.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-stone-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-                <th className="px-5 py-3 text-left font-semibold">Name</th>
-                <th className="px-5 py-3 text-left font-semibold">Date</th>
-                <th className="px-5 py-3 text-left font-semibold">Venue</th>
-                <th className="px-5 py-3 text-left font-semibold">Guests</th>
+              <tr className="text-xs uppercase tracking-[0.16em]" style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}>
+                <th className="px-6 py-3 text-left font-semibold">Name</th>
+                <th className="px-6 py-3 text-left font-semibold">Date</th>
+                <th className="px-6 py-3 text-left font-semibold">Venue</th>
+                <th className="px-6 py-3 text-left font-semibold">Guests</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody>
               {events.slice(0, 5).map((ev) => (
-                <tr key={ev.id} className="hover:bg-stone-50/70">
-                  <td className="px-5 py-4 font-medium text-[var(--ink)]">{ev.name}</td>
-                  <td className="px-5 py-4 text-[var(--muted)]">{new Date(ev.date).toLocaleDateString()}</td>
-                  <td className="px-5 py-4 text-[var(--muted)]">{ev.venue || '--'}</td>
-                  <td className="px-5 py-4 text-[var(--muted)]">{ev.guest_count}</td>
+                <tr key={ev.id} className="transition-colors" style={{ borderTop: '1px solid var(--line)' }}>
+                  <td className="px-6 py-3.5 font-medium" style={{ color: 'var(--ink)' }}>{ev.name}</td>
+                  <td className="px-6 py-3.5" style={{ color: 'var(--muted)' }}>{new Date(ev.date).toLocaleDateString()}</td>
+                  <td className="px-6 py-3.5" style={{ color: 'var(--muted)' }}>{ev.venue || '--'}</td>
+                  <td className="px-6 py-3.5" style={{ color: 'var(--muted)' }}>{ev.guest_count}</td>
                 </tr>
               ))}
             </tbody>
@@ -102,16 +81,17 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Link href="/admin/guests/add" className="rounded-[26px] border border-stone-200 bg-[#fffaf0] px-6 py-5 transition hover:-translate-y-0.5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand)]">New registration</p>
-          <p className="mt-3 font-display text-3xl text-[var(--ink)]">Add Guest</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Register one guest manually and assign them to an event in a few fields.</p>
+      {/* Quick links */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/admin/guests/add" className="group rounded-[20px] px-6 py-6 transition hover:border-[var(--brand)]" style={{ border: '1px solid var(--line)', background: 'var(--bg)' }}>
+          <p className="text-xs font-semibold uppercase tracking-[0.20em]" style={{ color: 'var(--brand)' }}>New registration</p>
+          <p className="mt-3 font-display text-3xl" style={{ color: 'var(--ink-strong)' }}>Add Guest</p>
+          <p className="mt-2 text-sm leading-6 font-light" style={{ color: 'var(--muted)' }}>Register one guest manually and assign them to an event.</p>
         </Link>
-        <Link href="/admin/guests/bulk-upload" className="rounded-[26px] border border-stone-200 bg-[#eef7f5] px-6 py-5 transition hover:-translate-y-0.5">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand)]">Team import</p>
-          <p className="mt-3 font-display text-3xl text-[var(--ink)]">Bulk Upload</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Bring in larger guest lists, then let the system generate their assets for you.</p>
+        <Link href="/admin/guests/bulk-upload" className="group rounded-[20px] px-6 py-6 transition hover:border-[var(--brand)]" style={{ border: '1px solid var(--line)', background: 'var(--bg)' }}>
+          <p className="text-xs font-semibold uppercase tracking-[0.20em]" style={{ color: 'var(--brand)' }}>Team import</p>
+          <p className="mt-3 font-display text-3xl" style={{ color: 'var(--ink-strong)' }}>Bulk Upload</p>
+          <p className="mt-2 text-sm leading-6 font-light" style={{ color: 'var(--muted)' }}>Bring in larger guest lists, then let the system generate their assets.</p>
         </Link>
       </div>
     </div>
