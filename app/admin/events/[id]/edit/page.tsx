@@ -36,6 +36,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [selectedFont, setSelectedFont] = useState('')
   const [fontColor, setFontColor]       = useState('#ffffff')
   const [fontSizeFrac, setFontSizeFrac] = useState(0.05)
+  const [qrBgColor, setQrBgColor]       = useState('none')
 
   const [ticketTypes, setTicketTypes]         = useState<TicketTypeDef[]>([])
   const [requiredFields, setRequiredFields]   = useState<string[]>(['phone_number'])
@@ -56,6 +57,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         if (ev.name_font) setSelectedFont(String(ev.name_font))
         setFontColor(ev.name_font_color || '#ffffff')
         setFontSizeFrac(ev.name_font_size_fraction ?? 0.05)
+        setQrBgColor(ev.qr_bg_color || 'none')
         if (ev.ticket_types?.length)   setTicketTypes(ev.ticket_types as TicketTypeDef[])
         if (ev.required_fields?.length) setRequiredFields(ev.required_fields as string[])
         setWhatsappEnabled(ev.whatsapp_enabled ?? true)
@@ -109,12 +111,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     formData.append('name_font', selectedFont)
     formData.append('name_font_color',         fontColor)
     formData.append('name_font_size_fraction', String(fontSizeFrac))
+    formData.append('qr_bg_color',             qrBgColor)
     formData.append('ticket_types',    JSON.stringify(ticketTypes))
     formData.append('required_fields', JSON.stringify(requiredFields))
     formData.append('whatsapp_enabled', String(whatsappEnabled))
 
     try {
-      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: formData, credentials: 'include' })
+      const csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
+      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: formData, credentials: 'include', headers: { 'X-CSRFToken': csrfToken } })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.detail ?? JSON.stringify(err))
@@ -227,6 +231,53 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 {!nameZone && <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>}
               </>
             )}
+
+            {/* QR background */}
+            <div>
+              <label className={label}>QR Code Background</label>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { value: 'none',    label: 'None (transparent)' },
+                  { value: '#ffffff', label: 'White' },
+                  { value: '#000000', label: 'Black' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setQrBgColor(opt.value)}
+                    className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                    style={{
+                      borderColor: qrBgColor === opt.value ? 'var(--brand)' : 'var(--line)',
+                      background:  qrBgColor === opt.value ? 'var(--brand-soft)' : '#fff',
+                      color:       qrBgColor === opt.value ? 'var(--brand)' : 'var(--ink)',
+                    }}
+                  >
+                    {opt.value !== 'none' && (
+                      <span className="h-3 w-3 rounded-full border border-[var(--line)]"
+                        style={{ background: opt.value }} />
+                    )}
+                    {opt.label}
+                  </button>
+                ))}
+                {/* Custom colour */}
+                <label className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold cursor-pointer transition"
+                  style={{
+                    borderColor: !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand)' : 'var(--line)',
+                    background:  !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand-soft)' : '#fff',
+                    color:       !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand)' : 'var(--ink)',
+                  }}>
+                  <span className="h-3 w-3 rounded-full border border-[var(--line)]"
+                    style={{ background: !['none','#ffffff','#000000'].includes(qrBgColor) ? qrBgColor : '#eee' }} />
+                  Custom
+                  <input type="color" className="sr-only"
+                    value={['none','#ffffff','#000000'].includes(qrBgColor) ? '#ffffff' : qrBgColor}
+                    onChange={(e) => setQrBgColor(e.target.value)} />
+                </label>
+              </div>
+              <p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                Adds a solid colour pad behind the QR on the pass. Use white for dark templates, none for light ones.
+              </p>
+            </div>
           </div>
         </div>
 

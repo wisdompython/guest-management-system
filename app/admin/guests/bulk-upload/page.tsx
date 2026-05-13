@@ -64,10 +64,12 @@ export default function BulkUploadPage() {
     formData.append('csv_file', file)
 
     try {
+      const csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
       const res = await fetch(`${BASE_URL}/guests/bulk-upload/`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers: { 'X-CSRFToken': csrfToken },
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data))

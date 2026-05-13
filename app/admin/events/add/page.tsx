@@ -78,7 +78,8 @@ export default function AddEventPage() {
     formData.append('whatsapp_enabled', String(whatsappEnabled))
 
     try {
-      const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: formData, credentials: 'include' })
+      const csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
+      const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: formData, credentials: 'include', headers: { 'X-CSRFToken': csrfToken } })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.detail ?? JSON.stringify(err))

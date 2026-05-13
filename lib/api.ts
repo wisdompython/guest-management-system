@@ -1,8 +1,13 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
+function getCsrfToken(): string {
+  if (typeof document === 'undefined') return ''
+  return document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
     credentials: 'include',
     ...options,
   });
@@ -14,6 +19,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Auth
+  login: (username: string, password: string) =>
+    request<AuthUser>('/auth/login/', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () =>
+    request<void>('/auth/logout/', { method: 'POST' }),
+  me: () =>
+    request<AuthUser>('/auth/me/'),
+
+  // Users (super admin only)
+  getUsers: () =>
+    request<AuthUser[]>('/auth/users/'),
+  createUser: (data: CreateUserPayload) =>
+    request<AuthUser>('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id: number, data: Partial<Pick<AuthUser, 'email' | 'first_name' | 'last_name' | 'role' | 'is_active'>>) =>
+    request<AuthUser>(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteUser: (id: number) =>
+    request<void>(`/auth/users/${id}/`, { method: 'DELETE' }),
+
   // Guests
   getGuests: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -54,6 +77,29 @@ export const api = {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type UserRole = 'super_admin' | 'event_manager' | 'check_in_staff' | 'viewer';
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  role_display: string;
+  is_active: boolean;
+  date_joined: string;
+  last_login: string | null;
+}
+
+export interface CreateUserPayload {
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  password: string;
+}
 export type TicketType = string;
 export type GuestStatus = 'registered' | 'checked_in';
 
@@ -112,6 +158,7 @@ export interface Event {
   name_font_name: string | null;
   name_font_color: string;
   name_font_size_fraction: number;
+  qr_bg_color: string;
   ticket_types: TicketTypeDef[];
   required_fields: string[];
   whatsapp_enabled: boolean;

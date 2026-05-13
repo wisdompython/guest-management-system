@@ -221,7 +221,7 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
             <div className="p-6 flex flex-col items-center gap-3">
               {qrUrl ? (
                 <>
-                  <img src={qrUrl} alt="QR Code" className="w-44 h-44 rounded-[14px] border border-[var(--line)]" />
+                  <img src={qrUrl} alt="QR Code" className="w-44 h-44 rounded-[14px]" style={{ background: '#111', padding: '10px' }} />
                   <p className="text-xs text-[var(--muted)] font-mono break-all text-center leading-relaxed">ID: {guest.id}</p>
                 </>
               ) : (
