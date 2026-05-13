@@ -1,0 +1,10 @@
+# Normalise all text files to LF in the repo; no CRLF conversion on checkout
+* text=auto eol=lf
+
+# Treat uploaded media and compiled assets as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.pyc binary

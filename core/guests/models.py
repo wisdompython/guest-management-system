@@ -2,6 +2,15 @@ import uuid
 from django.db import models
 
 
+class Font(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    file = models.FileField(upload_to='fonts/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Event(models.Model):
     name = models.CharField(max_length=255)
     date = models.DateTimeField()
@@ -12,11 +21,41 @@ class Event(models.Model):
 
     # QR zone — stored as fractions (0.0–1.0) of the template dimensions so they
     # scale correctly regardless of the actual image resolution.
-    # Set via the visual QR zone selector in the event editor.
     qr_zone_x = models.FloatField(null=True, blank=True)
     qr_zone_y = models.FloatField(null=True, blank=True)
     qr_zone_w = models.FloatField(null=True, blank=True)
     qr_zone_h = models.FloatField(null=True, blank=True)
+
+    # Name zone — where the guest's name is drawn on the pass
+    name_zone_x = models.FloatField(null=True, blank=True)
+    name_zone_y = models.FloatField(null=True, blank=True)
+    name_zone_w = models.FloatField(null=True, blank=True)
+    name_zone_h = models.FloatField(null=True, blank=True)
+
+    # Name typography settings
+    name_font = models.ForeignKey(Font, null=True, blank=True, on_delete=models.SET_NULL, related_name='events')
+    name_font_color = models.CharField(max_length=20, default='#ffffff')
+    name_font_size_fraction = models.FloatField(default=0.05)  # fraction of template height
+
+    # QR backing — 'none' means no backing, any CSS hex like '#ffffff' adds a solid pad
+    QR_BG_NONE = 'none'
+    qr_bg_color = models.CharField(max_length=20, default='none', blank=True)
+
+    # Per-event guest configuration
+    # ticket_types: [{"value": "vip", "label": "VIP"}, ...]  — defines allowed ticket categories
+    ticket_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of {value, label} objects defining ticket categories for this event.',
+    )
+    # required_fields: subset of ["full_name", "phone_number", "email", "table_number", "seat_number"]
+    required_fields = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Guest fields that are required for this event.',
+    )
+    # When False, WhatsApp delivery is not expected and phone_number is not auto-required
+    whatsapp_enabled = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -25,25 +64,20 @@ class Event(models.Model):
 
 
 class Guest(models.Model):
-    class TicketType(models.TextChoices):
-        GENERAL = 'general', 'General'
-        VIP = 'vip', 'VIP'
-        VVIP = 'vvip', 'VVIP'
-
     class Status(models.TextChoices):
         REGISTERED = 'registered', 'Registered'
         CHECKED_IN = 'checked_in', 'Checked In'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # Required fields
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='guests')
     full_name = models.CharField(max_length=255)
-    phone_number = models.CharField(max_length=20)
+    # phone_number is optional at the DB level; required-ness is governed by event.required_fields
+    phone_number = models.CharField(max_length=20, blank=True)
 
-    # Optional fields
     email = models.EmailField(blank=True)
-    ticket_type = models.CharField(max_length=20, choices=TicketType.choices, default=TicketType.GENERAL)
+    # ticket_type is a free-text field validated against event.ticket_types at the API level
+    ticket_type = models.CharField(max_length=50, blank=True, default='general')
     table_number = models.CharField(max_length=50, blank=True)
     seat_number = models.CharField(max_length=50, blank=True)
 
@@ -59,7 +93,7 @@ class Guest(models.Model):
     registered_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.full_name} ({self.ticket_type})"
+        return f"{self.full_name} — {self.ticket_type or 'guest'}"
 
 
 class BulkUpload(models.Model):
@@ -72,7 +106,7 @@ class BulkUpload(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='bulk_uploads')
     csv_file = models.FileField(upload_to='bulk_uploads/')
     uploaded_by = models.ForeignKey(
-        'auth.User', on_delete=models.SET_NULL, null=True, blank=True
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True
     )
     status = models.CharField(max_length=20, choices=UploadStatus.choices, default=UploadStatus.PENDING)
     total_rows = models.PositiveIntegerField(default=0)

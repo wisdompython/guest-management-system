@@ -1,37 +1,40 @@
 import io
 import logging
 import qrcode
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
 
 def build_qr_payload(guest) -> str:
-    event_name = guest.event.name if guest.event else 'Unknown Event'
-    return (
-        f"EVENT: {event_name}\n"
-        f"GUEST: {guest.full_name}\n"
-        f"ID: {guest.id}"
-    )
+    event_name = guest.event.name if guest.event else ''
+    parts = [str(guest.id), guest.full_name]
+    if event_name:
+        parts.append(event_name)
+    if guest.ticket_type:
+        parts.append(guest.ticket_type.upper())
+    return '|'.join(parts)
 
 
 def generate_qr_code(guest) -> bool:
     """
     Generate a QR code for the guest and save it.
+    Always black-on-white so the standalone file is universally readable
+    (email, print, download). Contrast on the pass is handled at composite time.
     Returns True on success, False on failure (logs the error).
     """
     try:
         qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=12,
             border=4,
         )
         qr.add_data(build_qr_payload(guest))
         qr.make(fit=True)
 
-        img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+        img = qr.make_image(fill_color="black", back_color="white").convert('RGBA')
 
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
@@ -46,9 +49,63 @@ def generate_qr_code(guest) -> bool:
         return False
 
 
+def _parse_color(hex_color: str):
+    """Convert a hex color string like #ffffff or #fff to an (R, G, B) tuple."""
+    h = hex_color.lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    try:
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return (255, 255, 255)
+
+
+def _draw_name_in_zone(draw: ImageDraw.ImageDraw, name: str, zone_px: dict,
+                       font_path: str | None, font_color: str, font_size: int):
+    """
+    Draw `name` centred inside zone_px (keys: x, y, w, h in pixels).
+    Shrinks font size until the text fits horizontally.
+    """
+    color = _parse_color(font_color)
+    zone_w = zone_px['w']
+    zone_h = zone_px['h']
+
+    # Try loading the custom font; fall back to PIL's built-in bitmap font
+    def load_font(size):
+        if font_path:
+            try:
+                return ImageFont.truetype(font_path, size)
+            except Exception:
+                pass
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:
+            return ImageFont.load_default()
+
+    # Shrink until the name fits within zone width
+    size = max(font_size, 8)
+    pil_font = load_font(size)
+    bbox = pil_font.getbbox(name)
+    text_w = bbox[2] - bbox[0]
+    while text_w > zone_w * 0.95 and size > 8:
+        size -= 2
+        pil_font = load_font(size)
+        bbox = pil_font.getbbox(name)
+        text_w = bbox[2] - bbox[0]
+
+    text_h = bbox[3] - bbox[1]
+
+    # Centre the text inside the zone box
+    x = zone_px['x'] + (zone_w - text_w) / 2 - bbox[0]
+    y = zone_px['y'] + (zone_h - text_h) / 2 - bbox[1]
+
+    draw.text((x, y), name, font=pil_font, fill=color)
+
+
 def generate_pass_image(guest) -> bool:
     """
-    Composite the guest's QR code onto the event design template.
+    Composite the guest's QR code onto the event design template,
+    then draw the guest's name in the name zone if configured.
     Returns True on success, False on failure (logs the error).
     """
     try:
@@ -66,6 +123,7 @@ def generate_pass_image(guest) -> bool:
         event = guest.event
         tw, th = template.width, template.height
 
+        # ── Place QR code ──────────────────────────────────────────────────────
         if all(v is not None for v in [event.qr_zone_x, event.qr_zone_y, event.qr_zone_w, event.qr_zone_h]):
             x = int(event.qr_zone_x * tw)
             y = int(event.qr_zone_y * th)
@@ -83,7 +141,46 @@ def generate_pass_image(guest) -> bool:
         qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
 
         composite = template.copy()
+
+        qr_bg = (event.qr_bg_color or 'none').strip().lower()
+        if qr_bg != 'none':
+            # User-chosen backing colour — parse hex and draw a rounded rectangle behind the QR
+            bg_rgb = _parse_color(qr_bg)
+            pad = max(6, qr_size // 20)
+            backing_size = (qr_size + pad * 2, qr_size + pad * 2)
+            backing = Image.new('RGBA', backing_size, (*bg_rgb, 255))
+            mask = Image.new('L', backing_size, 0)
+            ImageDraw.Draw(mask).rounded_rectangle(
+                [(0, 0), (backing_size[0] - 1, backing_size[1] - 1)],
+                radius=pad * 2, fill=255,
+            )
+            backing.putalpha(mask)
+            composite.paste(backing, (x - pad, y - pad), backing)
+
         composite.paste(qr_img, (x, y), qr_img)
+
+        # ── Draw guest name ────────────────────────────────────────────────────
+        if all(v is not None for v in [event.name_zone_x, event.name_zone_y,
+                                       event.name_zone_w, event.name_zone_h]):
+            font_path = None
+            if event.name_font and event.name_font.file:
+                try:
+                    font_path = event.name_font.file.path
+                except Exception:
+                    pass
+
+            font_size = max(8, int(event.name_font_size_fraction * th))
+            font_color = event.name_font_color or '#ffffff'
+
+            zone_px = {
+                'x': int(event.name_zone_x * tw),
+                'y': int(event.name_zone_y * th),
+                'w': int(event.name_zone_w * tw),
+                'h': int(event.name_zone_h * th),
+            }
+
+            draw = ImageDraw.Draw(composite)
+            _draw_name_in_zone(draw, guest.full_name, zone_px, font_path, font_color, font_size)
 
         buffer = io.BytesIO()
         composite.convert('RGB').save(buffer, format='PNG')

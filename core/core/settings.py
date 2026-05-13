@@ -23,8 +23,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     # Local
+    'accounts',
     'guests',
 ]
+
+AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -105,7 +108,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001'
+    'http://localhost:3000,http://127.0.0.1:3000,'
+    'http://localhost:3001,http://127.0.0.1:3001,'
+    'http://localhost:3003,http://127.0.0.1:3003'
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
@@ -113,19 +118,20 @@ CORS_ALLOW_CREDENTIALS = True
 # Trusted origins for CSRF (needed for POST/PUT/DELETE from browser)
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001'
+    'http://localhost:3000,http://127.0.0.1:3000,'
+    'http://localhost:3001,http://127.0.0.1:3001,'
+    'http://localhost:3003,http://127.0.0.1:3003'
 ).split(',')
 
 # ---------------------------------------------------------------------------
 # Django REST Framework
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
-    # No authentication enforced at API level for MVP.
-    # SessionAuthentication enforces CSRF — removing it here allows browser
-    # clients to POST without a CSRF token. Add token auth before production.
-    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'accounts.permissions.IsAuthenticatedAnyRole',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,

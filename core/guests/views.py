@@ -1,30 +1,58 @@
+import csv
 import logging
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 
-from .models import Event, Guest, BulkUpload
+from .models import Event, Guest, BulkUpload, Font
 from .serializers import (
     EventSerializer, GuestSerializer, GuestListSerializer,
-    BulkGuestUploadSerializer, BulkUploadSerializer,
+    BulkGuestUploadSerializer, BulkUploadSerializer, FontSerializer,
 )
 from .utils import generate_qr_code, generate_pass_image
+from accounts.permissions import (
+    IsAuthenticatedAnyRole,
+    IsEventManagerOrAbove,
+    IsCheckInStaffOrAbove,
+    ReadOnlyOrEventManager,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class FontViewSet(viewsets.ModelViewSet):
+    queryset = Font.objects.all().order_by('name')
+    serializer_class = FontSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsEventManagerOrAbove]
 
 
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all().order_by('-date')
     serializer_class = EventSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [ReadOnlyOrEventManager]
 
 
 class GuestViewSet(viewsets.ModelViewSet):
     queryset = Guest.objects.select_related('event').all().order_by('-registered_at')
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        """
+        list/retrieve/scan/export  → any authenticated user
+        check_in                   → check-in staff or above
+        create/update/delete/bulk  → event manager or above
+        """
+        if self.action in ('list', 'retrieve', 'scan', 'export'):
+            return [IsAuthenticatedAnyRole()]
+        if self.action == 'check_in':
+            return [IsCheckInStaffOrAbove()]
+        return [IsEventManagerOrAbove()]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -47,12 +75,10 @@ class GuestViewSet(viewsets.ModelViewSet):
         self._generate_assets(guest)
 
     def _generate_assets(self, guest) -> dict:
-        """Generate QR and pass image. Returns dict with per-asset success flags."""
         results = {'qr': False, 'pass': False}
         results['qr'] = generate_qr_code(guest)
         if not results['qr']:
             logger.warning("QR generation skipped or failed for guest %s", guest.id)
-        # Refresh from DB so pass generation can find the newly saved qr_code path
         guest.refresh_from_db(fields=['qr_code'])
         if guest.event and guest.event.design_template and guest.qr_code:
             results['pass'] = generate_pass_image(guest)
@@ -62,7 +88,6 @@ class GuestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='regenerate_assets')
     def regenerate_assets(self, request, pk=None):
-        """Manually retry QR + pass generation for a guest (e.g. after template upload)."""
         guest = self.get_object()
         results = self._generate_assets(guest)
         guest.refresh_from_db()
@@ -91,14 +116,9 @@ class GuestViewSet(viewsets.ModelViewSet):
         if not token:
             return Response({'detail': 'token required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Support both legacy plain-UUID tokens and the current structured payload:
-        # "EVENT: ...\nGUEST: ...\nID: <uuid>"
-        guest_id = token.strip()
-        if '\n' in guest_id:
-            for line in guest_id.splitlines():
-                if line.startswith('ID:'):
-                    guest_id = line.split('ID:', 1)[1].strip()
-                    break
+        # Support both "uuid|name|event|ticket" and plain uuid
+        raw = token.strip()
+        guest_id = raw.split('|')[0] if '|' in raw else raw
 
         try:
             guest = Guest.objects.select_related('event').get(id=guest_id)
@@ -118,13 +138,12 @@ class GuestViewSet(viewsets.ModelViewSet):
         upload_record = BulkUpload.objects.create(
             event=event,
             csv_file=csv_file,
-            uploaded_by=None,
+            uploaded_by=request.user if request.user.is_authenticated else None,
             status=BulkUpload.UploadStatus.PROCESSING,
         )
 
         valid_rows, error_report = serializer.parse()
 
-        # TODO: move asset generation into a background task (Celery/Django-Q) for large batches.
         created_guests = []
         asset_failures = []
         for row in valid_rows:
@@ -161,3 +180,51 @@ class GuestViewSet(viewsets.ModelViewSet):
             'asset_warnings': asset_failures,
             'guest_ids': created_guests,
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        qs = self.get_queryset()
+
+        event_id = request.query_params.get('event')
+        if event_id:
+            qs = qs.filter(event_id=event_id)
+
+        status_param = request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+
+        try:
+            event = Event.objects.get(pk=event_id) if event_id else None
+        except Event.DoesNotExist:
+            event = None
+        event_slug = event.name.replace(' ', '_') if event else 'all_events'
+        filename = f"guests_{event_slug}.csv"
+
+        columns = [
+            'full_name', 'email', 'phone_number',
+            'ticket_type', 'table_number', 'seat_number',
+            'status', 'registered_at', 'checked_in_at',
+            'whatsapp_sent', 'event',
+        ]
+
+        def row_iter():
+            yield columns
+            for g in qs.select_related('event').iterator():
+                yield [
+                    g.full_name, g.email, g.phone_number,
+                    g.get_ticket_type_display(), g.table_number, g.seat_number,
+                    g.get_status_display(),
+                    g.registered_at.strftime('%Y-%m-%d %H:%M') if g.registered_at else '',
+                    g.checked_in_at.strftime('%Y-%m-%d %H:%M') if g.checked_in_at else '',
+                    'Yes' if g.whatsapp_sent else 'No',
+                    g.event.name if g.event else '',
+                ]
+
+        class EchoBuffer:
+            def write(self, value): return value
+
+        writer = csv.writer(EchoBuffer())
+        rows = (writer.writerow(r) for r in row_iter())
+        response = StreamingHttpResponse(rows, content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
