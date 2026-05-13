@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Event, Font } from '@/lib/api'
-import ZoneSelector from '@/components/ZoneSelector'
-import type { Zone } from '@/components/ZoneSelector'
+import EventConfigPanel from '@/components/EventConfigPanel'
+import type { TicketTypeDef } from '@/components/EventConfigPanel'
+import NameTypographyPanel from '@/components/NameTypographyPanel'
+import { DualZoneCanvas, ZoneLegendItem, ZoneWarning } from '@/components/PassDesignPanel'
+import type { Zone } from '@/components/PassDesignPanel'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
@@ -16,42 +19,46 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [event, setEvent]   = useState<Event | null>(null)
+  const [event, setEvent]     = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError]     = useState('')
 
-  const [previewUrl, setPreviewUrl]     = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl]       = useState<string | null>(null)
   const [newFileChosen, setNewFileChosen] = useState(false)
 
-  const [qrZone, setQrZone]       = useState<Zone | null>(null)
-  const [qrTouched, setQrTouched] = useState(false)
-  const [nameZone, setNameZone]   = useState<Zone | null>(null)
+  const [qrZone, setQrZone]         = useState<Zone | null>(null)
+  const [qrTouched, setQrTouched]   = useState(false)
+  const [nameZone, setNameZone]     = useState<Zone | null>(null)
   const [nameTouched, setNameTouched] = useState(false)
 
   const [fonts, setFonts]               = useState<Font[]>([])
-  const [selectedFont, setSelectedFont] = useState<string>('')
+  const [selectedFont, setSelectedFont] = useState('')
   const [fontColor, setFontColor]       = useState('#ffffff')
   const [fontSizeFrac, setFontSizeFrac] = useState(0.05)
+
+  const [ticketTypes, setTicketTypes]         = useState<TicketTypeDef[]>([])
+  const [requiredFields, setRequiredFields]   = useState<string[]>(['phone_number'])
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true)
 
   useEffect(() => {
     Promise.all([api.getEvent(Number(id)), api.getFonts()])
       .then(([ev, fts]) => {
         setEvent(ev)
         setFonts(fts)
-
-        if (ev.qr_zone_x != null && ev.qr_zone_y != null &&
-            ev.qr_zone_w != null && ev.qr_zone_h != null) {
+        if (ev.qr_zone_x != null && ev.qr_zone_y != null && ev.qr_zone_w != null && ev.qr_zone_h != null) {
           setQrZone({ x: ev.qr_zone_x, y: ev.qr_zone_y, w: ev.qr_zone_w, h: ev.qr_zone_h })
         }
-        if (ev.name_zone_x != null && ev.name_zone_y != null &&
-            ev.name_zone_w != null && ev.name_zone_h != null) {
+        if (ev.name_zone_x != null && ev.name_zone_y != null && ev.name_zone_w != null && ev.name_zone_h != null) {
           setNameZone({ x: ev.name_zone_x, y: ev.name_zone_y, w: ev.name_zone_w, h: ev.name_zone_h })
         }
         if (ev.design_template) setPreviewUrl(ev.design_template)
-        if (ev.name_font)  setSelectedFont(String(ev.name_font))
+        if (ev.name_font) setSelectedFont(String(ev.name_font))
         setFontColor(ev.name_font_color || '#ffffff')
         setFontSizeFrac(ev.name_font_size_fraction ?? 0.05)
+        if (ev.ticket_types?.length)   setTicketTypes(ev.ticket_types as TicketTypeDef[])
+        if (ev.required_fields?.length) setRequiredFields(ev.required_fields as string[])
+        setWhatsappEnabled(ev.whatsapp_enabled ?? true)
       })
       .catch(() => setError('Could not load event.'))
       .finally(() => setLoading(false))
@@ -78,8 +85,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     formData.append('venue',       (form.elements.namedItem('venue')       as HTMLInputElement).value)
     formData.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
 
-    const fileInput = fileInputRef.current
-    if (fileInput?.files?.[0]) formData.append('design_template', fileInput.files[0])
+    if (fileInputRef.current?.files?.[0]) formData.append('design_template', fileInputRef.current.files[0])
 
     if (qrTouched) {
       if (qrZone) {
@@ -101,13 +107,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     }
 
     formData.append('name_font', selectedFont)
-    formData.append('name_font_color', fontColor)
+    formData.append('name_font_color',         fontColor)
     formData.append('name_font_size_fraction', String(fontSizeFrac))
+    formData.append('ticket_types',    JSON.stringify(ticketTypes))
+    formData.append('required_fields', JSON.stringify(requiredFields))
+    formData.append('whatsapp_enabled', String(whatsappEnabled))
 
     try {
-      const res = await fetch(`${BASE_URL}/events/${id}/`, {
-        method: 'PATCH', body: formData, credentials: 'include',
-      })
+      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: formData, credentials: 'include' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.detail ?? JSON.stringify(err))
@@ -151,7 +158,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* ── Event details ── */}
+        {/* Event details */}
         <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] px-6 py-4">
             <h2 className="text-sm font-semibold text-[var(--ink)]">Event Details</h2>
@@ -176,13 +183,12 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
 
-        {/* ── Design template & zones ── */}
+        {/* Pass design & zones */}
         <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] px-6 py-4">
             <h2 className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
             <p className="mt-0.5 text-xs text-[var(--muted)]">Leave the file picker empty to keep the existing design.</p>
           </div>
-
           <div className="space-y-5 p-6">
             {event.design_template && !newFileChosen && (
               <div className="flex items-center gap-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-4 py-2.5">
@@ -193,7 +199,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 </a>
               </div>
             )}
-
             <div>
               <label className={label}>{newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)'}</label>
               <input
@@ -211,7 +216,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   <ZoneLegendItem color="#6366f1" label="QR Zone" set={!!qrZone} />
                   <ZoneLegendItem color="#10b981" label="Name Zone" set={!!nameZone} />
                 </div>
-
                 <DualZoneCanvas
                   imageUrl={previewUrl}
                   qrZone={qrZone}
@@ -219,72 +223,42 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   nameZone={nameZone}
                   onNameChange={(z) => { setNameZone(z); setNameTouched(true) }}
                 />
-
-                {!qrZone && (
-                  <ZoneWarning>No QR zone — will fall back to bottom-right corner.</ZoneWarning>
-                )}
-                {!nameZone && (
-                  <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>
-                )}
+                {!qrZone && <ZoneWarning>No QR zone — will fall back to bottom-right corner.</ZoneWarning>}
+                {!nameZone && <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>}
               </>
             )}
           </div>
         </div>
 
-        {/* ── Name typography ── */}
+        {/* Guest configuration */}
         <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Name Typography</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
-              Controls how the guest name is rendered inside the name zone.
-              <a href="/admin/fonts" className="ml-1 font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Manage fonts →</a>
-            </p>
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">Set ticket categories, required fields, and delivery options for this event.</p>
           </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-3">
-            <div>
-              <label className={label}>Font</label>
-              <select value={selectedFont} onChange={(e) => setSelectedFont(e.target.value)} className={field}>
-                <option value="">Default (system)</option>
-                {fonts.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={label}>Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={fontColor}
-                  onChange={(e) => setFontColor(e.target.value)}
-                  className="h-10 w-10 flex-shrink-0 cursor-pointer rounded-lg border p-0.5"
-                  style={{ borderColor: 'var(--line)' }}
-                />
-                <input
-                  type="text"
-                  value={fontColor}
-                  onChange={(e) => setFontColor(e.target.value)}
-                  maxLength={7}
-                  placeholder="#ffffff"
-                  className={`${field} flex-1`}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={label}>
-                Size — {(fontSizeFrac * 100).toFixed(1)}% of height
-              </label>
-              <input
-                type="range"
-                min={0.02} max={0.15} step={0.005}
-                value={fontSizeFrac}
-                onChange={(e) => setFontSizeFrac(Number(e.target.value))}
-                className="mt-1 w-full accent-[var(--brand)]"
-              />
-              <div className="mt-1 flex justify-between text-[10px]" style={{ color: 'var(--muted-2)' }}>
-                <span>Smaller</span><span>Larger</span>
-              </div>
-            </div>
+          <div className="p-6">
+            <EventConfigPanel
+              ticketTypes={ticketTypes}
+              requiredFields={requiredFields}
+              whatsappEnabled={whatsappEnabled}
+              onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
+                if (tt !== undefined) setTicketTypes(tt)
+                if (rf !== undefined) setRequiredFields(rf)
+                if (wa !== undefined) setWhatsappEnabled(wa)
+              }}
+            />
           </div>
         </div>
+
+        <NameTypographyPanel
+          fonts={fonts}
+          selectedFont={selectedFont}
+          fontColor={fontColor}
+          fontSizeFrac={fontSizeFrac}
+          onFontChange={setSelectedFont}
+          onColorChange={setFontColor}
+          onSizeChange={setFontSizeFrac}
+        />
 
         <div className="flex gap-3 pt-1">
           <button type="submit" disabled={submitting}
@@ -297,88 +271,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           </button>
         </div>
       </form>
-    </div>
-  )
-}
-
-// ── Helper components (shared between add + edit) ──────────────────────────────
-
-function ZoneLegendItem({ color, label, set }: { color: string; label: string; set: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: color, opacity: set ? 1 : 0.3 }} />
-      <span className={set ? 'font-semibold' : ''} style={{ color: set ? 'var(--ink)' : 'var(--muted-2)' }}>
-        {label} {set ? '✓' : '(not set)'}
-      </span>
-    </div>
-  )
-}
-
-function ZoneWarning({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 rounded-[10px] border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-600">
-      <span>⚠</span> {children}
-    </div>
-  )
-}
-
-function DualZoneCanvas({
-  imageUrl,
-  qrZone, onQrChange,
-  nameZone, onNameChange,
-}: {
-  imageUrl: string
-  qrZone: Zone | null
-  onQrChange: (z: Zone | null) => void
-  nameZone: Zone | null
-  onNameChange: (z: Zone | null) => void
-}) {
-  const [active, setActive] = useState<'qr' | 'name'>('qr')
-
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        {(['qr', 'name'] as const).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setActive(mode)}
-            className="rounded-full border px-4 py-1.5 text-xs font-semibold transition"
-            style={{
-              background: active === mode ? (mode === 'qr' ? '#6366f1' : '#10b981') : '#fff',
-              borderColor: active === mode ? (mode === 'qr' ? '#6366f1' : '#10b981') : 'var(--line)',
-              color: active === mode ? '#fff' : 'var(--muted)',
-            }}
-          >
-            {mode === 'qr' ? 'Draw QR Zone' : 'Draw Name Zone'}
-          </button>
-        ))}
-      </div>
-
-      {active === 'qr' && (
-        <ZoneSelector
-          imageUrl={imageUrl}
-          zone={qrZone}
-          onChange={onQrChange}
-          label="QR Zone"
-          color="indigo"
-          borderColor="#6366f1"
-          bgColor="rgba(99,102,241,0.10)"
-          dotColor="#6366f1"
-        />
-      )}
-      {active === 'name' && (
-        <ZoneSelector
-          imageUrl={imageUrl}
-          zone={nameZone}
-          onChange={onNameChange}
-          label="Name Zone"
-          color="emerald"
-          borderColor="#10b981"
-          bgColor="rgba(16,185,129,0.10)"
-          dotColor="#10b981"
-        />
-      )}
     </div>
   )
 }

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { api, Guest, Event } from '@/lib/api'
+import ExportDropdown from '@/components/ExportDropdown'
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 const TICKET_LABELS: Record<string, string> = { general: 'General', vip: 'VIP', vvip: 'VVIP' }
 
 export default function GuestsPage() {
@@ -15,13 +15,7 @@ export default function GuestsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [ticketFilter, setTicketFilter] = useState('')
   const [deleting, setDeleting]         = useState<string | null>(null)
-
-  // Export panel state
-  const [exportOpen, setExportOpen]     = useState(false)
   const [events, setEvents]             = useState<Event[]>([])
-  const [exportEvent, setExportEvent]   = useState('')
-  const [exportStatus, setExportStatus] = useState('')
-  const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -35,34 +29,9 @@ export default function GuestsPage() {
       .finally(() => setLoading(false))
   }, [search, statusFilter, ticketFilter])
 
-  // Load events once for the export dropdown
   useEffect(() => {
     api.getEvents().then(setEvents).catch(console.error)
   }, [])
-
-  // Close export panel on outside click
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setExportOpen(false)
-      }
-    }
-    if (exportOpen) document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [exportOpen])
-
-  function buildExportUrl() {
-    const params = new URLSearchParams()
-    if (exportEvent)  params.set('event',  exportEvent)
-    if (exportStatus) params.set('status', exportStatus)
-    const qs = params.toString()
-    return `${BASE_URL}/guests/export/${qs ? '?' + qs : ''}`
-  }
-
-  function handleExportDownload() {
-    window.location.href = buildExportUrl()
-    setExportOpen(false)
-  }
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Remove ${name} from the guest list?`)) return
@@ -91,92 +60,7 @@ export default function GuestsPage() {
             + Add Guest
           </Link>
 
-          {/* Export dropdown */}
-          <div className="relative" ref={exportRef}>
-            <button
-              onClick={() => setExportOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-              style={{ background: 'var(--brand)' }}
-            >
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              Export CSV
-              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                style={{ opacity: 0.7, transform: exportOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </button>
-
-            {exportOpen && (
-              <div
-                className="absolute right-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-[14px] shadow-xl"
-                style={{ border: '1px solid var(--line)', background: '#fff' }}
-              >
-                <div className="border-b px-4 py-3.5" style={{ borderColor: 'var(--line)' }}>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Export Guest List</p>
-                  <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Download as CSV. Leave filters blank to export everyone.</p>
-                </div>
-
-                <div className="space-y-3 p-4">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-                      Event
-                    </label>
-                    <select
-                      value={exportEvent}
-                      onChange={(e) => setExportEvent(e.target.value)}
-                      className="w-full rounded-[10px] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                      style={{ borderColor: 'var(--line)', color: 'var(--ink)' }}
-                    >
-                      <option value="">All events</option>
-                      {events.map((ev) => (
-                        <option key={ev.id} value={ev.id}>{ev.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-                      Status
-                    </label>
-                    <select
-                      value={exportStatus}
-                      onChange={(e) => setExportStatus(e.target.value)}
-                      className="w-full rounded-[10px] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                      style={{ borderColor: 'var(--line)', color: 'var(--ink)' }}
-                    >
-                      <option value="">All statuses</option>
-                      <option value="registered">Pending</option>
-                      <option value="checked_in">Checked-in</option>
-                    </select>
-                  </div>
-
-                  {/* Preview of what will be exported */}
-                  <div className="rounded-[10px] px-3 py-2.5 text-xs" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
-                    Columns: Name · Email · Phone · Ticket · Table · Seat · Status · Registered · Checked-in · WhatsApp · Event
-                  </div>
-                </div>
-
-                <div className="border-t px-4 py-3" style={{ borderColor: 'var(--line)' }}>
-                  <button
-                    onClick={handleExportDownload}
-                    className="flex w-full items-center justify-center gap-2 rounded-[10px] py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-                    style={{ background: 'var(--brand)' }}
-                  >
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Download CSV
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <ExportDropdown events={events} />
         </div>
       </div>
 

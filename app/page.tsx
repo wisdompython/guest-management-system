@@ -132,22 +132,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Stats band ── */}
-      <div style={{ background: 'var(--brand)' }}>
-        <div className="mx-auto grid max-w-6xl grid-cols-3 divide-x px-6 py-12 sm:px-10" style={{ '--tw-divide-opacity': '0.25' } as React.CSSProperties}>
-          {[
-            { value: '1M+',   label: 'GUESTS MANAGED' },
-            { value: '99.9%', label: 'DELIVERY RATE' },
-            { value: '100+',  label: 'ENTERPRISE EVENTS' },
-          ].map(({ value, label }) => (
-            <div key={value} className="px-6 text-center first:pl-0 last:pr-0">
-              <p className="text-4xl font-extrabold text-white sm:text-5xl">{value}</p>
-              <p className="mt-1.5 text-[11px] font-semibold tracking-[0.22em]" style={{ color: 'rgba(255,255,255,0.60)' }}>{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ── Feature cards ── */}
       <section className="mx-auto max-w-6xl px-6 py-20 sm:px-10">
         <div className="mb-12 text-center">

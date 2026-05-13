@@ -54,7 +54,7 @@ export const api = {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type TicketType = 'general' | 'vip' | 'vvip';
+export type TicketType = string;
 export type GuestStatus = 'registered' | 'checked_in';
 
 export interface Guest {
@@ -88,6 +88,11 @@ export type CreateGuestPayload = Pick<
   'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'event'
 >;
 
+export interface TicketTypeDef {
+  value: string;
+  label: string;
+}
+
 export interface Event {
   id: number;
   name: string;
@@ -107,6 +112,9 @@ export interface Event {
   name_font_name: string | null;
   name_font_color: string;
   name_font_size_fraction: number;
+  ticket_types: TicketTypeDef[];
+  required_fields: string[];
+  whatsapp_enabled: boolean;
   guest_count: number;
   created_at: string;
 }

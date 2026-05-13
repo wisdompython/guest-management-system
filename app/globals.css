@@ -1,32 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Exact tones from the reference image ── */
-  --bg:           #f0f2f5;        /* page background: light blue-grey */
+  /* ── TWS Cards luxury palette ── */
+  --bg:           #faf8f4;        /* warm cream page background */
   --panel:        #ffffff;
-  --ink:          #0d1117;        /* near-black headings */
-  --ink-2:        #1c2a3a;
-  --muted:        #5a6a7a;
-  --muted-2:      #8a9ab0;
-  --line:         #dde3ea;
+  --ink:          #1a1612;        /* deep warm near-black */
+  --ink-2:        #2e2a24;
+  --muted:        #6b6359;        /* warm brown-grey */
+  --muted-2:      #9e9488;        /* lighter warm muted */
+  --line:         #e8e2d9;        /* warm stone divider */
 
-  --brand:        #1a3ed4;        /* cobalt blue — primary CTA, active nav */
-  --brand-strong: #1430a8;
-  --brand-soft:   #e8edfb;        /* light blue tint for badges/pills */
+  --brand:        #b8913f;        /* warm gold — primary CTA */
+  --brand-strong: #9a7830;        /* deeper gold for hover */
+  --brand-soft:   #f5edd8;        /* pale gold tint for badges */
 
-  --sidebar:      #0f1b2d;        /* dark navy sidebar */
-  --sidebar-2:    #162436;        /* slightly lighter for hover */
-  --sidebar-line: rgba(255,255,255,0.07);
+  --sidebar:      #1c1a18;        /* deep warm charcoal */
+  --sidebar-2:    #26231f;        /* slightly lighter for hover */
+  --sidebar-line: rgba(255,255,255,0.06);
 
-  --success:      #16a34a;
-  --success-bg:   #dcfce7;
-  --warn:         #b45309;
-  --warn-bg:      #fef3c7;
-  --danger:       #dc2626;
-  --danger-bg:    #fee2e2;
+  --success:      #3d7c52;
+  --success-bg:   #eaf4ee;
+  --warn:         #a0620e;
+  --warn-bg:      #fef4e0;
+  --danger:       #c0392b;
+  --danger-bg:    #fdecea;
 
   --font-sans:    var(--loaded-sans, 'Inter', 'Segoe UI', system-ui, sans-serif);
-  --font-display: var(--loaded-display, 'Inter', 'Segoe UI', system-ui, sans-serif);
+  --font-display: var(--loaded-display, 'Georgia', 'Times New Roman', serif);
 }
 
 html, body {
@@ -39,7 +39,7 @@ html, body {
 }
 
 ::selection {
-  background: rgba(26, 62, 212, 0.15);
+  background: rgba(184, 145, 63, 0.18);
 }
 
 .font-display {
@@ -62,7 +62,7 @@ html, body {
 
 /* Gradient text */
 .grad-text {
-  background: linear-gradient(120deg, #1a3ed4 0%, #4f7fff 50%, #1a3ed4 100%);
+  background: linear-gradient(120deg, #b8913f 0%, #d4aa60 50%, #b8913f 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

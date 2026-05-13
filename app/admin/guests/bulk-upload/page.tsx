@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react'
 import { api, Event } from '@/lib/api'
 
+function eventRequiredCols(ev: Event | null): string[] {
+  if (!ev) return ['full_name', 'phone_number']
+  const base = ['full_name']
+  const rf: string[] = ev.required_fields ?? []
+  if (ev.whatsapp_enabled && !rf.includes('phone_number')) base.push('phone_number')
+  return [...new Set([...base, ...rf])]
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
 const field = 'w-full rounded-[12px] border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
@@ -18,14 +26,25 @@ interface UploadResult {
 }
 
 export default function BulkUploadPage() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState<UploadResult | null>(null)
-  const [error, setError] = useState('')
+  const [events, setEvents]           = useState<Event[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [submitting, setSubmitting]   = useState(false)
+  const [result, setResult]           = useState<UploadResult | null>(null)
+  const [error, setError]             = useState('')
 
   useEffect(() => {
     api.getEvents().then(setEvents).catch(console.error)
   }, [])
+
+  function handleEventChange(id: string) {
+    setSelectedEvent(events.find((e) => String(e.id) === id) ?? null)
+  }
+
+  const requiredCols = eventRequiredCols(selectedEvent)
+  const optionalCols = ['email', 'ticket_type', 'table_number', 'seat_number'].filter(
+    (c) => !requiredCols.includes(c)
+  )
+  const ticketTypes = selectedEvent?.ticket_types as { value: string; label: string }[] | undefined
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -68,9 +87,7 @@ export default function BulkUploadPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Team import</p>
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Bulk Upload</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Import a guest list from CSV. Required columns:{' '}
-          <code className="rounded bg-[var(--bg)] px-1.5 py-0.5 font-mono text-xs">full_name</code>,{' '}
-          <code className="rounded bg-[var(--bg)] px-1.5 py-0.5 font-mono text-xs">phone_number</code>.
+          Import a guest list from CSV. Select an event first — required columns update automatically.
         </p>
       </div>
 
@@ -105,13 +122,57 @@ export default function BulkUploadPage() {
         <div className="space-y-4 p-6">
           <div>
             <label className={label}>Event *</label>
-            <select name="event" required className={field}>
+            <select name="event" required className={field}
+              onChange={(e) => handleEventChange(e.target.value)}>
               <option value="">Select an event…</option>
               {events.map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.name}</option>
               ))}
             </select>
           </div>
+
+          {/* Live config summary — updates when event is chosen */}
+          {selectedEvent && (
+            <div className="rounded-[12px] space-y-3 border border-[var(--line)] bg-[var(--bg)] px-4 py-3.5 text-xs">
+              <div>
+                <p className="mb-1.5 font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>Required columns</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {requiredCols.map((c) => (
+                    <code key={c} className="rounded-md px-2 py-0.5 font-mono font-semibold"
+                      style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>{c}</code>
+                  ))}
+                </div>
+              </div>
+              {optionalCols.length > 0 && (
+                <div>
+                  <p className="mb-1.5 font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>Optional columns</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {optionalCols.map((c) => (
+                      <code key={c} className="rounded-md px-2 py-0.5 font-mono"
+                        style={{ background: '#f1f5f9', color: 'var(--muted)' }}>{c}</code>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {ticketTypes && ticketTypes.length > 0 && (
+                <div>
+                  <p className="mb-1.5 font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted)' }}>ticket_type values</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ticketTypes.map((t) => (
+                      <span key={t.value} className="rounded-md px-2 py-0.5"
+                        style={{ background: '#f1f5f9', color: 'var(--muted)' }}>
+                        <code className="font-mono">{t.value}</code>
+                        <span className="ml-1" style={{ color: 'var(--muted-2)' }}>({t.label})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p style={{ color: 'var(--muted-2)' }}>
+                WhatsApp delivery: <b style={{ color: 'var(--ink)' }}>{selectedEvent.whatsapp_enabled ? 'Enabled' : 'Disabled'}</b>
+              </p>
+            </div>
+          )}
 
           <div>
             <label className={label}>CSV File *</label>
@@ -121,9 +182,9 @@ export default function BulkUploadPage() {
               accept=".csv"
               className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
             />
-            <p className="mt-1.5 text-xs text-[var(--muted)]">
-              Optional columns: email, ticket_type (general / vip / vvip), table_number, seat_number
-            </p>
+            {!selectedEvent && (
+              <p className="mt-1.5 text-xs text-[var(--muted)]">Select an event above to see which columns are required.</p>
+            )}
           </div>
         </div>
 
