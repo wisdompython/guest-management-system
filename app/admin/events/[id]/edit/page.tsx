@@ -3,323 +3,109 @@
 import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Event, Font } from '@/lib/api'
-import EventConfigPanel from '@/components/EventConfigPanel'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
-import { DualZoneCanvas, ZoneLegendItem, ZoneWarning } from '@/components/PassDesignPanel'
 import type { Zone } from '@/components/PassDesignPanel'
+import { EventDetailsForm } from '@/components/events/EventDetailsForm'
+import { PassDesignSection } from '@/components/events/PassDesignSection'
+import { GuestConfigSection } from '@/components/events/GuestConfigSection'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
-
-const field = 'w-full rounded-[12px] border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted)]'
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [event, setEvent]     = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]     = useState('')
-
-  const [previewUrl, setPreviewUrl]       = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [newFileChosen, setNewFileChosen] = useState(false)
-
-  const [qrZone, setQrZone]         = useState<Zone | null>(null)
-  const [qrTouched, setQrTouched]   = useState(false)
-  const [nameZone, setNameZone]     = useState<Zone | null>(null)
+  const [qrZone, setQrZone]   = useState<Zone | null>(null)
+  const [qrTouched, setQrTouched] = useState(false)
+  const [nameZone, setNameZone] = useState<Zone | null>(null)
   const [nameTouched, setNameTouched] = useState(false)
-
-  const [fonts, setFonts]               = useState<Font[]>([])
+  const [fonts, setFonts]     = useState<Font[]>([])
   const [selectedFont, setSelectedFont] = useState('')
-  const [fontColor, setFontColor]       = useState('#ffffff')
+  const [fontColor, setFontColor] = useState('#ffffff')
   const [fontSizeFrac, setFontSizeFrac] = useState(0.05)
-  const [qrBgColor, setQrBgColor]       = useState('none')
-
-  const [ticketTypes, setTicketTypes]         = useState<TicketTypeDef[]>([])
-  const [requiredFields, setRequiredFields]   = useState<string[]>(['phone_number'])
+  const [qrBgColor, setQrBgColor] = useState('none')
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>([])
+  const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
 
   useEffect(() => {
     Promise.all([api.getEvent(Number(id)), api.getFonts()])
       .then(([ev, fts]) => {
-        setEvent(ev)
-        setFonts(fts)
-        if (ev.qr_zone_x != null && ev.qr_zone_y != null && ev.qr_zone_w != null && ev.qr_zone_h != null) {
+        setEvent(ev); setFonts(fts)
+        if (ev.qr_zone_x != null && ev.qr_zone_y != null && ev.qr_zone_w != null && ev.qr_zone_h != null)
           setQrZone({ x: ev.qr_zone_x, y: ev.qr_zone_y, w: ev.qr_zone_w, h: ev.qr_zone_h })
-        }
-        if (ev.name_zone_x != null && ev.name_zone_y != null && ev.name_zone_w != null && ev.name_zone_h != null) {
+        if (ev.name_zone_x != null && ev.name_zone_y != null && ev.name_zone_w != null && ev.name_zone_h != null)
           setNameZone({ x: ev.name_zone_x, y: ev.name_zone_y, w: ev.name_zone_w, h: ev.name_zone_h })
-        }
         if (ev.design_template) setPreviewUrl(ev.design_template)
         if (ev.name_font) setSelectedFont(String(ev.name_font))
-        setFontColor(ev.name_font_color || '#ffffff')
-        setFontSizeFrac(ev.name_font_size_fraction ?? 0.05)
+        setFontColor(ev.name_font_color || '#ffffff'); setFontSizeFrac(ev.name_font_size_fraction ?? 0.05)
         setQrBgColor(ev.qr_bg_color || 'none')
-        if (ev.ticket_types?.length)   setTicketTypes(ev.ticket_types as TicketTypeDef[])
+        if (ev.ticket_types?.length) setTicketTypes(ev.ticket_types as TicketTypeDef[])
         if (ev.required_fields?.length) setRequiredFields(ev.required_fields as string[])
         setWhatsappEnabled(ev.whatsapp_enabled ?? true)
       })
-      .catch(() => setError('Could not load event.'))
-      .finally(() => setLoading(false))
+      .catch(() => setError('Could not load event.')).finally(() => setLoading(false))
   }, [id])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setNewFileChosen(true)
-    setQrZone(null); setQrTouched(false)
-    setNameZone(null); setNameTouched(false)
+    const file = e.target.files?.[0]; if (!file) return
+    setNewFileChosen(true); setQrZone(null); setQrTouched(false); setNameZone(null); setNameTouched(false)
     setPreviewUrl(URL.createObjectURL(file))
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
-
-    const form = e.currentTarget
-    const formData = new FormData()
-    formData.append('name',        (form.elements.namedItem('name')        as HTMLInputElement).value)
-    formData.append('date',        (form.elements.namedItem('date')        as HTMLInputElement).value)
-    formData.append('venue',       (form.elements.namedItem('venue')       as HTMLInputElement).value)
-    formData.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
-
-    if (fileInputRef.current?.files?.[0]) formData.append('design_template', fileInputRef.current.files[0])
-
-    if (qrTouched) {
-      if (qrZone) {
-        formData.append('qr_zone_x', String(qrZone.x)); formData.append('qr_zone_y', String(qrZone.y))
-        formData.append('qr_zone_w', String(qrZone.w)); formData.append('qr_zone_h', String(qrZone.h))
-      } else {
-        formData.append('qr_zone_x', ''); formData.append('qr_zone_y', '')
-        formData.append('qr_zone_w', ''); formData.append('qr_zone_h', '')
-      }
-    }
-    if (nameTouched) {
-      if (nameZone) {
-        formData.append('name_zone_x', String(nameZone.x)); formData.append('name_zone_y', String(nameZone.y))
-        formData.append('name_zone_w', String(nameZone.w)); formData.append('name_zone_h', String(nameZone.h))
-      } else {
-        formData.append('name_zone_x', ''); formData.append('name_zone_y', '')
-        formData.append('name_zone_w', ''); formData.append('name_zone_h', '')
-      }
-    }
-
-    formData.append('name_font', selectedFont)
-    formData.append('name_font_color',         fontColor)
-    formData.append('name_font_size_fraction', String(fontSizeFrac))
-    formData.append('qr_bg_color',             qrBgColor)
-    formData.append('ticket_types',    JSON.stringify(ticketTypes))
-    formData.append('required_fields', JSON.stringify(requiredFields))
-    formData.append('whatsapp_enabled', String(whatsappEnabled))
-
+    e.preventDefault(); setError(''); setSubmitting(true)
+    const form = e.currentTarget; const fd = new FormData()
+    fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
+    fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
+    fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
+    fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
+    if (fileInputRef.current?.files?.[0]) fd.append('design_template', fileInputRef.current.files[0])
+    if (qrTouched) { if (qrZone) { fd.append('qr_zone_x', String(qrZone.x)); fd.append('qr_zone_y', String(qrZone.y)); fd.append('qr_zone_w', String(qrZone.w)); fd.append('qr_zone_h', String(qrZone.h)) } else { fd.append('qr_zone_x', ''); fd.append('qr_zone_y', ''); fd.append('qr_zone_w', ''); fd.append('qr_zone_h', '') } }
+    if (nameTouched) { if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) } else { fd.append('name_zone_x', ''); fd.append('name_zone_y', ''); fd.append('name_zone_w', ''); fd.append('name_zone_h', '') } }
+    fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
+    fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
     try {
-      const csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
-      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: formData, credentials: 'include', headers: { 'X-CSRFToken': csrfToken } })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail ?? JSON.stringify(err))
-      }
+      const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
+      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
       router.push('/admin/events')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes.')
-      setSubmitting(false)
-    }
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to save changes.'); setSubmitting(false) }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-sm text-[var(--muted)]">Loading event…</p>
-      </div>
-    )
-  }
-  if (!event) {
-    return (
-      <div className="px-6 py-8 lg:px-8 lg:py-10">
-        <p className="text-sm text-red-500">{error || 'Event not found.'}</p>
-      </div>
-    )
-  }
-
-  const localDateValue = event.date ? new Date(event.date).toISOString().slice(0, 16) : ''
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><p className="text-sm text-[var(--muted)]">Loading event…</p></div>
+  if (!event) return <div className="px-6 py-8 lg:px-8 lg:py-10"><p className="text-sm text-red-500">{error || 'Event not found.'}</p></div>
 
   return (
     <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
-
       <div className="mb-8 border-b border-[var(--line)] pb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Event setup</p>
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Edit Event</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{event.name}</p>
       </div>
-
-      {error && (
-        <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>
-      )}
-
+      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-
-        {/* Event details */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Event Details</h2>
-          </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className={label}>Event Name *</label>
-              <input name="name" type="text" required defaultValue={event.name} className={field} />
-            </div>
-            <div>
-              <label className={label}>Date & Time *</label>
-              <input name="date" type="datetime-local" required defaultValue={localDateValue} className={field} />
-            </div>
-            <div>
-              <label className={label}>Venue</label>
-              <input name="venue" type="text" defaultValue={event.venue} placeholder="optional" className={field} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={label}>Description</label>
-              <textarea name="description" rows={2} defaultValue={event.description} placeholder="optional" className={`${field} resize-none`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Pass design & zones */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">Leave the file picker empty to keep the existing design.</p>
-          </div>
-          <div className="space-y-5 p-6">
-            {event.design_template && !newFileChosen && (
-              <div className="flex items-center gap-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Current:</span>
-                <a href={event.design_template} target="_blank" rel="noopener noreferrer"
-                  className="truncate text-xs font-semibold text-[var(--brand)] hover:underline">
-                  {event.design_template.split('/').pop()}
-                </a>
-              </div>
-            )}
-            <div>
-              <label className={label}>{newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)'}</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={handleFileChange}
-                className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
-              />
-            </div>
-
-            {previewUrl && (
-              <>
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <ZoneLegendItem color="#6366f1" label="QR Zone" set={!!qrZone} />
-                  <ZoneLegendItem color="#10b981" label="Name Zone" set={!!nameZone} />
-                </div>
-                <DualZoneCanvas
-                  imageUrl={previewUrl}
-                  qrZone={qrZone}
-                  onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
-                  nameZone={nameZone}
-                  onNameChange={(z) => { setNameZone(z); setNameTouched(true) }}
-                />
-                {!qrZone && <ZoneWarning>No QR zone — will fall back to bottom-right corner.</ZoneWarning>}
-                {!nameZone && <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>}
-              </>
-            )}
-
-            {/* QR background */}
-            <div>
-              <label className={label}>QR Code Background</label>
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { value: 'none',    label: 'None (transparent)' },
-                  { value: '#ffffff', label: 'White' },
-                  { value: '#000000', label: 'Black' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setQrBgColor(opt.value)}
-                    className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                    style={{
-                      borderColor: qrBgColor === opt.value ? 'var(--brand)' : 'var(--line)',
-                      background:  qrBgColor === opt.value ? 'var(--brand-soft)' : '#fff',
-                      color:       qrBgColor === opt.value ? 'var(--brand)' : 'var(--ink)',
-                    }}
-                  >
-                    {opt.value !== 'none' && (
-                      <span className="h-3 w-3 rounded-full border border-[var(--line)]"
-                        style={{ background: opt.value }} />
-                    )}
-                    {opt.label}
-                  </button>
-                ))}
-                {/* Custom colour */}
-                <label className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold cursor-pointer transition"
-                  style={{
-                    borderColor: !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand)' : 'var(--line)',
-                    background:  !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand-soft)' : '#fff',
-                    color:       !['none','#ffffff','#000000'].includes(qrBgColor) ? 'var(--brand)' : 'var(--ink)',
-                  }}>
-                  <span className="h-3 w-3 rounded-full border border-[var(--line)]"
-                    style={{ background: !['none','#ffffff','#000000'].includes(qrBgColor) ? qrBgColor : '#eee' }} />
-                  Custom
-                  <input type="color" className="sr-only"
-                    value={['none','#ffffff','#000000'].includes(qrBgColor) ? '#ffffff' : qrBgColor}
-                    onChange={(e) => setQrBgColor(e.target.value)} />
-                </label>
-              </div>
-              <p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
-                Adds a solid colour pad behind the QR on the pass. Use white for dark templates, none for light ones.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Guest configuration */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">Set ticket categories, required fields, and delivery options for this event.</p>
-          </div>
-          <div className="p-6">
-            <EventConfigPanel
-              ticketTypes={ticketTypes}
-              requiredFields={requiredFields}
-              whatsappEnabled={whatsappEnabled}
-              onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
-                if (tt !== undefined) setTicketTypes(tt)
-                if (rf !== undefined) setRequiredFields(rf)
-                if (wa !== undefined) setWhatsappEnabled(wa)
-              }}
-            />
-          </div>
-        </div>
-
-        <NameTypographyPanel
-          fonts={fonts}
-          selectedFont={selectedFont}
-          fontColor={fontColor}
-          fontSizeFrac={fontSizeFrac}
-          onFontChange={setSelectedFont}
-          onColorChange={setFontColor}
-          onSizeChange={setFontSizeFrac}
-        />
-
+        <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} />
+        <PassDesignSection event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}
+          previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
+          onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
+          onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
+        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}
+          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
+            if (tt !== undefined) setTicketTypes(tt); if (rf !== undefined) setRequiredFields(rf); if (wa !== undefined) setWhatsappEnabled(wa)
+          }} />
+        <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+          onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
         <div className="flex gap-3 pt-1">
-          <button type="submit" disabled={submitting}
-            className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">
-            {submitting ? 'Saving…' : 'Save Changes'}
-          </button>
-          <button type="button" onClick={() => router.push('/admin/events')}
-            className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">
-            Cancel
-          </button>
+          <button type="submit" disabled={submitting} className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">{submitting ? 'Saving…' : 'Save Changes'}</button>
+          <button type="button" onClick={() => router.push('/admin/events')} className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Cancel</button>
         </div>
       </form>
     </div>

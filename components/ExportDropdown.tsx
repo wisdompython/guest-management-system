@@ -54,7 +54,7 @@ export default function ExportDropdown({ events }: Props) {
       {open && (
         <div
           className="absolute right-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-[14px] shadow-xl"
-          style={{ border: '1px solid var(--line)', background: '#fff' }}
+          style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'var(--panel)' }}
         >
           <div className="border-b px-4 py-3.5" style={{ borderColor: 'var(--line)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Export Guest List</p>
@@ -70,7 +70,7 @@ export default function ExportDropdown({ events }: Props) {
                 value={exportEvent}
                 onChange={(e) => setExportEvent(e.target.value)}
                 className="w-full rounded-[10px] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                style={{ borderColor: 'var(--line)', color: 'var(--ink)' }}
+                style={{ borderColor: 'var(--line)', color: 'var(--ink)', background: '#1a2030' }}
               >
                 <option value="">All events</option>
                 {events.map((ev) => (
@@ -87,7 +87,7 @@ export default function ExportDropdown({ events }: Props) {
                 value={exportStatus}
                 onChange={(e) => setExportStatus(e.target.value)}
                 className="w-full rounded-[10px] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                style={{ borderColor: 'var(--line)', color: 'var(--ink)' }}
+                style={{ borderColor: 'var(--line)', color: 'var(--ink)', background: '#1a2030' }}
               >
                 <option value="">All statuses</option>
                 <option value="registered">Pending</option>

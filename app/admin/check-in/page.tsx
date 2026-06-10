@@ -70,7 +70,7 @@ export default function CheckInPage() {
         <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Paste or type the guest token below</p>
       </div>
 
-      <div className="p-8 mb-6 text-center" style={{ background: '#fff', border: '1px solid var(--line)' }}>
+      <div className="p-8 mb-6 text-center" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
         <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--brand-soft)' }}>
           <svg className="w-8 h-8" style={{ color: 'var(--brand)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round"
@@ -97,7 +97,7 @@ export default function CheckInPage() {
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="w-full bg-white px-4 py-4 text-sm font-mono focus:outline-none placeholder:text-[var(--muted-2)]"
+          className="w-full bg-[rgba(255,255,255,0.06)] px-4 py-4 text-sm text-[var(--ink)] font-mono focus:outline-none placeholder:text-[var(--muted-2)]"
           style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
         />
         <button

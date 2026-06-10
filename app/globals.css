@@ -12,9 +12,9 @@
   --line:         rgba(255,255,255,0.07);   /* dividers */
   --line-2:       rgba(255,255,255,0.04);
 
-  --brand:        #22c9a0;          /* cyan-green accent — live indicators, active nav */
-  --brand-strong: #18a882;
-  --brand-soft:   rgba(34,201,160,0.12);
+  --brand:        #b8963e;          /* TWS gold */
+  --brand-strong: #9a7c32;
+  --brand-soft:   rgba(184,150,62,0.12);
 
   --sidebar:      #0d1016;          /* sidebar background */
   --sidebar-2:    rgba(255,255,255,0.05);   /* nav item hover */
@@ -45,7 +45,7 @@ html, body {
 }
 
 ::selection {
-  background: rgba(34, 201, 160, 0.20);
+  background: rgba(184, 150, 62, 0.20);
 }
 
 .font-display {

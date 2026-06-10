@@ -41,11 +41,11 @@ export default function LoginPage() {
             style={{ background: 'var(--brand)' }}>
             T
           </div>
-          <h1 className="font-display text-3xl font-semibold" style={{ color: 'var(--ink)' }}>TWS GuestOps</h1>
+          <h1 className="font-display text-3xl font-semibold" style={{ color: 'var(--ink)' }}>TWS Guest Pass</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Sign in to your account</p>
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid var(--line)' }} className="p-8">
+        <div style={{ background: 'var(--panel)', border: '1px solid rgba(255,255,255,0.07)' }} className="p-8">
 
           {error && (
             <div className="mb-5 px-4 py-3 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid #fca5a5' }}>
@@ -65,7 +65,7 @@ export default function LoginPage() {
                 required
                 autoComplete="username"
                 autoFocus
-                className="w-full bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)' }}
                 style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
               />
             </div>
@@ -80,7 +80,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)' }}
                 style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
               />
             </div>
@@ -97,7 +97,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs" style={{ color: 'var(--muted-2)' }}>
-          TWS GuestOps · Luxury Event Management
+          TWS Guest Pass · Luxury Event Management
         </p>
       </div>
     </div>

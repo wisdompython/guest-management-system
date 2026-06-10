@@ -3,16 +3,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Font } from '@/lib/api'
-import EventConfigPanel from '@/components/EventConfigPanel'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
-import { DualZoneCanvas, ZoneLegendItem, ZoneWarning } from '@/components/PassDesignPanel'
 import type { Zone } from '@/components/PassDesignPanel'
+import { EventDetailsForm } from '@/components/events/EventDetailsForm'
+import { PassDesignSection } from '@/components/events/PassDesignSection'
+import { GuestConfigSection } from '@/components/events/GuestConfigSection'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
-
-const field = 'w-full rounded-[12px] border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted)]'
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
 const DEFAULT_TICKET_TYPES: TicketTypeDef[] = [
   { value: 'general', label: 'General' },
@@ -28,176 +26,62 @@ export default function AddEventPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [qrZone, setQrZone]         = useState<Zone | null>(null)
   const [nameZone, setNameZone]     = useState<Zone | null>(null)
-
-  const [fonts, setFonts]               = useState<Font[]>([])
+  const [fonts, setFonts]           = useState<Font[]>([])
   const [selectedFont, setSelectedFont] = useState('')
-  const [fontColor, setFontColor]       = useState('#ffffff')
+  const [fontColor, setFontColor]   = useState('#ffffff')
   const [fontSizeFrac, setFontSizeFrac] = useState(0.05)
-
-  const [ticketTypes, setTicketTypes]         = useState<TicketTypeDef[]>(DEFAULT_TICKET_TYPES)
-  const [requiredFields, setRequiredFields]   = useState<string[]>(['phone_number'])
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>(DEFAULT_TICKET_TYPES)
+  const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
 
   useEffect(() => { api.getFonts().then(setFonts).catch(console.error) }, [])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setQrZone(null); setNameZone(null)
-    setPreviewUrl(URL.createObjectURL(file))
+    const file = e.target.files?.[0]; if (!file) return
+    setQrZone(null); setNameZone(null); setPreviewUrl(URL.createObjectURL(file))
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
-
-    const form = e.currentTarget
-    const formData = new FormData()
-    formData.append('name',        (form.elements.namedItem('name')        as HTMLInputElement).value)
-    formData.append('date',        (form.elements.namedItem('date')        as HTMLInputElement).value)
-    formData.append('venue',       (form.elements.namedItem('venue')       as HTMLInputElement).value)
-    formData.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
-
-    if (fileInputRef.current?.files?.[0]) formData.append('design_template', fileInputRef.current.files[0])
-
-    if (qrZone) {
-      formData.append('qr_zone_x', String(qrZone.x)); formData.append('qr_zone_y', String(qrZone.y))
-      formData.append('qr_zone_w', String(qrZone.w)); formData.append('qr_zone_h', String(qrZone.h))
-    }
-    if (nameZone) {
-      formData.append('name_zone_x', String(nameZone.x)); formData.append('name_zone_y', String(nameZone.y))
-      formData.append('name_zone_w', String(nameZone.w)); formData.append('name_zone_h', String(nameZone.h))
-    }
-
-    if (selectedFont) formData.append('name_font', selectedFont)
-    formData.append('name_font_color',         fontColor)
-    formData.append('name_font_size_fraction', String(fontSizeFrac))
-    formData.append('ticket_types',    JSON.stringify(ticketTypes))
-    formData.append('required_fields', JSON.stringify(requiredFields))
-    formData.append('whatsapp_enabled', String(whatsappEnabled))
-
+    e.preventDefault(); setError(''); setSubmitting(true)
+    const form = e.currentTarget; const fd = new FormData()
+    fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
+    fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
+    fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
+    fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
+    if (fileInputRef.current?.files?.[0]) fd.append('design_template', fileInputRef.current.files[0])
+    if (qrZone) { fd.append('qr_zone_x', String(qrZone.x)); fd.append('qr_zone_y', String(qrZone.y)); fd.append('qr_zone_w', String(qrZone.w)); fd.append('qr_zone_h', String(qrZone.h)) }
+    if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) }
+    if (selectedFont) fd.append('name_font', selectedFont)
+    fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
+    fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
     try {
-      const csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
-      const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: formData, credentials: 'include', headers: { 'X-CSRFToken': csrfToken } })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail ?? JSON.stringify(err))
-      }
+      const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
+      const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
       router.push('/admin/events')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create event.')
-      setSubmitting(false)
-    }
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to create event.'); setSubmitting(false) }
   }
 
   return (
     <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
-
       <div className="mb-8 border-b border-[var(--line)] pb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Event setup</p>
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">New Event</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Create an event and configure the pass design template.</p>
       </div>
-
-      {error && (
-        <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>
-      )}
-
+      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-
-        {/* Event details */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Event Details</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">Fields marked * are required.</p>
-          </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className={label}>Event Name *</label>
-              <input name="name" type="text" required placeholder="e.g. Annual Gala 2026" className={field} />
-            </div>
-            <div>
-              <label className={label}>Date & Time *</label>
-              <input name="date" type="datetime-local" required className={field} />
-            </div>
-            <div>
-              <label className={label}>Venue</label>
-              <input name="venue" type="text" placeholder="optional" className={field} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={label}>Description</label>
-              <textarea name="description" rows={2} placeholder="optional" className={`${field} resize-none`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Pass design & zones */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">Upload your design, then drag to mark the QR code area and the guest name area.</p>
-          </div>
-          <div className="space-y-5 p-6">
-            <div>
-              <label className={label}>Design Template (PNG / JPG)</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={handleFileChange}
-                className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]"
-              />
-            </div>
-
-            {previewUrl && (
-              <>
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <ZoneLegendItem color="#6366f1" label="QR Zone" set={!!qrZone} />
-                  <ZoneLegendItem color="#10b981" label="Name Zone" set={!!nameZone} />
-                </div>
-                <DualZoneCanvas
-                  imageUrl={previewUrl}
-                  qrZone={qrZone}  onQrChange={setQrZone}
-                  nameZone={nameZone} onNameChange={setNameZone}
-                />
-                {!qrZone && <ZoneWarning>No QR zone — will fall back to bottom-right corner.</ZoneWarning>}
-                {!nameZone && <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Guest configuration */}
-        <div className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white">
-          <div className="border-b border-[var(--line)] px-6 py-4">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">Set ticket categories, required fields, and delivery options for this event.</p>
-          </div>
-          <div className="p-6">
-            <EventConfigPanel
-              ticketTypes={ticketTypes}
-              requiredFields={requiredFields}
-              whatsappEnabled={whatsappEnabled}
-              onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
-                if (tt !== undefined) setTicketTypes(tt)
-                if (rf !== undefined) setRequiredFields(rf)
-                if (wa !== undefined) setWhatsappEnabled(wa)
-              }}
-            />
-          </div>
-        </div>
-
-        <NameTypographyPanel
-          fonts={fonts}
-          selectedFont={selectedFont}
-          fontColor={fontColor}
-          fontSizeFrac={fontSizeFrac}
-          onFontChange={setSelectedFont}
-          onColorChange={setFontColor}
-          onSizeChange={setFontSizeFrac}
-        />
-
+        <EventDetailsForm subtitle="Fields marked * are required." />
+        <PassDesignSection fileInputRef={fileInputRef} previewUrl={previewUrl}
+          qrZone={qrZone} nameZone={nameZone} qrBgColor="none"
+          onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}
+          onQrBgColorChange={() => {}} isEdit={false} />
+        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}
+          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
+            if (tt !== undefined) setTicketTypes(tt); if (rf !== undefined) setRequiredFields(rf); if (wa !== undefined) setWhatsappEnabled(wa)
+          }} />
+        <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+          onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
         <div className="flex gap-3 pt-1">
           <button type="submit" disabled={submitting}
             className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">

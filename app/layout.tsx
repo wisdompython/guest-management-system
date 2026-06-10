@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'TWS GuestOps',
+  title: 'TWS Guest Pass',
   description: 'Event guest operations, pass delivery, and door check-in in one place.',
 }
 
