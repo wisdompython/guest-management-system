@@ -33,6 +33,7 @@ export default function AddEventPage() {
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>(DEFAULT_TICKET_TYPES)
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [dateValid, setDateValid] = useState(true)
 
   useEffect(() => { api.getFonts().then(setFonts).catch(console.error) }, [])
 
@@ -42,7 +43,9 @@ export default function AddEventPage() {
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setError(''); setSubmitting(true)
+    e.preventDefault()
+    if (!dateValid) { setError('Please set a future date and time for the event.'); return }
+    setError(''); setSubmitting(true)
     const form = e.currentTarget; const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
     fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
@@ -71,7 +74,7 @@ export default function AddEventPage() {
       </div>
       {error && <div className="mb-5 px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <EventDetailsForm subtitle="Fields marked * are required." />
+        <EventDetailsForm subtitle="Fields marked * are required." onValidationChange={setDateValid} />
         <PassDesignSection fileInputRef={fileInputRef} previewUrl={previewUrl}
           qrZone={qrZone} nameZone={nameZone} qrBgColor="none"
           onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}

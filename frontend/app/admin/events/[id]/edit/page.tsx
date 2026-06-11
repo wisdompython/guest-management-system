@@ -34,6 +34,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>([])
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [dateValid, setDateValid] = useState(true)
 
   useEffect(() => {
     Promise.all([api.getEvent(Number(id)), api.getFonts()])
@@ -61,7 +62,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setError(''); setSubmitting(true)
+    e.preventDefault()
+    if (!dateValid) { setError('Please set a future date and time for the event.'); return }
+    setError(''); setSubmitting(true)
     const form = e.currentTarget; const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
     fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
@@ -92,7 +95,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       </div>
       {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} />
+        <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} onValidationChange={setDateValid} />
         <PassDesignSection event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}
           previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
           onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}

@@ -25,9 +25,10 @@ interface Props {
   localDateValue?: string
   subtitle?: string
   onDateChange?: (val: string) => void
+  onValidationChange?: (valid: boolean) => void
 }
 
-export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange }: Props) {
+export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange, onValidationChange }: Props) {
   const [minVal] = useState(nowMin)
   const [dateVal, setDateVal] = useState(
     localDateValue ?? (event?.date ? toLocalDateTimeValue(event.date) : '')
@@ -41,11 +42,9 @@ export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
     setDateVal(val)
-    if (val && val < minVal) {
-      setDateError('Event date cannot be in the past.')
-    } else {
-      setDateError('')
-    }
+    const isPast = val && val < minVal
+    setDateError(isPast ? 'Event date cannot be in the past.' : '')
+    onValidationChange?.(!isPast)
     onDateChange?.(val)
   }
 
