@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Already logged in → go straight to dashboard
   useEffect(() => {
     if (!loading && user) router.replace('/admin/dashboard')
   }, [user, loading, router])
@@ -65,8 +64,8 @@ export default function LoginPage() {
                 required
                 autoComplete="username"
                 autoFocus
-                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)' }}
-                style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
+                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}
               />
             </div>
 
@@ -80,8 +79,8 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)' }}
-                style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
+                className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}
               />
             </div>
 
