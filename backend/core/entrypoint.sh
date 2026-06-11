@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# If arguments are passed (e.g. celery worker), run them directly without gunicorn setup
+if [ "$1" = "celery" ]; then
+  exec "$@"
+fi
+
 echo "Running migrations..."
 python manage.py migrate --noinput
 

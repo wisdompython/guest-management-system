@@ -14,7 +14,7 @@ export const guestsApi = {
   checkIn: (id: string) =>
     request<Guest>(`/guests/${id}/check_in/`, { method: 'POST' }),
   regenerateAssets: (id: string) =>
-    request<{ qr_generated: boolean; pass_generated: boolean; whatsapp_sent: boolean; guest: Guest }>(`/guests/${id}/regenerate_assets/`, { method: 'POST' }),
+    request<{ queued: boolean; guest_id: string }>(`/guests/${id}/regenerate_assets/`, { method: 'POST' }),
   sendWhatsApp: (id: string) =>
     request<{ sent: boolean; guest: Guest }>(`/guests/${id}/send_whatsapp/`, { method: 'POST' }),
   bulkSendWhatsApp: (eventId: number, resend = false) =>

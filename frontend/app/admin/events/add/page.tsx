@@ -69,7 +69,7 @@ export default function AddEventPage() {
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">New Event</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Create an event and configure the pass design template.</p>
       </div>
-      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
+      {error && <div className="mb-5 px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
         <EventDetailsForm subtitle="Fields marked * are required." />
         <PassDesignSection fileInputRef={fileInputRef} previewUrl={previewUrl}

@@ -81,7 +81,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><p className="text-sm text-[var(--muted)]">Loading event…</p></div>
-  if (!event) return <div className="px-6 py-8 lg:px-8 lg:py-10"><p className="text-sm text-red-500">{error || 'Event not found.'}</p></div>
+  if (!event) return <div className="px-6 py-8 lg:px-8 lg:py-10"><p className="text-sm" style={{ color: 'var(--danger)' }}>{error || 'Event not found.'}</p></div>
 
   return (
     <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
@@ -90,7 +90,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Edit Event</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{event.name}</p>
       </div>
-      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
+      {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
         <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} />
         <PassDesignSection event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}

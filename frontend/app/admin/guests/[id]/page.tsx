@@ -38,12 +38,23 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
     if (!guest) return
     setRegenerating(true); setError('')
     try {
-      const result = await api.regenerateAssets(guest.id)
-      setGuest(result.guest)
-      if (!result.qr_generated || !result.pass_generated)
-        setError(`Partial regeneration: QR ${result.qr_generated ? '✓' : '✗'}, Pass ${result.pass_generated ? '✓' : '✗'}. Check server logs.`)
-    } catch { setError('Regeneration failed. Check server logs.') }
-    finally { setRegenerating(false) }
+      await api.regenerateAssets(guest.id)
+      // Assets are generated asynchronously — poll until they appear (max ~15s)
+      let attempts = 0
+      const poll = async () => {
+        const updated = await api.getGuest(id)
+        setGuest(updated)
+        if (updated.pass_image && updated.qr_code) {
+          setRegenerating(false)
+        } else if (attempts++ < 6) {
+          setTimeout(poll, 2500)
+        } else {
+          setError('Assets are still processing — refresh in a moment.')
+          setRegenerating(false)
+        }
+      }
+      setTimeout(poll, 2500)
+    } catch { setError('Regeneration failed. Check server logs.'); setRegenerating(false) }
   }
 
   async function handleCheckIn() {
