@@ -1,0 +1,12 @@
+# Normalise all text files to LF in the repo; no CRLF conversion on checkout
+* text=auto eol=lf
+
+# Treat compiled/binary assets as binary — no line-ending touching
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

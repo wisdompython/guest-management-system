@@ -1,0 +1,82 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { api, Guest, Event } from '@/lib/api'
+import { StatCards } from '@/components/dashboard/StatCards'
+import { ArrivalsFeed } from '@/components/dashboard/ArrivalsFeed'
+import { EventsPanel } from '@/components/dashboard/EventsPanel'
+
+export default function DashboardPage() {
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(true)
+  const [time, setTime] = useState(new Date())
+
+  useEffect(() => {
+    Promise.all([api.getGuests(), api.getEvents()])
+      .then(([g, e]) => { setGuests(g.results); setEvents(e) })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const total         = guests.length
+  const checkedIn     = guests.filter((g) => g.status === 'checked_in').length
+  const waSent        = guests.filter((g) => g.whatsapp_sent).length
+  const attendancePct = total > 0 ? Math.round((checkedIn / total) * 100) : 0
+  const activeEvent   = events[0] ?? null
+  const recentGuests  = [...guests].sort((a, b) =>
+    (b.checked_in_at ?? '').localeCompare(a.checked_in_at ?? '')
+  ).slice(0, 10)
+  const timeStr = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
+      <div className="flex flex-shrink-0 items-center justify-between px-6 py-3"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            {loading ? '—' : activeEvent ? activeEvent.name : 'No active event'}
+            {activeEvent && <span style={{ color: 'var(--brand)' }}> · Live</span>}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+            {activeEvent ? new Date(activeEvent.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '--'}
+            {' '}· {timeStr}
+            {activeEvent?.venue ? ' · ' + activeEvent.venue : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/check-in"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition hover:opacity-80"
+            style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel)' }}>
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+              <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/>
+              <rect x="7" y="14" width="3" height="3" rx="0.5"/>
+            </svg>
+            Open scanner
+          </Link>
+          <Link href="/admin/whatsapp"
+            className="px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+            style={{ background: 'var(--brand)' }}>
+            WhatsApp
+          </Link>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-6 space-y-5">
+        <StatCards loading={loading} checkedIn={checkedIn} total={total} waSent={waSent}
+          eventsCount={events.length} attendancePct={attendancePct}
+          activeEventLabel={activeEvent ? 'Active event running' : 'No active event'} />
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ArrivalsFeed guests={recentGuests} loading={loading} />
+          <EventsPanel events={events} loading={loading} />
+        </div>
+      </div>
+    </div>
+  )
+}

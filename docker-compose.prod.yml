@@ -1,0 +1,86 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - internal
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.prod
+    command: celery -A core worker --loglevel=info --concurrency=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  media_files:
+  static_files:
+
+networks:
+  internal:
+    driver: bridge

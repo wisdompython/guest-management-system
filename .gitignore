@@ -1,0 +1,49 @@
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.prod
+.env.local
+.env.*.local
+*.env
+
+# ── Nginx (contains domain + SSL paths) ──────────────────────────────────────
+nginx/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# ── Django ────────────────────────────────────────────────────────────────────
+backend/core/db.sqlite3
+backend/core/media/
+backend/core/staticfiles/
+backend/core/*.log
+
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
