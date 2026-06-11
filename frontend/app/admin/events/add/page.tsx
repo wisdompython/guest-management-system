@@ -33,7 +33,7 @@ export default function AddEventPage() {
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>(DEFAULT_TICKET_TYPES)
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
-  const [dateValid, setDateValid] = useState(true)
+  const [dateValid, setDateValid] = useState(false)
 
   useEffect(() => { api.getFonts().then(setFonts).catch(console.error) }, [])
 

@@ -35,16 +35,28 @@ export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange
   )
   const [dateError, setDateError] = useState('')
 
+  function validate(val: string) {
+    const isPast = Boolean(val && val < minVal)
+    setDateError(isPast ? 'Event date cannot be in the past.' : '')
+    onValidationChange?.(!isPast)
+    return !isPast
+  }
+
   useEffect(() => {
-    if (localDateValue) setDateVal(localDateValue)
+    const initial = localDateValue ?? (event?.date ? toLocalDateTimeValue(event.date) : '')
+    if (initial) {
+      setDateVal(initial)
+      const isPast = Boolean(initial && initial < minVal)
+      setDateError(isPast ? 'Event date cannot be in the past.' : '')
+      onValidationChange?.(!isPast)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localDateValue])
 
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
     setDateVal(val)
-    const isPast = val && val < minVal
-    setDateError(isPast ? 'Event date cannot be in the past.' : '')
-    onValidationChange?.(!isPast)
+    validate(val)
     onDateChange?.(val)
   }
 
