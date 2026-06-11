@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # GuestOps
 
 A private-event guest operations platform for WhatsApp-first teams. Covers the full workflow from guest import → branded pass generation → WhatsApp delivery → QR check-in.
@@ -313,3 +314,6 @@ docker compose -f docker-compose.prod.yml restart backend
 ## License
 
 Private — all rights reserved.
+=======
+# guest-management-system
+>>>>>>> ecfb8dc0655cbf212b6ee29e464a951d43484cb7
