@@ -2,10 +2,10 @@
 
 import { Guest } from '@/lib/api'
 
-const TICKET_COLORS: Record<string, string> = {
-  vvip:    'bg-purple-50 text-purple-700 border-purple-200',
-  vip:     'bg-amber-50 text-amber-700 border-amber-200',
-  general: 'bg-stone-100 text-stone-600 border-stone-200',
+const TICKET_COLORS: Record<string, { bg: string; color: string; border: string }> = {
+  vvip:    { bg: 'rgba(168,85,247,0.15)',  color: '#c084fc', border: 'rgba(168,85,247,0.3)' },
+  vip:     { bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+  general: { bg: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: 'rgba(255,255,255,0.1)' },
 }
 
 export function GuestFoundScreen({
@@ -37,9 +37,12 @@ export function GuestFoundScreen({
               <h2 className="font-display text-2xl font-semibold leading-tight" style={{ color: 'var(--ink)' }}>{guest.full_name}</h2>
               {guest.event_name && <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>{guest.event_name}</p>}
             </div>
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-sm border flex-shrink-0 mt-1 ${TICKET_COLORS[guest.ticket_type] ?? TICKET_COLORS.general}`}>
-              {guest.ticket_type.toUpperCase()}
-            </span>
+            {(() => { const tc = TICKET_COLORS[guest.ticket_type] ?? TICKET_COLORS.general; return (
+              <span className="text-xs font-bold px-3 py-1.5 flex-shrink-0 mt-1"
+                style={{ background: tc.bg, color: tc.color, border: `1px solid ${tc.border}` }}>
+                {guest.ticket_type.toUpperCase()}
+              </span>
+            )})()}
           </div>
         </div>
         <div className="grid grid-cols-2 divide-x divide-y" style={{ borderColor: 'var(--line)' }}>
