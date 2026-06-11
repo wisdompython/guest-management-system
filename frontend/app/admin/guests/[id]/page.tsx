@@ -28,6 +28,8 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [checkingIn, setCheckingIn] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
+  const [whatsAppSent, setWhatsAppSent] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -55,6 +57,21 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
       }
       setTimeout(poll, 2500)
     } catch { setError('Regeneration failed. Check server logs.'); setRegenerating(false) }
+  }
+
+  async function handleSendWhatsApp() {
+    if (!guest) return
+    setSendingWhatsApp(true); setError('')
+    try {
+      await api.sendWhatsApp(guest.id)
+      setWhatsAppSent(true)
+      // Refresh after delay to pick up whatsapp_sent=True
+      setTimeout(async () => {
+        const updated = await api.getGuest(id)
+        setGuest(updated)
+      }, 4000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'WhatsApp send failed.') }
+    finally { setSendingWhatsApp(false) }
   }
 
   async function handleCheckIn() {
@@ -96,11 +113,18 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <p className="mt-1 text-sm text-[var(--muted)]">{guest.event_name}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={handleRegenerateAssets} disabled={regenerating}
               className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--ink)] transition hover:border-[var(--ink)] disabled:opacity-50">
               {regenerating ? 'Regenerating…' : 'Regenerate Assets'}
             </button>
+            {passUrl && (
+              <button onClick={handleSendWhatsApp} disabled={sendingWhatsApp}
+                className="rounded-full border px-4 py-2 text-xs font-semibold transition disabled:opacity-50"
+                style={{ borderColor: 'var(--brand)', color: whatsAppSent ? 'var(--muted)' : 'var(--brand)' }}>
+                {sendingWhatsApp ? 'Sending…' : guest.whatsapp_sent ? 'Resend WhatsApp' : 'Send WhatsApp'}
+              </button>
+            )}
             {!checkedIn && (
               <button onClick={handleCheckIn} disabled={checkingIn}
                 className="rounded-full bg-[var(--brand)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">

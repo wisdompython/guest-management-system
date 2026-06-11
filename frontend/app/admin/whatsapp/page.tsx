@@ -36,9 +36,13 @@ export default function WhatsAppPage() {
   async function handleSend(guest: Guest) {
     setSending(true)
     try {
-      const res = await api.sendWhatsApp(guest.id)
-      setGuests((prev) => prev.map((g) => g.id === guest.id ? res.guest : g))
-      showToast(res.sent ? `Pass sent to ${guest.full_name}` : 'Send failed — check pass image exists', res.sent)
+      await api.sendWhatsApp(guest.id)
+      showToast(`Pass queued for ${guest.full_name}`, true)
+      // Refresh guest after a delay to reflect whatsapp_sent update
+      setTimeout(async () => {
+        const gData = await api.getGuests()
+        setGuests(gData.results.filter((g) => g.phone_number))
+      }, 4000)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Send failed', false)
     } finally {

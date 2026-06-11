@@ -16,7 +16,7 @@ export const guestsApi = {
   regenerateAssets: (id: string) =>
     request<{ queued: boolean; guest_id: string }>(`/guests/${id}/regenerate_assets/`, { method: 'POST' }),
   sendWhatsApp: (id: string) =>
-    request<{ sent: boolean; guest: Guest }>(`/guests/${id}/send_whatsapp/`, { method: 'POST' }),
+    request<{ queued: boolean; guest_id: string }>(`/guests/${id}/send_whatsapp/`, { method: 'POST' }),
   bulkSendWhatsApp: (eventId: number, resend = false) =>
     request<{ sent: number; failed: number; failures: { guest_id: string; name: string }[] }>('/guests/bulk_send_whatsapp/', { method: 'POST', body: JSON.stringify({ event_id: eventId, resend }) }),
   sendMessage: (id: string, message: string) =>
