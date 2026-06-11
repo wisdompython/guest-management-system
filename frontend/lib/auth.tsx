@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const u = await api.login(username, password)
     setUser(u)
-    router.replace('/admin/dashboard')
-  }, [router])
+    // Navigation is handled by the calling page (supports ?next= redirect)
+  }, [])
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => {})

@@ -12,6 +12,9 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 
+# Public URL of the frontend — used to build QR scan links
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:3000')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django_celery_results',

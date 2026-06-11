@@ -7,13 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 def build_qr_payload(guest) -> str:
-    event_name = guest.event.name if guest.event else ''
-    parts = [str(guest.id), guest.full_name]
-    if event_name:
-        parts.append(event_name)
-    if guest.ticket_type:
-        parts.append(guest.ticket_type.upper())
-    return '|'.join(parts)
+    from django.conf import settings
+    site_url = getattr(settings, 'SITE_URL', 'http://localhost:3000').rstrip('/')
+    return f"{site_url}/scan/{guest.id}"
 
 
 def generate_qr_code(guest) -> bool:

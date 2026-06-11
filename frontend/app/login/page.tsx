@@ -2,19 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') ?? '/admin/dashboard'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!loading && user) router.replace('/admin/dashboard')
-  }, [user, loading, router])
+    if (!loading && user) router.replace(next)
+  }, [user, loading, router, next])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -22,6 +24,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(username, password)
+      router.replace(next)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid credentials.')
       setSubmitting(false)
