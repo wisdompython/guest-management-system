@@ -52,9 +52,9 @@ def send_pass(guest) -> bool:
         pass_url = _build_pass_url(guest)
         event_name = guest.event.name if guest.event else 'the event'
 
-        # Use a fallback public image if the pass URL is not publicly accessible
         if not pass_url or 'localhost' in pass_url or '127.0.0.1' in pass_url:
-            pass_url = 'https://godsverifiedown.com/media/products/Screenshot_2026-05-14_050441.png'
+            logger.error("Pass URL is not publicly accessible for guest %s: %s", guest.id, pass_url)
+            return False
 
         logger.info("Sending WhatsApp to %s | pass_url=%s", phone, pass_url)
 
