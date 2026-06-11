@@ -6,10 +6,10 @@ import { api, Guest } from '@/lib/api'
 import { GuestDetailsCard } from '@/components/guests/GuestDetailsCard'
 import { GuestAssetsCard } from '@/components/guests/GuestAssetsCard'
 
-const TICKET_COLORS: Record<string, string> = {
-  vvip: 'bg-purple-100 text-purple-700',
-  vip:  'bg-amber-100 text-amber-700',
-  general: 'bg-[var(--bg)] text-[var(--muted)]',
+const TICKET_COLORS: Record<string, { bg: string; color: string }> = {
+  vvip:    { bg: 'rgba(168,85,247,0.15)',  color: '#c084fc' },
+  vip:     { bg: 'rgba(245,158,11,0.15)',  color: 'var(--warn)' },
+  general: { bg: 'rgba(255,255,255,0.06)', color: 'var(--muted)' },
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
@@ -72,10 +72,14 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-4xl text-[var(--ink)]">{guest.full_name}</h1>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TICKET_COLORS[guest.ticket_type]}`}>
-                {guest.ticket_type.toUpperCase()}
-              </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${checkedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--bg)] text-[var(--muted)]'}`}>
+              {(() => { const tc = TICKET_COLORS[guest.ticket_type] ?? TICKET_COLORS.general; return (
+                <span className="px-2.5 py-0.5 text-xs font-semibold"
+                  style={{ background: tc.bg, color: tc.color }}>
+                  {guest.ticket_type.toUpperCase()}
+                </span>
+              )})()}
+              <span className="px-2.5 py-0.5 text-xs font-semibold"
+                style={{ background: checkedIn ? 'var(--brand-soft)' : 'rgba(255,255,255,0.06)', color: checkedIn ? 'var(--brand)' : 'var(--muted)' }}>
                 {checkedIn ? 'Checked In' : 'Registered'}
               </span>
             </div>
@@ -95,7 +99,7 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
-      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
+      {error && <div className="mb-5 px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <div className="grid lg:grid-cols-2 gap-5">
         <GuestDetailsCard guest={guest} />
         <GuestAssetsCard guest={guest} passUrl={passUrl} qrUrl={qrUrl} />

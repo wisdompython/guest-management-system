@@ -8,14 +8,19 @@ import { ArrivalsFeed } from '@/components/dashboard/ArrivalsFeed'
 import { EventsPanel } from '@/components/dashboard/EventsPanel'
 
 export default function DashboardPage() {
-  const [guests, setGuests] = useState<Guest[]>([])
-  const [events, setEvents] = useState<Event[]>([])
+  const [guests, setGuests]   = useState<Guest[]>([])
+  const [events, setEvents]   = useState<Event[]>([])
+  const [activeEvent, setActiveEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
-  const [time, setTime] = useState(new Date())
+  const [time, setTime]       = useState(new Date())
 
   useEffect(() => {
     Promise.all([api.getGuests(), api.getEvents()])
-      .then(([g, e]) => { setGuests(g.results); setEvents(e) })
+      .then(([g, e]) => {
+        setGuests(g.results)
+        setEvents(e)
+        setActiveEvent(e[0] ?? null)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -25,31 +30,55 @@ export default function DashboardPage() {
     return () => clearInterval(t)
   }, [])
 
-  const total         = guests.length
-  const checkedIn     = guests.filter((g) => g.status === 'checked_in').length
-  const waSent        = guests.filter((g) => g.whatsapp_sent).length
+  const filteredGuests = activeEvent
+    ? guests.filter((g) => g.event === activeEvent.id)
+    : guests
+
+  const total         = filteredGuests.length
+  const checkedIn     = filteredGuests.filter((g) => g.status === 'checked_in').length
+  const waSent        = filteredGuests.filter((g) => g.whatsapp_sent).length
   const attendancePct = total > 0 ? Math.round((checkedIn / total) * 100) : 0
-  const activeEvent   = events[0] ?? null
-  const recentGuests  = [...guests].sort((a, b) =>
-    (b.checked_in_at ?? '').localeCompare(a.checked_in_at ?? '')
-  ).slice(0, 10)
+
+  const recentArrivals = [...filteredGuests]
+    .filter((g) => g.status === 'checked_in')
+    .sort((a, b) => (b.checked_in_at ?? '').localeCompare(a.checked_in_at ?? ''))
+    .slice(0, 10)
+
   const timeStr = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   return (
     <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
+
+      {/* Top bar */}
       <div className="flex flex-shrink-0 items-center justify-between px-6 py-3"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
-        <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            {loading ? '—' : activeEvent ? activeEvent.name : 'No active event'}
-            {activeEvent && <span style={{ color: 'var(--brand)' }}> · Live</span>}
-          </p>
+        <div className="flex items-center gap-4">
+          {/* Event switcher */}
+          {events.length > 1 ? (
+            <select
+              value={activeEvent?.id ?? ''}
+              onChange={(e) => setActiveEvent(events.find((ev) => ev.id === Number(e.target.value)) ?? null)}
+              className="text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[var(--brand)] px-2 py-1"
+              style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+              {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+            </select>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                {loading ? '—' : activeEvent ? activeEvent.name : 'No active event'}
+                {activeEvent && <span style={{ color: 'var(--brand)' }}> · Live</span>}
+              </p>
+            </div>
+          )}
           <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-            {activeEvent ? new Date(activeEvent.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '--'}
-            {' '}· {timeStr}
+            {activeEvent
+              ? new Date(activeEvent.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+              : '--'}
+            {' · '}{timeStr}
             {activeEvent?.venue ? ' · ' + activeEvent.venue : ''}
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           <Link href="/admin/check-in"
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition hover:opacity-80"
@@ -68,12 +97,19 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        <StatCards loading={loading} checkedIn={checkedIn} total={total} waSent={waSent}
-          eventsCount={events.length} attendancePct={attendancePct}
-          activeEventLabel={activeEvent ? 'Active event running' : 'No active event'} />
+        <StatCards
+          loading={loading}
+          checkedIn={checkedIn}
+          total={total}
+          waSent={waSent}
+          eventsCount={events.length}
+          attendancePct={attendancePct}
+          activeEventLabel={activeEvent ? 'Active event running' : 'No active event'}
+        />
         <div className="grid gap-4 xl:grid-cols-2">
-          <ArrivalsFeed guests={recentGuests} loading={loading} />
+          <ArrivalsFeed guests={recentArrivals} loading={loading} />
           <EventsPanel events={events} loading={loading} />
         </div>
       </div>

@@ -33,7 +33,7 @@ export function GuestList({ guests, loading, activeId, sent, notSent, total, onS
           return (
             <button key={g.id} onClick={() => onSelect(g.id)}
               className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors"
-              style={{ borderBottom: '1px solid var(--line)', background: isActive ? 'rgba(34,201,160,0.08)' : 'transparent' }}>
+              style={{ borderBottom: '1px solid var(--line)', background: isActive ? 'var(--brand-soft)' : 'transparent' }}>
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
                 style={{ background: 'var(--panel-2)', color: 'var(--muted)' }}>
                 {initials}

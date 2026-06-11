@@ -10,7 +10,7 @@ const WA_DOT: Record<string, string> = {
   read: 'var(--brand)', delivered: 'var(--brand)', sent: 'var(--muted)', failed: 'var(--danger)',
 }
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  checked_in: { bg: 'rgba(34,201,160,0.14)', color: 'var(--brand)', label: 'CHECKED-IN' },
+  checked_in: { bg: 'var(--brand-soft)', color: 'var(--brand)', label: 'CHECKED-IN' },
   registered:  { bg: 'rgba(245,158,11,0.14)',  color: 'var(--warn)',  label: 'PENDING' },
   no_show:     { bg: 'rgba(239,68,68,0.14)',    color: 'var(--danger)', label: 'NO-SHOW' },
 }
@@ -35,14 +35,14 @@ export function GuestTableRow({ g, isSel, deleting, onToggleSelect, onDelete }: 
     : g.ticket_type.charAt(0).toUpperCase() + g.ticket_type.slice(1)
   return (
     <tr className="transition-colors"
-      style={{ borderBottom: '1px solid var(--line)', background: isSel ? 'rgba(34,201,160,0.05)' : 'transparent' }}
+      style={{ borderBottom: '1px solid var(--line)', background: isSel ? 'var(--brand-soft)' : 'transparent' }}
       onMouseEnter={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'var(--panel)' }}
       onMouseLeave={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
       <td className="px-4 py-3"><input type="checkbox" checked={isSel} onChange={() => onToggleSelect(g.id)} className="accent-[var(--brand)]" /></td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-            style={{ background: 'rgba(34,201,160,0.15)', color: 'var(--brand)' }}>{initials}</div>
+            style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>{initials}</div>
           <div>
             <Link href={`/admin/guests/${g.id}`} className="font-semibold hover:underline" style={{ color: 'var(--ink)' }}>{g.full_name}</Link>
             <p className="text-[11px] font-mono" style={{ color: 'var(--muted-2)' }}>

@@ -56,7 +56,7 @@ export function NavSidebar({ user, logout }: Props) {
         <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-[11px] font-bold"
-              style={{ background: 'var(--brand)', color: '#0d1016' }}>G</div>
+              style={{ background: 'var(--brand)', color: '#0d1016' }}>T</div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>TWS Guest Pass</p>
               <p className="text-[10px]" style={{ color: 'var(--muted)' }}>northport.agency</p>
@@ -78,7 +78,7 @@ export function NavSidebar({ user, logout }: Props) {
                     return (
                       <Link key={href} href={href}
                         className="flex items-center gap-2.5 rounded px-2 py-1.5 text-[13px] transition-colors"
-                        style={{ background: active ? 'rgba(34,201,160,0.10)' : 'transparent', color: active ? 'var(--brand)' : 'var(--muted)' }}>
+                        style={{ background: active ? 'var(--brand-soft)' : 'transparent', color: active ? 'var(--brand)' : 'var(--muted)' }}>
                         <span style={{ opacity: active ? 1 : 0.7, color: active ? 'var(--brand)' : 'inherit' }}>{icon}</span>
                         <span className="flex-1">{itemLabel}</span>
                         {badge > 0 && (
@@ -97,7 +97,7 @@ export function NavSidebar({ user, logout }: Props) {
         <div className="px-3 py-3" style={{ borderTop: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-              style={{ background: 'rgba(34,201,160,0.15)', color: 'var(--brand)' }}>{initial}</div>
+              style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>{initial}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-medium" style={{ color: 'var(--ink)' }}>{displayName}</p>
               <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{user.username}</p>

@@ -38,7 +38,7 @@ export function ArrivalsFeed({ guests, loading }: Props) {
                 {checkedInTime || '--:--'}
               </div>
               {checkedInTime
-                ? <span className="text-[10px] font-bold px-1.5 py-0.5" style={{ background: 'rgba(34,201,160,0.12)', color: 'var(--brand)' }}>IN</span>
+                ? <span className="text-[10px] font-bold px-1.5 py-0.5" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>IN</span>
                 : <span className="w-8" />
               }
               <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-bold"

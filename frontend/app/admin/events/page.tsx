@@ -83,7 +83,7 @@ export default function EventsPage() {
                         Export
                       </button>
                       <button onClick={() => handleDelete(ev.id, ev.name)} disabled={deleting === ev.id}
-                        className="text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-40">Delete</button>
+                        className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40" style={{ color: 'var(--danger)' }}>Delete</button>
                     </div>
                   </td>
                 </tr>

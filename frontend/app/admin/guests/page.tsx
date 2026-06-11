@@ -85,7 +85,6 @@ export default function GuestsPage() {
           </h1>
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
             {checkedIn} checked in · {pending} pending
-            {loading ? '' : ' · 3 errors'}
           </p>
         </div>
         <div className="flex items-center gap-2">
