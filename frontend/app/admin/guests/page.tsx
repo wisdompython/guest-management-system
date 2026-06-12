@@ -31,9 +31,13 @@ export default function GuestsPage() {
   const [count, setCount]               = useState(0)
   const [loading, setLoading]           = useState(false)
   const [query, setQuery]               = useState('')
+  const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Set<string>>(new Set())
   const [deleting, setDeleting]         = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const PAGE_SIZE = 50
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
   const { tokens, freeText } = parseTokens(query)
   const statusToken = tokens.find((t) => t.key === 'status')?.value ?? ''
@@ -44,11 +48,14 @@ export default function GuestsPage() {
     api.getEvents().then(setEvents).catch(console.error).finally(() => setEventsLoading(false))
   }, [])
 
+  // reset to page 1 when filters or event changes
+  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken])
+
   useEffect(() => {
     if (!selectedEvent) return
     setLoading(true)
     setSelected(new Set())
-    const params: Record<string, string> = { event: String(selectedEvent.id) }
+    const params: Record<string, string> = { event: String(selectedEvent.id), page: String(page) }
     if (freeText)    params.search      = freeText
     if (statusToken) params.status      = statusToken === 'pending' ? 'registered' : statusToken
     if (ticketToken) params.ticket_type = ticketToken
@@ -56,7 +63,7 @@ export default function GuestsPage() {
       .then((data) => { setGuests(data.results); setCount(data.count) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedEvent, freeText, statusToken, ticketToken])
+  }, [selectedEvent, freeText, statusToken, ticketToken, page])
 
   const filtered = waToken
     ? guests.filter((g) => {
@@ -194,6 +201,49 @@ export default function GuestsPage() {
           onDelete={handleDelete} onClearQuery={() => setQuery('')}
         />
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-shrink-0 items-center justify-between px-5 py-3"
+          style={{ borderTop: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Page {page} of {totalPages} · {count} guests
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>«</button>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>‹ Prev</button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | '…')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('…')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) => p === '…' ? (
+                <span key={`ellipsis-${i}`} className="px-1 text-xs" style={{ color: 'var(--muted-2)' }}>…</span>
+              ) : (
+                <button key={p} onClick={() => setPage(p as number)}
+                  className="min-w-[28px] rounded px-2 py-1 text-xs font-semibold transition"
+                  style={{
+                    background: page === p ? 'var(--brand)' : 'transparent',
+                    color: page === p ? '#fff' : 'var(--muted)',
+                    border: `1px solid ${page === p ? 'var(--brand)' : 'var(--line)'}`,
+                  }}>{p}</button>
+              ))}
+
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>Next ›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>»</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
