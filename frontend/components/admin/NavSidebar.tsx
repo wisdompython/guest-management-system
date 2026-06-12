@@ -63,7 +63,6 @@ export function NavSidebar({ user, logout }: Props) {
               style={{ background: 'var(--brand)', color: '#0d1016' }}>T</div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>TWS Guest Pass</p>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>northport.agency</p>
             </div>
           </div>
         </div>
@@ -77,7 +76,7 @@ export function NavSidebar({ user, logout }: Props) {
                 <p className="mb-1 px-2 text-[10px] font-semibold tracking-[0.14em]" style={{ color: 'var(--muted-2)' }}>{label}</p>
                 <div className="space-y-0.5">
                   {visible.map(({ href, label: itemLabel, icon }) => {
-                    const active = pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href))
+                    const active = pathname === href || (href !== '/admin/dashboard' && href !== '/admin/settings' && pathname.startsWith(href))
                     const badge = 0
                     return (
                       <Link key={href} href={href}

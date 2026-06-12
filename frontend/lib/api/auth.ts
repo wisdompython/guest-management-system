@@ -12,7 +12,7 @@ export const authApi = {
     request<AuthUser[]>('/auth/users/'),
   createUser: (data: CreateUserPayload) =>
     request<AuthUser>('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
-  updateUser: (id: number, data: Partial<Pick<AuthUser, 'email' | 'first_name' | 'last_name' | 'role' | 'is_active'>>) =>
+  updateUser: (id: number, data: Partial<Pick<AuthUser, 'email' | 'first_name' | 'last_name' | 'role' | 'is_active'>> & { password?: string }) =>
     request<AuthUser>(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteUser: (id: number) =>
     request<void>(`/auth/users/${id}/`, { method: 'DELETE' }),

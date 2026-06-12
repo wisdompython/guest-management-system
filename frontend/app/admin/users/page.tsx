@@ -21,9 +21,6 @@ export default function UsersPage() {
   const [form, setForm]             = useState<CreateUserPayload>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError]   = useState('')
-  const [editingId, setEditingId]   = useState<number | null>(null)
-  const [editingRole, setEditingRole] = useState<UserRole>('viewer')
-  const [savingId, setSavingId]     = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -36,20 +33,19 @@ export default function UsersPage() {
 
   async function handleCreate(e: React.SyntheticEvent) {
     e.preventDefault(); setFormError(''); setSubmitting(true)
-    try { const u = await api.createUser(form); setUsers((prev) => [...prev, u]); setForm(EMPTY_FORM); setShowForm(false) }
-    catch (err: unknown) { setFormError(err instanceof Error ? err.message : 'Failed to create user.') }
+    try {
+      const u = await api.createUser(form)
+      setUsers((prev) => [...prev, u])
+      setForm(EMPTY_FORM); setShowForm(false)
+    } catch (err: unknown) { setFormError(err instanceof Error ? err.message : 'Failed to create user.') }
     finally { setSubmitting(false) }
   }
-  async function handleRoleSave(userId: number) {
-    setSavingId(userId)
-    try { const u = await api.updateUser(userId, { role: editingRole }); setUsers((prev) => prev.map((x) => x.id === userId ? u : x)); setEditingId(null) }
-    catch { /* ignore */ } finally { setSavingId(null) }
+
+  async function handleEditSave(userId: number, data: Partial<AuthUser> & { password?: string }) {
+    const u = await api.updateUser(userId, data)
+    setUsers((prev) => prev.map((x) => x.id === userId ? u : x))
   }
-  async function handleToggleActive(user: AuthUser) {
-    setSavingId(user.id)
-    try { const u = await api.updateUser(user.id, { is_active: !user.is_active }); setUsers((prev) => prev.map((x) => x.id === user.id ? u : x)) }
-    catch { /* ignore */ } finally { setSavingId(null) }
-  }
+
   async function handleDelete(user: AuthUser) {
     if (!confirm(`Permanently delete ${user.username}?`)) return
     setDeletingId(user.id)
@@ -67,7 +63,7 @@ export default function UsersPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ROLES.map(({ value, label }) => (
-          <div key={value} className="px-4 py-3" style={{ border: '1px solid var(--line)', background: '#fff' }}>
+          <div key={value} className="px-4 py-3" style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
             <span className="inline-block mb-1.5 rounded-sm px-2 py-0.5 text-xs font-semibold"
               style={{ background: ROLE_STYLE[value].bg, color: ROLE_STYLE[value].color }}>
               {label}
@@ -77,24 +73,26 @@ export default function UsersPage() {
         ))}
       </div>
 
-      <div className="overflow-hidden" style={{ border: '1px solid var(--line)' }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)', background: '#fff' }}>
+      <div className="overflow-hidden rounded-[12px]" style={{ border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{users.length} users</p>
           <button onClick={() => { setShowForm((s) => !s); setFormError('') }}
-            className="px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
             style={{ background: 'var(--brand)' }}>
-            {showForm ? 'Cancel' : '+ Invite User'}
+            {showForm ? 'Cancel' : '+ New User'}
           </button>
         </div>
         {showForm && (
           <UserFormModal form={form} submitting={submitting} formError={formError}
             onSubmit={handleCreate} onFieldChange={setField} />
         )}
-        <UserTable users={users} loading={loading} meId={me?.id}
-          editingId={editingId} editingRole={editingRole} savingId={savingId} deletingId={deletingId}
-          onEditStart={(id, role) => { setEditingId(id); setEditingRole(role) }}
-          onEditCancel={() => setEditingId(null)} onEditingRoleChange={setEditingRole}
-          onRoleSave={handleRoleSave} onToggleActive={handleToggleActive} onDelete={handleDelete} />
+        <UserTable
+          users={users} loading={loading} meId={me?.id}
+          editingId={null} editingRole={'viewer'} savingId={null} deletingId={deletingId}
+          onEditStart={() => {}} onEditCancel={() => {}} onEditingRoleChange={() => {}}
+          onRoleSave={() => {}} onToggleActive={() => {}} onDelete={handleDelete}
+          onEditSave={handleEditSave}
+        />
       </div>
     </div>
   )
