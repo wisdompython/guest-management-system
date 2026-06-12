@@ -76,6 +76,17 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# Trust the X-Forwarded-Proto header from Nginx so Django knows requests
+# arrive over HTTPS. Required for secure cookies behind SSL termination.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+# When running behind HTTPS, mark cookies as secure so the browser sends them.
+_https = os.environ.get('HTTPS', 'False') == 'True'
+CSRF_COOKIE_SECURE    = _https
+SESSION_COOKIE_SECURE = _https
+CSRF_COOKIE_SAMESITE  = 'Lax'
+
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
