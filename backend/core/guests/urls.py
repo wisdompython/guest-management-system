@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import EventViewSet, GuestViewSet, FontViewSet, EventReminderViewSet, WhatsAppTemplateViewSet
+from .views import EventViewSet, GuestViewSet, FontViewSet, EventReminderViewSet, WhatsAppTemplateViewSet, AvailableVarsView
 from .webhook import whatsapp_webhook
 from .views.test_views import whatsapp_test_send
 
@@ -13,6 +13,7 @@ router.register('whatsapp-templates', WhatsAppTemplateViewSet, basename='whatsap
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('whatsapp-templates/available-vars/', AvailableVarsView.as_view(), name='available-vars'),
     path('webhooks/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
     path('whatsapp/test-send/', whatsapp_test_send, name='whatsapp_test_send'),
 ]

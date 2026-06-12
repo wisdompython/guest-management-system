@@ -110,6 +110,8 @@ export interface WhatsAppTemplate {
   name: string;
   display_name: string;
   description: string;
+  body_params: string[];
+  has_header_image: boolean;
   is_active: boolean;
   created_at: string;
 }

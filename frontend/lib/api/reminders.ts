@@ -18,6 +18,8 @@ export const remindersApi = {
     const res = await request<WhatsAppTemplate[] | { results: WhatsAppTemplate[] }>('/whatsapp-templates/?active_only=1')
     return Array.isArray(res) ? res : res.results
   },
+  getAvailableTemplateVars: () =>
+    request<{ key: string; label: string }[]>('/whatsapp-templates/available-vars/'),
   createWhatsAppTemplate: (data: Omit<WhatsAppTemplate, 'id' | 'created_at'>) =>
     request<WhatsAppTemplate>('/whatsapp-templates/', { method: 'POST', body: JSON.stringify(data) }),
   deleteWhatsAppTemplate: (id: number) =>

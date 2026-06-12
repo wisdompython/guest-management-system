@@ -1,6 +1,7 @@
 from rest_framework import viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from ..models import EventReminder, ReminderLog, WhatsAppTemplate
 from accounts.permissions import IsEventManagerOrAbove
 
@@ -56,11 +57,29 @@ class EventReminderViewSet(viewsets.ModelViewSet):
         return Response({'queued': queued})
 
 
+AVAILABLE_VARS = [
+    {'key': 'guest_name',   'label': 'Guest full name'},
+    {'key': 'event_name',   'label': 'Event name'},
+    {'key': 'event_date',   'label': 'Event date & time'},
+    {'key': 'venue',        'label': 'Event venue'},
+    {'key': 'ticket_type',  'label': 'Guest ticket type'},
+    {'key': 'table_number', 'label': 'Guest table number'},
+    {'key': 'seat_number',  'label': 'Guest seat number'},
+]
+
+
 class WhatsAppTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhatsAppTemplate
-        fields = ['id', 'name', 'display_name', 'description', 'is_active', 'created_at']
+        fields = ['id', 'name', 'display_name', 'description', 'body_params', 'has_header_image', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+class AvailableVarsView(APIView):
+    permission_classes = [IsEventManagerOrAbove]
+
+    def get(self, request):
+        return Response(AVAILABLE_VARS)
 
 
 class WhatsAppTemplateViewSet(viewsets.ModelViewSet):

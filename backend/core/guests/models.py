@@ -160,11 +160,25 @@ class BulkUpload(models.Model):
 
 class WhatsAppTemplate(models.Model):
     """Registry of approved Meta WhatsApp templates available for use."""
-    name        = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
+
+    AVAILABLE_VARS = [
+        ('guest_name',  'Guest full name'),
+        ('event_name',  'Event name'),
+        ('event_date',  'Event date & time'),
+        ('venue',       'Event venue'),
+        ('ticket_type', 'Guest ticket type'),
+        ('table_number','Guest table number'),
+        ('seat_number', 'Guest seat number'),
+    ]
+
+    name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
     display_name = models.CharField(max_length=200, blank=True, help_text="Friendly label shown in the UI")
-    description = models.TextField(blank=True)
-    is_active   = models.BooleanField(default=True)
-    created_at  = models.DateTimeField(auto_now_add=True)
+    description  = models.TextField(blank=True)
+    # Ordered list of variable keys to pass as body params, e.g. ["guest_name", "event_name", "event_date"]
+    body_params  = models.JSONField(default=list, blank=True, help_text="Ordered list of variable keys for body params")
+    has_header_image = models.BooleanField(default=False, help_text="Template has a header image (pass image will be sent)")
+    is_active    = models.BooleanField(default=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.display_name or self.name

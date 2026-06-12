@@ -76,6 +76,25 @@ def send_pass(guest) -> bool:
         return False
 
 
+def _resolve_template_params(guest, body_params: list) -> list:
+    """Resolve ordered variable keys to actual guest/event values."""
+    event = guest.event
+    event_date = ''
+    if event and event.date:
+        event_date = event.date.strftime('%A, %d %B %Y at %I:%M %p')
+
+    var_map = {
+        'guest_name':   guest.full_name or '',
+        'event_name':   event.name if event else '',
+        'event_date':   event_date,
+        'venue':        event.venue if event else '',
+        'ticket_type':  guest.get_ticket_type_display() if hasattr(guest, 'get_ticket_type_display') else (guest.ticket_type or ''),
+        'table_number': guest.table_number or '',
+        'seat_number':  guest.seat_number or '',
+    }
+    return [var_map.get(key, '') for key in body_params]
+
+
 def send_reminder(guest, template_name: str) -> bool:
     """Send a reminder WhatsApp template message to a guest."""
     if not settings.WHATSAPP_PHONE_ID or not settings.WHATSAPP_TOKEN:
@@ -86,24 +105,38 @@ def send_reminder(guest, template_name: str) -> bool:
         return False
 
     try:
-        from pywa.types.templates import BodyText, TemplateLanguage
+        from pywa.types.templates import BodyText, HeaderImage, TemplateLanguage
+        from .models import WhatsAppTemplate
 
         phone = _normalise_phone(guest.phone_number)
-        event_name = guest.event.name if guest.event else 'the event'
 
-        # Format event date nicely
-        event_date = ''
-        if guest.event and guest.event.date:
-            event_date = guest.event.date.strftime('%A, %d %B %Y at %I:%M %p')
+        # Look up registered template config for param mapping
+        try:
+            tmpl = WhatsAppTemplate.objects.get(name=template_name, is_active=True)
+            body_param_values = _resolve_template_params(guest, tmpl.body_params or [])
+            has_header_image = tmpl.has_header_image
+        except WhatsAppTemplate.DoesNotExist:
+            # Fallback: default param order for unregistered templates
+            event = guest.event
+            event_date = event.date.strftime('%A, %d %B %Y at %I:%M %p') if (event and event.date) else ''
+            body_param_values = [guest.full_name, event.name if event else '', event_date]
+            has_header_image = False
+
+        params = []
+        if has_header_image:
+            pass_url = _build_pass_url(guest)
+            if pass_url:
+                params.append(HeaderImage.params(image=pass_url))
+
+        if body_param_values:
+            params.append(BodyText.params(*body_param_values))
 
         wa = _get_client()
         wa.send_template(
             to=phone,
             name=template_name,
             language=TemplateLanguage.ENGLISH,
-            params=[
-                BodyText.params(guest.full_name, event_name, event_date),
-            ],
+            params=params,
         )
         logger.info("Reminder sent to guest %s via template %s", guest.id, template_name)
         return True
