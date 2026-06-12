@@ -34,6 +34,35 @@ const input = 'w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ri
 const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }
 const label = 'block text-[10px] font-semibold uppercase tracking-[0.14em] mb-1'
 
+function RoleSelect({ value, disabled, onChange }: { value: UserRole; disabled?: boolean; onChange: (r: UserRole) => void }) {
+  const [open, setOpen] = useState(false)
+  const current = ROLES.find((r) => r.value === value)
+  return (
+    <div className="relative">
+      <button type="button" disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-3 py-2 text-sm text-left flex items-center justify-between disabled:opacity-50"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+        <span>{current?.label ?? value}</span>
+        <span style={{ color: 'var(--muted)' }}>▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 left-0 right-0 mt-1 py-1 rounded shadow-lg"
+          style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          {ROLES.map((r) => (
+            <button key={r.value} type="button"
+              onClick={() => { onChange(r.value as UserRole); setOpen(false) }}
+              className="w-full px-3 py-2 text-sm text-left transition hover:bg-[rgba(255,255,255,0.06)]"
+              style={{ color: r.value === value ? 'var(--brand)' : 'var(--ink)' }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function UserTable({
   users, loading, meId, deletingId,
   onDelete, onEditSave,
@@ -161,10 +190,8 @@ function UserRow({ u, meId, deletingId, onDelete, onEditSave }: {
             </div>
             <div>
               <label className={label} style={{ color: 'var(--muted)' }}>Role</label>
-              <select className={input} style={inputStyle} value={form.role} disabled={isMe}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserRole }))}>
-                {ROLES.map(({ value, label: l }) => <option key={value} value={value}>{l}</option>)}
-              </select>
+              <RoleSelect value={form.role} disabled={isMe}
+                onChange={(r) => setForm((f) => ({ ...f, role: r }))} />
             </div>
             <div>
               <label className={label} style={{ color: 'var(--muted)' }}>New password</label>
