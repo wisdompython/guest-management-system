@@ -97,6 +97,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} onValidationChange={setDateValid} />
         <PassDesignSection event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}
           previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
+          fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+          fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
           onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
           onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}

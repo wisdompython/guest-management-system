@@ -77,6 +77,8 @@ export default function AddEventPage() {
         <EventDetailsForm subtitle="Fields marked * are required." onValidationChange={setDateValid} />
         <PassDesignSection fileInputRef={fileInputRef} previewUrl={previewUrl}
           qrZone={qrZone} nameZone={nameZone} qrBgColor="none"
+          fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+          fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
           onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}
           onQrBgColorChange={() => {}} isEdit={false} />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}

@@ -5,6 +5,9 @@ import { Font } from '@/lib/api'
 const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
 const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
+// Reference height used to give a real px estimate (A4 landscape at 150dpi ≈ 1240px tall)
+const REF_HEIGHT_PX = 1240
+
 interface Props {
   fonts: Font[]
   selectedFont: string
@@ -19,6 +22,16 @@ export default function NameTypographyPanel({
   fonts, selectedFont, fontColor, fontSizeFrac,
   onFontChange, onColorChange, onSizeChange,
 }: Props) {
+  const approxPx = Math.round(fontSizeFrac * REF_HEIGHT_PX)
+
+  function handlePxInput(raw: string) {
+    const px = parseInt(raw, 10)
+    if (!isNaN(px) && px > 0) {
+      const frac = Math.min(Math.max(px / REF_HEIGHT_PX, 0.02), 0.15)
+      onSizeChange(frac)
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
@@ -57,15 +70,24 @@ export default function NameTypographyPanel({
           </div>
         </div>
         <div>
-          <label className={label}>
-            Size — {(fontSizeFrac * 100).toFixed(1)}% of height
-          </label>
+          <label className={label}>Size</label>
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="number"
+              min={Math.round(0.02 * REF_HEIGHT_PX)}
+              max={Math.round(0.15 * REF_HEIGHT_PX)}
+              value={approxPx}
+              onChange={(e) => handlePxInput(e.target.value)}
+              className="w-20 rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            />
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>px &nbsp;·&nbsp; {(fontSizeFrac * 100).toFixed(1)}% of height</span>
+          </div>
           <input
             type="range"
             min={0.02} max={0.15} step={0.005}
             value={fontSizeFrac}
             onChange={(e) => onSizeChange(Number(e.target.value))}
-            className="mt-1 w-full accent-[var(--brand)]"
+            className="w-full accent-[var(--brand)]"
           />
           <div className="mt-1 flex justify-between text-[10px]" style={{ color: 'var(--muted-2)' }}>
             <span>Smaller</span><span>Larger</span>
