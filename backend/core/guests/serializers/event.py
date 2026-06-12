@@ -45,7 +45,7 @@ class EventSerializer(serializers.ModelSerializer):
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
             'ticket_types', 'required_fields', 'whatsapp_enabled',
-            'guest_count', 'created_at',
+            'is_ended', 'guest_count', 'created_at',
         )
         read_only_fields = ('id', 'created_at', 'name_font_name')
 

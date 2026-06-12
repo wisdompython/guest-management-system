@@ -14,10 +14,20 @@ export default function EventsPage() {
   const [events, setEvents]   = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   useEffect(() => {
     api.getEvents().then(setEvents).catch(console.error).finally(() => setLoading(false))
   }, [])
+
+  async function handleToggleEnded(ev: Event) {
+    setTogglingId(ev.id)
+    try {
+      const updated = await api.updateEvent(ev.id, { is_ended: !ev.is_ended })
+      setEvents((prev) => prev.map((e) => e.id === ev.id ? updated : e))
+    } catch {}
+    finally { setTogglingId(null) }
+  }
 
   async function handleDelete(id: number, name: string) {
     if (!confirm(`Delete event "${name}"? This cannot be undone.`)) return
@@ -62,7 +72,16 @@ export default function EventsPage() {
             <tbody>
               {events.map((ev) => (
                 <tr key={ev.id} className="transition-colors hover:bg-[var(--bg)]" style={{ borderTop: '1px solid var(--line)' }}>
-                  <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</td>
+                  <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
+                    <div className="flex items-center gap-2">
+                      {ev.name}
+                      {ev.is_ended && (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>
+                          Ended
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="whitespace-nowrap px-5 py-3.5" style={{ color: 'var(--muted)' }}>{new Date(ev.date).toLocaleDateString()}</td>
                   <td className="max-w-[140px] truncate px-5 py-3.5" style={{ color: 'var(--muted)' }}>{ev.venue || '--'}</td>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>{ev.guest_count}</td>
@@ -81,6 +100,11 @@ export default function EventsPage() {
                       <button onClick={() => exportEvent(ev.id)}
                         className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>
                         Export
+                      </button>
+                      <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
+                        className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40"
+                        style={{ color: ev.is_ended ? 'var(--brand)' : 'var(--muted)' }}>
+                        {togglingId === ev.id ? '…' : ev.is_ended ? 'Reopen' : 'End'}
                       </button>
                       <button onClick={() => handleDelete(ev.id, ev.name)} disabled={deleting === ev.id}
                         className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40" style={{ color: 'var(--danger)' }}>Delete</button>

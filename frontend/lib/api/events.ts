@@ -9,6 +9,8 @@ export const eventsApi = {
   getEvent: (id: number) => request<Event>(`/events/${id}/`),
   createEvent: (data: Partial<Event>) =>
     request<Event>('/events/', { method: 'POST', body: JSON.stringify(data) }),
+  updateEvent: (id: number, data: Partial<Event>) =>
+    request<Event>(`/events/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteEvent: (id: number) =>
     request<void>(`/events/${id}/`, { method: 'DELETE' }),
 };

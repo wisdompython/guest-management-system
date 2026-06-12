@@ -56,6 +56,7 @@ class Event(models.Model):
     )
     # When False, WhatsApp delivery is not expected and phone_number is not auto-required
     whatsapp_enabled = models.BooleanField(default=True)
+    is_ended = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
