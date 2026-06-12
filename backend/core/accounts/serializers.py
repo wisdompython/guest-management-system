@@ -8,7 +8,19 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(username=data['username'], password=data['password'])
+        identifier = data['username']
+        password = data['password']
+
+        # Allow login with email address as well as username
+        user = authenticate(username=identifier, password=password)
+        if not user:
+            try:
+                from .models import User as UserModel
+                u = UserModel.objects.get(email__iexact=identifier)
+                user = authenticate(username=u.username, password=password)
+            except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
+                pass
+
         if not user:
             raise serializers.ValidationError('Invalid credentials.')
         if not user.is_active:

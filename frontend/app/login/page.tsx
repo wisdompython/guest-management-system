@@ -54,7 +54,7 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
-              Username
+              Username or Email
             </label>
             <input
               type="text"
