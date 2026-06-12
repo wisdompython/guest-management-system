@@ -156,3 +156,15 @@ class BulkUpload(models.Model):
 
     def __str__(self):
         return f"Upload for {self.event} ({self.status})"
+
+
+class WhatsAppTemplate(models.Model):
+    """Registry of approved Meta WhatsApp templates available for use."""
+    name        = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
+    display_name = models.CharField(max_length=200, blank=True, help_text="Friendly label shown in the UI")
+    description = models.TextField(blank=True)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.display_name or self.name

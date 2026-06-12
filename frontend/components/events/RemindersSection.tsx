@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { api, EventReminder } from '@/lib/api'
+import { api, EventReminder, WhatsAppTemplate } from '@/lib/api'
 
 const PRESET_HOURS = [
   { label: '7 days before',  hours: 168 },
@@ -21,6 +21,7 @@ interface Props { eventId: number }
 
 export function RemindersSection({ eventId }: Props) {
   const [reminders, setReminders] = useState<EventReminder[]>([])
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [sending, setSending] = useState<number | null>(null)
@@ -32,11 +33,17 @@ export function RemindersSection({ eventId }: Props) {
   const [presetHours, setPresetHours] = useState(24)
   const [customHours, setCustomHours] = useState('')
   const [templateName, setTemplateName] = useState('')
+  const [templateMode, setTemplateMode] = useState<'pick' | 'custom'>('pick')
 
   useEffect(() => {
-    api.getReminders(eventId)
-      .then(setReminders)
-      .catch(() => setError('Could not load reminders.'))
+    Promise.all([
+      api.getReminders(eventId),
+      api.getWhatsAppTemplates(),
+    ]).then(([r, t]) => {
+      setReminders(r)
+      setTemplates(t)
+      if (t.length > 0) setTemplateName(t[0].name)
+    }).catch(() => setError('Could not load reminders.'))
       .finally(() => setLoading(false))
   }, [eventId])
 
@@ -142,13 +149,39 @@ export function RemindersSection({ eventId }: Props) {
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] mb-1.5" style={{ color: 'var(--muted)' }}>
-              Meta Template Name
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--muted)' }}>
+              WhatsApp Template
             </p>
-            <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="e.g. event_reminder_1day"
-              className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+            {templates.length > 0 && (
+              <div className="flex gap-2 mb-3">
+                {(['pick', 'custom'] as const).map((m) => (
+                  <button key={m} type="button"
+                    onClick={() => {
+                      setTemplateMode(m)
+                      if (m === 'pick' && templates.length > 0) setTemplateName(templates[0].name)
+                      else setTemplateName('')
+                    }}
+                    className="px-3 py-1 text-xs font-semibold rounded-full transition"
+                    style={{ background: templateMode === m ? 'var(--brand-soft)' : 'transparent', color: templateMode === m ? 'var(--brand)' : 'var(--muted)', border: '1px solid var(--line)' }}>
+                    {m === 'pick' ? 'Select template' : 'Type name'}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(templateMode === 'pick' && templates.length > 0) ? (
+              <select value={templateName} onChange={(e) => setTemplateName(e.target.value)}
+                className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.name}>{t.display_name || t.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="e.g. event_reminder_1day"
+                className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+            )}
             <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
               Must match an approved template in your Meta WhatsApp Business account.
             </p>

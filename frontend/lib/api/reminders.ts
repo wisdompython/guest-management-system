@@ -1,5 +1,5 @@
 import { request } from './request';
-import type { EventReminder } from './types';
+import type { EventReminder, WhatsAppTemplate } from './types';
 
 export const remindersApi = {
   getReminders: async (eventId: number): Promise<EventReminder[]> => {
@@ -14,4 +14,12 @@ export const remindersApi = {
     request<void>(`/reminders/${id}/`, { method: 'DELETE' }),
   sendReminderNow: (id: number) =>
     request<{ queued: number }>(`/reminders/${id}/send_now/`, { method: 'POST' }),
+  getWhatsAppTemplates: async (): Promise<WhatsAppTemplate[]> => {
+    const res = await request<WhatsAppTemplate[] | { results: WhatsAppTemplate[] }>('/whatsapp-templates/?active_only=1')
+    return Array.isArray(res) ? res : res.results
+  },
+  createWhatsAppTemplate: (data: Omit<WhatsAppTemplate, 'id' | 'created_at'>) =>
+    request<WhatsAppTemplate>('/whatsapp-templates/', { method: 'POST', body: JSON.stringify(data) }),
+  deleteWhatsAppTemplate: (id: number) =>
+    request<void>(`/whatsapp-templates/${id}/`, { method: 'DELETE' }),
 };

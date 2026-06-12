@@ -1,7 +1,7 @@
 from rest_framework import viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from ..models import EventReminder, ReminderLog
+from ..models import EventReminder, ReminderLog, WhatsAppTemplate
 from accounts.permissions import IsEventManagerOrAbove
 
 
@@ -54,3 +54,21 @@ class EventReminderViewSet(viewsets.ModelViewSet):
             queued += 1
 
         return Response({'queued': queued})
+
+
+class WhatsAppTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WhatsAppTemplate
+        fields = ['id', 'name', 'display_name', 'description', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class WhatsAppTemplateViewSet(viewsets.ModelViewSet):
+    serializer_class = WhatsAppTemplateSerializer
+    permission_classes = [IsEventManagerOrAbove]
+
+    def get_queryset(self):
+        qs = WhatsAppTemplate.objects.all().order_by('display_name', 'name')
+        if self.request.query_params.get('active_only') == '1':
+            qs = qs.filter(is_active=True)
+        return qs
