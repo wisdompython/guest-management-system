@@ -38,7 +38,6 @@ const NAV_GROUPS = [
   { label: 'ADMIN', items: [
     { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const },
     { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const },
-    { href: '/admin/settings',           label: 'Settings',  icon: Ic.settings,  minRole: 'super_admin' as const },
   ]},
 ]
 
@@ -98,19 +97,19 @@ export function NavSidebar({ user, logout }: Props) {
         </div>
 
         <div className="px-3 py-3" style={{ borderTop: '1px solid var(--line)' }}>
-          <div className="flex items-center gap-2.5">
+          <Link href="/admin/profile" className="flex items-center gap-2.5 rounded px-1 py-1 transition-colors hover:bg-[var(--brand-soft)] group">
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
               style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>{initial}</div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium" style={{ color: 'var(--ink)' }}>{displayName}</p>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{user.username}</p>
+              <p className="truncate text-[12px] font-medium group-hover:text-[var(--brand)]" style={{ color: 'var(--ink)' }}>{displayName}</p>
+              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Edit profile</p>
             </div>
-            <button onClick={() => logout()} title="Sign out"
+            <button onClick={(e) => { e.preventDefault(); logout() }} title="Sign out"
               className="flex-shrink-0 transition-opacity hover:opacity-60"
               style={{ color: 'var(--muted-2)' }}>
               {Ic.logout}
             </button>
-          </div>
+          </Link>
         </div>
       </div>
     </aside>
