@@ -1,6 +1,9 @@
 import csv
 import io
+import logging
 from rest_framework import serializers
+
+logger = logging.getLogger(__name__)
 from ..models import Event, BulkUpload
 from .event import _event_required_fields, _event_valid_ticket_values
 
@@ -27,15 +30,24 @@ class BulkGuestUploadSerializer(serializers.Serializer):
         # Default ticket type: first in the event's list, or 'general' as a fallback
         default_ticket = valid_ticket_values[0] if valid_ticket_values else 'general'
 
-        text = csv_file.read().decode('utf-8-sig')
+        raw = csv_file.read()
+        for enc in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
+            try:
+                text = raw.decode(enc)
+                break
+            except (UnicodeDecodeError, ValueError):
+                continue
+        else:
+            text = raw.decode('latin-1')
         reader = csv.DictReader(io.StringIO(text))
 
-        headers = {h.strip().lower() for h in (reader.fieldnames or [])}
+        raw_headers = reader.fieldnames or []
+        headers = {h.strip().lower() for h in raw_headers}
+        logger.warning("CSV headers raw=%r parsed=%r", raw_headers, headers)
 
-        # full_name is the only column we always require in the CSV header
         if 'full_name' not in headers:
             raise serializers.ValidationError(
-                {'csv_file': "CSV is missing the required 'full_name' column."}
+                {'csv_file': f"CSV is missing the required 'full_name' column. Found columns: {list(headers)}"}
             )
 
         valid_rows = []
