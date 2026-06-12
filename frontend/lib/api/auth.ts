@@ -8,8 +8,10 @@ export const authApi = {
     request<void>('/auth/logout/', { method: 'POST' }),
   me: () =>
     request<AuthUser>('/auth/me/'),
-  getUsers: () =>
-    request<AuthUser[]>('/auth/users/'),
+  getUsers: async (): Promise<AuthUser[]> => {
+    const res = await request<AuthUser[] | { results: AuthUser[] }>('/auth/users/')
+    return Array.isArray(res) ? res : res.results
+  },
   createUser: (data: CreateUserPayload) =>
     request<AuthUser>('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id: number, data: Partial<Pick<AuthUser, 'email' | 'first_name' | 'last_name' | 'role' | 'is_active'>> & { password?: string }) =>
