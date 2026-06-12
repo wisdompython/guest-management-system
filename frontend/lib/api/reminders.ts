@@ -2,8 +2,10 @@ import { request } from './request';
 import type { EventReminder } from './types';
 
 export const remindersApi = {
-  getReminders: (eventId: number) =>
-    request<EventReminder[]>(`/reminders/?event=${eventId}`),
+  getReminders: async (eventId: number): Promise<EventReminder[]> => {
+    const res = await request<EventReminder[] | { results: EventReminder[] }>(`/reminders/?event=${eventId}`)
+    return Array.isArray(res) ? res : res.results
+  },
   createReminder: (data: { event: number; hours_before: number; template_name: string }) =>
     request<EventReminder>('/reminders/', { method: 'POST', body: JSON.stringify(data) }),
   updateReminder: (id: number, data: Partial<EventReminder>) =>
