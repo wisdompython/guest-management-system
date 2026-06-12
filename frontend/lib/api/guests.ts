@@ -18,7 +18,7 @@ export const guestsApi = {
   sendWhatsApp: (id: string) =>
     request<{ queued: boolean; guest_id: string }>(`/guests/${id}/send_whatsapp/`, { method: 'POST' }),
   bulkSendWhatsApp: (eventId: number, resend = false) =>
-    request<{ sent: number; failed: number; failures: { guest_id: string; name: string }[] }>('/guests/bulk_send_whatsapp/', { method: 'POST', body: JSON.stringify({ event_id: eventId, resend }) }),
+    request<{ queued: boolean; event_id: number; task_id: string }>('/guests/bulk_send_whatsapp/', { method: 'POST', body: JSON.stringify({ event_id: eventId, resend }) }),
   sendMessage: (id: string, message: string) =>
     request<{ sent: boolean }>(`/guests/${id}/send_message/`, { method: 'POST', body: JSON.stringify({ message }) }),
   scanGuest: (token: string) =>
