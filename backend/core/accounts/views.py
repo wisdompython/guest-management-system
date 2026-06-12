@@ -51,8 +51,6 @@ class UserViewSet(ModelViewSet):
     permission_classes = [IsSuperAdmin]
 
     def get_serializer_class(self):
-        if self.action in ('update', 'partial_update'):
-            return UpdateUserSerializer
         return UserSerializer
 
     def create(self, request, *args, **kwargs):
@@ -60,6 +58,14 @@ class UserViewSet(ModelViewSet):
         create_ser.is_valid(raise_exception=True)
         user = create_ser.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        update_ser = UpdateUserSerializer(instance, data=request.data, partial=partial)
+        update_ser.is_valid(raise_exception=True)
+        user = update_ser.save()
+        return Response(UserSerializer(user).data)
 
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
