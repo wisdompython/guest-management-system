@@ -76,6 +76,43 @@ def send_pass(guest) -> bool:
         return False
 
 
+def send_reminder(guest, template_name: str) -> bool:
+    """Send a reminder WhatsApp template message to a guest."""
+    if not settings.WHATSAPP_PHONE_ID or not settings.WHATSAPP_TOKEN:
+        logger.warning("WhatsApp not configured — skipping reminder for guest %s", guest.id)
+        return False
+
+    if not guest.phone_number:
+        return False
+
+    try:
+        from pywa.types.templates import BodyText, TemplateLanguage
+
+        phone = _normalise_phone(guest.phone_number)
+        event_name = guest.event.name if guest.event else 'the event'
+
+        # Format event date nicely
+        event_date = ''
+        if guest.event and guest.event.date:
+            event_date = guest.event.date.strftime('%A, %d %B %Y at %I:%M %p')
+
+        wa = _get_client()
+        wa.send_template(
+            to=phone,
+            name=template_name,
+            language=TemplateLanguage.ENGLISH,
+            params=[
+                BodyText.params(guest.full_name, event_name, event_date),
+            ],
+        )
+        logger.info("Reminder sent to guest %s via template %s", guest.id, template_name)
+        return True
+
+    except Exception as exc:
+        logger.error("Reminder send failed for guest %s: %s", guest.id, exc, exc_info=True)
+        return False
+
+
 def send_message(phone_number: str, message: str) -> bool:
     """
     Send a free-form text message to a phone number.

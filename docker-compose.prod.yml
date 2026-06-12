@@ -65,6 +65,23 @@ services:
     networks:
       - internal
 
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A core beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+    networks:
+      - internal
+
   frontend:
     build:
       context: ./frontend

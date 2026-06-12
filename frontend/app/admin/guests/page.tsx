@@ -89,6 +89,14 @@ export default function GuestsPage() {
         </div>
         <div className="flex items-center gap-2">
           <ExportDropdown events={events} />
+          <Link href="/admin/guests/bulk-upload"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90"
+            style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel-2)' }}>
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+            </svg>
+            Bulk upload
+          </Link>
           <Link href="/admin/guests/add"
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
             style={{ background: 'var(--brand)' }}>

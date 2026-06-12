@@ -1,6 +1,7 @@
 import logging
 from celery import shared_task
 from django.utils import timezone
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -113,3 +114,73 @@ def generate_guest_assets(guest_id: str, send_whatsapp: bool = True):
         send_whatsapp_pass.delay(guest_id)
 
     return {'qr': qr_ok, 'pass': pass_ok}
+
+
+@shared_task
+def send_reminder(reminder_id: int, guest_id: str):
+    """Send a single reminder WhatsApp message to one guest."""
+    from .models import EventReminder, ReminderLog, Guest
+    from .whatsapp import send_reminder as wa_send_reminder
+
+    try:
+        reminder = EventReminder.objects.select_related('event').get(pk=reminder_id)
+        guest = Guest.objects.select_related('event').get(pk=guest_id)
+    except (EventReminder.DoesNotExist, Guest.DoesNotExist):
+        return {'sent': False, 'reason': 'not found'}
+
+    # Avoid duplicate sends
+    if ReminderLog.objects.filter(reminder=reminder, guest=guest).exists():
+        return {'sent': False, 'reason': 'already sent'}
+
+    success = wa_send_reminder(guest, reminder.template_name)
+    ReminderLog.objects.create(reminder=reminder, guest=guest, success=success)
+    return {'sent': success}
+
+
+@shared_task
+def dispatch_due_reminders():
+    """
+    Periodic task — runs every 30 minutes.
+    Finds all active reminder rules whose fire window is now,
+    then queues individual send_reminder tasks for each eligible guest.
+    Fire window: event_date - hours_before is within the next 30 minutes.
+    """
+    from .models import EventReminder, ReminderLog
+
+    now = timezone.now()
+    window_end = now + timedelta(minutes=30)
+
+    # Find reminders whose scheduled fire time falls in the next 30-minute window
+    due_reminders = (
+        EventReminder.objects
+        .filter(is_active=True, event__date__isnull=False)
+        .select_related('event')
+    )
+
+    queued = 0
+    for reminder in due_reminders:
+        fire_at = reminder.event.date - timedelta(hours=reminder.hours_before)
+        if not (now <= fire_at < window_end):
+            continue
+
+        # Get guests for this event who have a phone number and haven't received this reminder
+        already_sent = ReminderLog.objects.filter(
+            reminder=reminder
+        ).values_list('guest_id', flat=True)
+
+        guests = (
+            reminder.event.guests
+            .exclude(pk__in=already_sent)
+            .exclude(phone_number='')
+            .values_list('id', flat=True)
+        )
+
+        for i, guest_id in enumerate(guests):
+            send_reminder.apply_async(
+                args=[reminder.id, str(guest_id)],
+                countdown=i * 3,  # 3s apart, same rate limit as pass sends
+            )
+            queued += 1
+
+    logger.info("dispatch_due_reminders: queued %s reminder sends", queued)
+    return {'queued': queued}

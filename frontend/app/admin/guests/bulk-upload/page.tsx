@@ -75,7 +75,7 @@ export default function BulkUploadPage() {
           Import a guest list from CSV. Select an event first — required columns update automatically.
         </p>
       </div>
-      {error && <div className="mb-5 rounded-[14px] border border-red-200 bg-red-50 px-5 py-3.5 text-sm text-red-700">{error}</div>}
+      {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       {result && <UploadResults result={result} />}
       <UploadForm
         events={events} selectedEvent={selectedEvent} submitting={submitting}

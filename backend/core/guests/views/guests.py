@@ -130,8 +130,10 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         if not token:
             return Response({'detail': 'token required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Support both "uuid|name|event|ticket" and plain uuid
+        # Support full URL, plain uuid, or legacy "uuid|name|event|ticket"
         raw = token.strip()
+        if raw.startswith('http'):
+            raw = raw.rstrip('/').split('/')[-1]
         guest_id = raw.split('|')[0] if '|' in raw else raw
 
         try:

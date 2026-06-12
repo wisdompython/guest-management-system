@@ -94,3 +94,13 @@ export interface Font {
   file: string;
   uploaded_at: string;
 }
+
+export interface EventReminder {
+  id: number;
+  event: number;
+  hours_before: number;
+  template_name: string;
+  is_active: boolean;
+  created_at: string;
+  logs_sent: number;
+}

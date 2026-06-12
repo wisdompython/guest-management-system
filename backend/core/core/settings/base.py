@@ -18,6 +18,7 @@ SITE_URL = os.environ.get('SITE_URL', 'http://localhost:3000')
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django_celery_results',
+    'django_celery_beat',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

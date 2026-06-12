@@ -96,6 +96,45 @@ class Guest(models.Model):
         return f"{self.full_name} — {self.ticket_type or 'guest'}"
 
 
+class EventReminder(models.Model):
+    """A reminder rule attached to an event. Fires X hours before the event."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reminders')
+    hours_before = models.PositiveIntegerField(
+        help_text='How many hours before the event to send this reminder (e.g. 168 = 7 days, 24 = 1 day).'
+    )
+    template_name = models.CharField(
+        max_length=100,
+        help_text='Approved Meta WhatsApp template name to use for this reminder.',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['hours_before']
+        unique_together = [('event', 'hours_before')]
+
+    def __str__(self):
+        days = self.hours_before // 24
+        hours = self.hours_before % 24
+        label = f"{days}d " if days else ""
+        label += f"{hours}h" if hours else ""
+        return f"{self.event.name} — {label.strip()} before"
+
+
+class ReminderLog(models.Model):
+    """Records that a specific reminder was sent to a specific guest."""
+    reminder = models.ForeignKey(EventReminder, on_delete=models.CASCADE, related_name='logs')
+    guest = models.ForeignKey(Guest, on_delete=models.CASCADE, related_name='reminder_logs')
+    sent_at = models.DateTimeField(auto_now_add=True)
+    success = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = [('reminder', 'guest')]
+
+    def __str__(self):
+        return f"{self.reminder} → {self.guest.full_name}"
+
+
 class BulkUpload(models.Model):
     class UploadStatus(models.TextChoices):
         PENDING = 'pending', 'Pending'

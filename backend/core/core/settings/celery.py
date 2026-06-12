@@ -1,4 +1,5 @@
 import os
+from celery.schedules import crontab
 
 # ---------------------------------------------------------------------------
 # Celery
@@ -16,3 +17,11 @@ CELERY_TIMEZONE           = 'UTC'
 _broker_set = bool(os.environ.get('CELERY_BROKER_URL'))
 CELERY_TASK_ALWAYS_EAGER  = not _broker_set
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# Periodic tasks (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    'dispatch-due-reminders': {
+        'task': 'guests.tasks.dispatch_due_reminders',
+        'schedule': crontab(minute='*/30'),  # every 30 minutes
+    },
+}
