@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { api, Event } from '@/lib/api'
-import { getCsrfToken } from '@/lib/api/request'
 import { UploadForm } from '@/components/bulk-upload/UploadForm'
 import { UploadResults } from '@/components/bulk-upload/UploadResults'
 
@@ -57,12 +56,7 @@ export default function BulkUploadPage() {
     formData.append('event', eventId)
     formData.append('csv_file', file)
     try {
-      // Ensure CSRF cookie exists before submitting FormData
-      if (!getCsrfToken()) {
-        const authBase = BASE_URL.replace(/\/api$/, '/api/auth')
-        await fetch(`${authBase}/csrf/`, { credentials: 'include' })
-      }
-      const res = await fetch(`${BASE_URL}/guests/bulk-upload/`, { method: 'POST', body: formData, credentials: 'include', headers: { 'X-CSRFToken': getCsrfToken() } })
+      const res = await fetch(`${BASE_URL}/guests/bulk-upload/`, { method: 'POST', body: formData, credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data))
       setResult(data); form.reset()

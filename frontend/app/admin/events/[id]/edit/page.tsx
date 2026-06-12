@@ -76,8 +76,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
     try {
-      const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
-      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
+      const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include' })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
       router.push('/admin/events')
     } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to save changes.'); setSubmitting(false) }

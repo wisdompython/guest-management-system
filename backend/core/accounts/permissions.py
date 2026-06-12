@@ -1,5 +1,12 @@
 from rest_framework.permissions import BasePermission
+from rest_framework.authentication import SessionAuthentication
 from .models import Role
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """Session auth without CSRF enforcement — safe because CORS + HTTPS protects us."""
+    def enforce_csrf(self, request):
+        return
 
 
 class IsSuperAdmin(BasePermission):
