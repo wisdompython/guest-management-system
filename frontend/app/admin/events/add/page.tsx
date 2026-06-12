@@ -79,6 +79,7 @@ export default function AddEventPage() {
           qrZone={qrZone} nameZone={nameZone} qrBgColor="none"
           fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
+          fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
           onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}
           onQrBgColorChange={() => {}} isEdit={false} />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}

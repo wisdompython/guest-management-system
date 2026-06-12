@@ -99,6 +99,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
           fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
+          fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
           onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
           onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}

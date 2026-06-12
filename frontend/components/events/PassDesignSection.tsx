@@ -20,6 +20,7 @@ interface Props {
   fontColor?: string
   fontSizeFrac?: number
   fontName?: string
+  fontFileUrl?: string
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onQrChange: (z: Zone | null) => void
   onNameChange: (z: Zone | null) => void
@@ -30,7 +31,7 @@ interface Props {
 export function PassDesignSection({
   event, newFileChosen, fileInputRef, previewUrl,
   qrZone, nameZone, qrBgColor,
-  fontColor, fontSizeFrac, fontName,
+  fontColor, fontSizeFrac, fontName, fontFileUrl,
   onFileChange, onQrChange, onNameChange, onQrBgColorChange,
   isEdit = false,
 }: Props) {
@@ -69,7 +70,7 @@ export function PassDesignSection({
             </div>
             <DualZoneCanvas imageUrl={previewUrl} qrZone={qrZone} onQrChange={onQrChange}
               nameZone={nameZone} onNameChange={onNameChange}
-              fontColor={fontColor} fontSizeFrac={fontSizeFrac} fontName={fontName} />
+              fontColor={fontColor} fontSizeFrac={fontSizeFrac} fontName={fontName} fontFileUrl={fontFileUrl} />
             {!qrZone && <ZoneWarning>No QR zone — will fall back to bottom-right corner.</ZoneWarning>}
             {!nameZone && <ZoneWarning>No name zone — guest name will not be printed on the pass.</ZoneWarning>}
           </>

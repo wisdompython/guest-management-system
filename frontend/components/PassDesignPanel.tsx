@@ -27,7 +27,7 @@ export function ZoneWarning({ children }: { children: React.ReactNode }) {
 
 function PassPreview({
   imageUrl, nameZone, qrZone,
-  fontColor, fontSizeFrac, fontName,
+  fontColor, fontSizeFrac, fontName, fontFileUrl,
 }: {
   imageUrl: string
   nameZone: Zone | null
@@ -35,11 +35,13 @@ function PassPreview({
   fontColor: string
   fontSizeFrac: number
   fontName: string
+  fontFileUrl?: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const [imgRect, setImgRect] = useState<{ width: number; height: number } | null>(null)
   const [previewName, setPreviewName] = useState('Guest Name')
+  const [fontLoaded, setFontLoaded] = useState(false)
 
   const measure = useCallback(() => {
     const img = imgRef.current
@@ -51,7 +53,18 @@ function PassPreview({
     return () => window.removeEventListener('resize', measure)
   }, [measure])
 
+  // Load the custom font into the browser when a font file URL is available
+  useEffect(() => {
+    if (!fontFileUrl || !fontName) { setFontLoaded(false); return }
+    const face = new FontFace(fontName, `url(${fontFileUrl})`)
+    face.load().then((loaded) => {
+      document.fonts.add(loaded)
+      setFontLoaded(true)
+    }).catch(() => setFontLoaded(false))
+  }, [fontFileUrl, fontName])
+
   const fontSizePx = imgRect ? fontSizeFrac * imgRect.height : 0
+  const resolvedFont = fontName && (fontLoaded || !fontFileUrl) ? fontName : 'inherit'
 
   return (
     <div className="space-y-3">
@@ -87,7 +100,7 @@ function PassPreview({
               style={{
                 fontSize: fontSizePx,
                 color: fontColor,
-                fontFamily: fontName || 'inherit',
+                fontFamily: resolvedFont,
                 whiteSpace: 'nowrap',
                 lineHeight: 1,
               }}>
@@ -136,7 +149,7 @@ export function DualZoneCanvas({
   imageUrl,
   qrZone, onQrChange,
   nameZone, onNameChange,
-  fontColor, fontSizeFrac, fontName,
+  fontColor, fontSizeFrac, fontName, fontFileUrl,
 }: {
   imageUrl: string
   qrZone: Zone | null
@@ -146,6 +159,7 @@ export function DualZoneCanvas({
   fontColor?: string
   fontSizeFrac?: number
   fontName?: string
+  fontFileUrl?: string
 }) {
   const [active, setActive] = useState<'qr' | 'name' | 'preview'>('qr')
 
@@ -193,6 +207,7 @@ export function DualZoneCanvas({
           fontColor={fontColor ?? '#ffffff'}
           fontSizeFrac={fontSizeFrac ?? 0.05}
           fontName={fontName ?? ''}
+          fontFileUrl={fontFileUrl}
         />
       )}
     </div>
