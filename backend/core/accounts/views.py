@@ -51,11 +51,15 @@ class UserViewSet(ModelViewSet):
     permission_classes = [IsSuperAdmin]
 
     def get_serializer_class(self):
-        if self.action == 'create':
-            return CreateUserSerializer
         if self.action in ('update', 'partial_update'):
             return UpdateUserSerializer
         return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        create_ser = CreateUserSerializer(data=request.data)
+        create_ser.is_valid(raise_exception=True)
+        user = create_ser.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
