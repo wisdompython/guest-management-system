@@ -29,7 +29,7 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         check_in                   → check-in staff or above
         create/update/delete/bulk  → event manager or above
         """
-        if self.action in ('list', 'retrieve', 'scan', 'export'):
+        if self.action in ('list', 'retrieve', 'scan', 'export', 'download_assets'):
             return [IsAuthenticatedAnyRole()]
         if self.action == 'check_in':
             return [IsCheckInStaffOrAbove()]

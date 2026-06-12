@@ -6,6 +6,7 @@ import { api, Guest, Event } from '@/lib/api'
 import ExportDropdown from '@/components/ExportDropdown'
 import { GuestFilterBar } from '@/components/guests/GuestFilterBar'
 import { GuestTable } from '@/components/guests/GuestTable'
+import { DownloadAssetsButton } from '@/components/guests/DownloadAssetsButton'
 
 type FilterToken = { key: string; value: string }
 
@@ -158,6 +159,7 @@ export default function GuestsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <DownloadAssetsButton eventId={selectedEvent.id} eventName={selectedEvent.name} />
           <ExportDropdown events={[selectedEvent]} />
           <Link href={`/admin/guests/bulk-upload?event=${selectedEvent.id}`}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90"

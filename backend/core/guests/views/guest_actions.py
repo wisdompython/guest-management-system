@@ -1,11 +1,15 @@
 import csv
+import io
 import logging
+import os
+import re
+import zipfile
 
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, HttpResponse
 
 from ..models import Event, Guest, BulkUpload
 from ..serializers import BulkGuestUploadSerializer
@@ -116,5 +120,51 @@ class GuestBulkExportMixin:
         writer = csv.writer(EchoBuffer())
         rows = (writer.writerow(r) for r in row_iter())
         response = StreamingHttpResponse(rows, content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=['get'], url_path='download-assets')
+    def download_assets(self, request):
+        event_id = request.query_params.get('event')
+        mode = request.query_params.get('mode', 'both')  # 'passes', 'qr', 'both'
+        if not event_id:
+            return Response({'detail': 'event param required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            event = Event.objects.get(pk=event_id)
+        except Event.DoesNotExist:
+            return Response({'detail': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        guests = Guest.objects.filter(event=event).order_by('full_name')
+
+        def safe_name(name):
+            return re.sub(r'[^\w\s-]', '', name).strip().replace(' ', '_')
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            missing = 0
+            for guest in guests:
+                name = safe_name(guest.full_name) or str(guest.id)
+
+                if mode in ('passes', 'both') and guest.pass_image:
+                    try:
+                        path = guest.pass_image.path
+                        ext = os.path.splitext(path)[1] or '.png'
+                        zf.write(path, f'passes/{name}{ext}')
+                    except (FileNotFoundError, ValueError):
+                        missing += 1
+
+                if mode in ('qr', 'both') and guest.qr_code:
+                    try:
+                        path = guest.qr_code.path
+                        ext = os.path.splitext(path)[1] or '.png'
+                        zf.write(path, f'qr_codes/{name}{ext}')
+                    except (FileNotFoundError, ValueError):
+                        missing += 1
+
+        buf.seek(0)
+        event_slug = re.sub(r'[^\w-]', '_', event.name)
+        filename = f"{event_slug}_{mode}.zip"
+        response = HttpResponse(buf.read(), content_type='application/zip')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
