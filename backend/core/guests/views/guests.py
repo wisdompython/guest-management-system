@@ -43,6 +43,8 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
+        if e := params.get('event'):
+            qs = qs.filter(event_id=e)
         if search := params.get('search'):
             qs = qs.filter(full_name__icontains=search) | qs.filter(phone_number__icontains=search)
         if s := params.get('status'):
