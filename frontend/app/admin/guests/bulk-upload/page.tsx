@@ -58,7 +58,13 @@ export default function BulkUploadPage() {
     try {
       const res = await fetch(`${BASE_URL}/guests/bulk-upload/`, { method: 'POST', body: formData, credentials: 'include' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data))
+      if (!res.ok) {
+        const msg = data.detail
+          ?? (data.csv_file ? (Array.isArray(data.csv_file) ? data.csv_file[0] : data.csv_file)
+          : data.event ? (Array.isArray(data.event) ? data.event[0] : data.event)
+          : JSON.stringify(data))
+        throw new Error(msg)
+      }
       setResult(data); form.reset()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed.')
