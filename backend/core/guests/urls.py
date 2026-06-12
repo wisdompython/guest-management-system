@@ -12,8 +12,9 @@ router.register('reminders', EventReminderViewSet, basename='reminder')
 router.register('whatsapp-templates', WhatsAppTemplateViewSet, basename='whatsapp-template')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    # Custom paths BEFORE router so they aren't swallowed by the router's prefix match
     path('whatsapp-templates/available-vars/', AvailableVarsView.as_view(), name='available-vars'),
     path('webhooks/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
     path('whatsapp/test-send/', whatsapp_test_send, name='whatsapp_test_send'),
+    path('', include(router.urls)),
 ]
