@@ -1,6 +1,6 @@
 'use client'
 
-const PRESETS = ['none', '#ffffff', '#000000'] as const
+const PRESETS = ['none', 'transparentfff', '#000000'] as const
 
 interface Props {
   qrBgColor: string
@@ -15,14 +15,14 @@ export function QrBgColorPicker({ qrBgColor, onChange }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         {([
           { value: 'none',    label: 'None (transparent)' },
-          { value: '#ffffff', label: 'White' },
+          { value: 'transparentfff', label: 'White' },
           { value: '#000000', label: 'Black' },
         ] as const).map((opt) => (
           <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
             className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition"
             style={{
               borderColor: qrBgColor === opt.value ? 'var(--brand)' : 'var(--line)',
-              background:  qrBgColor === opt.value ? 'var(--brand-soft)' : '#fff',
+              background:  qrBgColor === opt.value ? 'var(--brand-soft)' : 'transparent',
               color:       qrBgColor === opt.value ? 'var(--brand)' : 'var(--ink)',
             }}>
             {opt.value !== 'none' && <span className="h-3 w-3 rounded-full border border-[var(--line)]" style={{ background: opt.value }} />}
@@ -32,14 +32,14 @@ export function QrBgColorPicker({ qrBgColor, onChange }: Props) {
         <label className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold cursor-pointer transition"
           style={{
             borderColor: isCustom ? 'var(--brand)' : 'var(--line)',
-            background:  isCustom ? 'var(--brand-soft)' : '#fff',
+            background:  isCustom ? 'var(--brand-soft)' : 'transparent',
             color:       isCustom ? 'var(--brand)' : 'var(--ink)',
           }}>
           <span className="h-3 w-3 rounded-full border border-[var(--line)]"
             style={{ background: isCustom ? qrBgColor : '#eee' }} />
           Custom
           <input type="color" className="sr-only"
-            value={isCustom ? qrBgColor : '#ffffff'}
+            value={isCustom ? qrBgColor : 'transparentfff'}
             onChange={(e) => onChange(e.target.value)} />
         </label>
       </div>
