@@ -1,4 +1,6 @@
 from django.contrib.auth import login, logout
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -14,6 +16,7 @@ from .serializers import (
 )
 
 
+@ensure_csrf_cookie
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -31,6 +34,7 @@ def logout_view(request):
     return Response({'detail': 'Logged out.'})
 
 
+@ensure_csrf_cookie
 @api_view(['GET'])
 @permission_classes([IsAuthenticatedAnyRole])
 def me_view(request):
