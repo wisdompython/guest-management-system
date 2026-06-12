@@ -56,6 +56,9 @@ class BulkGuestUploadSerializer(serializers.Serializer):
 
         for i, raw_row in enumerate(reader, start=2):
             row = {k.strip().lower(): v.strip() for k, v in raw_row.items() if k}
+            # Skip completely empty rows (Excel adds trailing blank rows)
+            if not any(row.values()):
+                continue
             errors = []
 
             # Validate required fields
