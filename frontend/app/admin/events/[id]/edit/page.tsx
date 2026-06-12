@@ -9,7 +9,6 @@ import type { Zone } from '@/components/PassDesignPanel'
 import { EventDetailsForm } from '@/components/events/EventDetailsForm'
 import { PassDesignSection } from '@/components/events/PassDesignSection'
 import { GuestConfigSection } from '@/components/events/GuestConfigSection'
-import { RemindersSection } from '@/components/events/RemindersSection'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
@@ -107,7 +106,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           }} />
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
-        <RemindersSection eventId={Number(id)} />
         <div className="flex gap-3 pt-1">
           <button type="submit" disabled={submitting} className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">{submitting ? 'Saving…' : 'Save Changes'}</button>
           <button type="button" onClick={() => router.push('/admin/events')} className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Cancel</button>

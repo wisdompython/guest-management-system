@@ -78,6 +78,7 @@ export default function EventsPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Edit</Link>
+                      <Link href={`/admin/events/${ev.id}/reminders`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>Reminders</Link>
                       <button onClick={() => exportEvent(ev.id)}
                         className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>
                         Export
