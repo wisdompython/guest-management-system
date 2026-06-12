@@ -30,6 +30,7 @@ class BulkGuestUploadSerializer(serializers.Serializer):
         # Default ticket type: first in the event's list, or 'general' as a fallback
         default_ticket = valid_ticket_values[0] if valid_ticket_values else 'general'
 
+        csv_file.seek(0)
         raw = csv_file.read()
         for enc in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
             try:
