@@ -1,21 +1,81 @@
-# GuestOps
+# TWS E-GuestPass
 
-A private-event guest operations platform for WhatsApp-first teams. Covers the full workflow from guest import → branded pass generation → WhatsApp delivery → QR check-in.
+A private-event guest operations platform built for WhatsApp-first markets. Covers the full workflow from guest import → branded pass generation → WhatsApp delivery → QR check-in.
 
-Built for event agencies, wedding planners, churches, and corporate brand events in markets where WhatsApp is the primary communication channel.
+Built for event agencies, wedding planners, churches, and corporate brand events where WhatsApp is the primary communication channel.
 
 ---
 
 ## Features
 
-- **Event management** — create events with ticket categories, required fields, and per-event configuration
-- **Guest management** — add guests individually or via CSV bulk upload
-- **Branded pass generation** — composite guest QR codes onto custom design templates with configurable zones and typography
-- **WhatsApp delivery** — automatically send personalised passes via WhatsApp Business API on guest registration; bulk send and resend flows included
-- **QR check-in** — scan QR codes at the door; instant check-in with status tracking
-- **Role-based access** — Super Admin, Event Manager, Check-In Staff, Viewer
-- **Background workers** — Celery + Redis handles asset generation and WhatsApp sends asynchronously
-- **CSV export** — export guest lists filtered by event and status
+### Event Management
+- Create and manage events with name, date, venue, and ticket categories
+- Mark events as **Ended** / Reopen with a toggle — ended events are visually flagged
+- Per-event pass design configuration (template, zones, typography, QR styling)
+- Schedule WhatsApp reminder messages per event with configurable lead times
+
+### Guest Management
+- Add guests individually or via **CSV bulk upload**
+- Event-scoped guest list — select an event first, then view its guests
+- Filter and search by name, phone, ticket type, check-in status, WhatsApp status
+- Paginated list (50 per page) with first/prev/next/last controls
+- Delete guests with confirmation
+
+### Branded Pass Design
+- Upload a design template (PNG/JPG) per event
+- **Dual-zone canvas** — drag to position the QR code zone and guest name zone independently
+- Live **pass preview** tab showing the guest name rendered on the design with the actual selected font
+- Configure name font (from uploaded fonts), color, and size (slider + numeric px input)
+- Set QR background color with a color picker — for contrast on dark templates
+- Passes are generated server-side by compositing QR code and name onto the template using Pillow
+
+### Font Library
+- Upload custom fonts (TTF/OTF/WOFF) for use in pass designs
+- Fonts are loaded dynamically in the browser for live pass preview using the `FontFace` API
+
+### WhatsApp Delivery
+- Passes automatically sent via WhatsApp Business API on guest registration
+- **WhatsApp page** — grouped by event (event picker → guest list)
+  - Per-guest: Send Pass, Resend (with confirmation), Send custom message (modal)
+  - Bulk: **Send to unsent** (queued), **Resend all** (queued)
+- Custom message modal with 24-hour session window warning
+- WhatsApp send status tracked per guest (Sent / Not sent)
+- Webhook integration for delivery status updates
+- **Registered template management** — register approved Meta templates with parameter mapping via the Templates admin
+
+### Asset Downloads
+- Bulk download of guest assets per event as a ZIP file
+- Three modes: **Passes + QR Codes**, **Passes only**, **QR Codes only**
+- Files sorted by guest name inside `passes/` and `qr_codes/` folders
+
+### QR Check-in
+- Scanner stations page — scan any guest QR code for instant check-in
+- Supports full URL, plain UUID, and legacy pipe-delimited QR formats
+- Check-in status and timestamp recorded per guest
+- Conflict detection — already checked-in guests return 409
+
+### Reminders
+- Schedule automated WhatsApp reminder messages per event
+- Configurable lead time (hours before event)
+- Uses registered Meta templates with per-template parameter mapping
+- Reminder log tracks send status per guest per reminder
+
+### CSV Export
+- Export guest list filtered by event and/or status
+- Streaming CSV response — handles large lists without memory issues
+
+### Team Management (Super Admin)
+- Create, edit, and delete user accounts
+- Assign roles: Super Admin, Event Manager, Check-In Staff, Viewer
+- Login supports username or email
+
+### Role-Based Access Control
+| Role | Permissions |
+|------|------------|
+| `super_admin` | Full access — users, events, guests, settings, templates |
+| `event_manager` | Events and guests — create, edit, delete, bulk upload |
+| `check_in_staff` | Check in guests, view guest lists |
+| `viewer` | Read-only access |
 
 ---
 
@@ -25,7 +85,7 @@ Built for event agencies, wedding planners, churches, and corporate brand events
 |-------|-----------|
 | Backend | Django 6, Django REST Framework |
 | Frontend | Next.js 16, React 19, Tailwind CSS 4 |
-| Database | SQLite (dev) / PostgreSQL (production) |
+| Database | PostgreSQL (production) / SQLite (dev) |
 | Task queue | Celery 5 + Redis 7 |
 | WhatsApp | Meta Cloud API via PyWA |
 | Image processing | Pillow, qrcode |
@@ -38,25 +98,33 @@ Built for event agencies, wedding planners, churches, and corporate brand events
 guest_management/
 ├── backend/
 │   └── core/
-│       ├── accounts/        # Custom user model, roles, permissions
-│       ├── guests/          # Events, guests, passes, WhatsApp, tasks
-│       │   ├── models.py
-│       │   ├── views/       # Split by resource (events, guests, fonts)
+│       ├── accounts/        # Custom user model, roles, JWT-free session auth
+│       ├── guests/          # Events, guests, passes, WhatsApp, reminders
+│       │   ├── models.py    # Event, Guest, Font, WhatsAppTemplate, Reminder
+│       │   ├── views/       # Split by resource (events, guests, fonts, templates)
 │       │   ├── serializers/ # Split by model
 │       │   ├── utils/       # QR generation, pass compositing, color helpers
-│       │   ├── tasks.py     # Celery tasks
-│       │   ├── whatsapp.py  # PyWA client, send_pass, send_message
-│       │   └── webhook.py   # Meta webhook handler
+│       │   ├── tasks.py     # Celery tasks (asset generation, WA sends, reminders)
+│       │   ├── whatsapp.py  # PyWA client — send_pass, send_message, send_reminder
+│       │   └── webhook.py   # Meta webhook handler (delivery status updates)
 │       └── core/
 │           └── settings/    # Split settings (base, db, celery, whatsapp, cors)
 ├── frontend/
 │   ├── app/
-│   │   ├── admin/           # Dashboard, events, guests, WhatsApp, check-in, users
-│   │   └── login/
-│   ├── components/          # Shared UI components
+│   │   ├── admin/           # Dashboard, events, guests, WhatsApp, check-in, fonts,
+│   │   │                    # reminders, users, templates, profile
+│   │   ├── login/
+│   │   └── scan/[id]/       # Public QR scan landing page
+│   ├── components/
+│   │   ├── admin/           # NavSidebar, MobileNav
+│   │   ├── events/          # PassDesignSection, QrBgColorPicker, DualZoneCanvas
+│   │   ├── guests/          # GuestTable, GuestFilterBar, DownloadAssetsButton
+│   │   ├── landing/         # LandingNav, LandingFooter
+│   │   └── users/           # UserTable, UserRow, UserFormModal
 │   └── lib/
-│       └── api/             # Typed API client split by domain
-└── docker-compose.yml       # Redis service
+│       └── api/             # Typed API client split by domain (auth, guests, events, …)
+├── docker-compose.yml       # Local dev (Redis only)
+└── docker-compose.prod.yml  # Production (backend, frontend, celery, redis, postgres)
 ```
 
 ---
@@ -67,7 +135,7 @@ guest_management/
 
 - Python 3.11+
 - Node.js 20+
-- Docker (for Redis)
+- Docker (for Redis in dev, or full stack in prod)
 
 ### Backend Setup
 
@@ -79,22 +147,14 @@ python -m venv venv
 source venv/Scripts/activate  # Windows
 # source venv/bin/activate     # Mac/Linux
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
 cp .env.example .env
 # Edit .env with your values
 
 cd core
-
-# Run migrations
 python manage.py migrate
-
-# Create a superuser
 python manage.py createsuperuser
-
-# Start development server
 python manage.py runserver
 ```
 
@@ -104,7 +164,6 @@ python manage.py runserver
 cd frontend
 npm install
 
-# Configure environment
 cp .env.local.example .env.local
 # Set NEXT_PUBLIC_API_URL=http://localhost:8000/api
 
@@ -114,7 +173,6 @@ npm run dev
 ### Start Redis (required for background tasks)
 
 ```bash
-# From project root
 docker compose up -d
 ```
 
@@ -165,9 +223,13 @@ celery -A core worker --loglevel=info
 ### Authentication
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/login/` | Login |
+| POST | `/api/auth/login/` | Login (username or email) |
 | POST | `/api/auth/logout/` | Logout |
 | GET | `/api/auth/me/` | Current user |
+| GET | `/api/auth/users/` | List users (super admin) |
+| POST | `/api/auth/users/` | Create user |
+| PATCH | `/api/auth/users/{id}/` | Update user |
+| DELETE | `/api/auth/users/{id}/` | Delete user |
 
 ### Events
 | Method | Endpoint | Description |
@@ -175,40 +237,55 @@ celery -A core worker --loglevel=info
 | GET | `/api/events/` | List events |
 | POST | `/api/events/` | Create event |
 | GET | `/api/events/{id}/` | Get event |
-| PATCH | `/api/events/{id}/` | Update event |
+| PATCH | `/api/events/{id}/` | Update event (incl. `is_ended`) |
 | DELETE | `/api/events/{id}/` | Delete event |
 
 ### Guests
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/guests/` | List guests (supports `search`, `status`, `ticket_type`) |
+| GET | `/api/guests/` | List guests (`event`, `search`, `status`, `ticket_type`, `page`) |
 | POST | `/api/guests/` | Create guest (triggers asset generation + WhatsApp send) |
 | GET | `/api/guests/{id}/` | Get guest |
+| PATCH | `/api/guests/{id}/` | Update guest |
 | DELETE | `/api/guests/{id}/` | Delete guest |
 | POST | `/api/guests/{id}/check_in/` | Check in guest |
 | POST | `/api/guests/{id}/regenerate_assets/` | Regenerate QR + pass (queued) |
 | POST | `/api/guests/{id}/send_whatsapp/` | Send pass via WhatsApp (queued) |
 | POST | `/api/guests/{id}/send_message/` | Send free-form WhatsApp message |
 | POST | `/api/guests/bulk-upload/` | CSV bulk upload |
-| POST | `/api/guests/bulk_send_whatsapp/` | Bulk send passes (queued) |
-| GET | `/api/guests/scan/?token=` | Scan QR token |
+| POST | `/api/guests/bulk_send_whatsapp/` | Bulk send passes for an event (queued) |
+| GET | `/api/guests/scan/?token=` | Scan QR token for check-in |
 | GET | `/api/guests/export/` | Export CSV |
+| GET | `/api/guests/download-assets/` | Download ZIP of passes and/or QR codes |
+
+### Fonts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/fonts/` | List uploaded fonts |
+| POST | `/api/fonts/` | Upload font file |
+| DELETE | `/api/fonts/{id}/` | Delete font |
+
+### Reminders
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/reminders/` | List reminders for an event |
+| POST | `/api/reminders/` | Create reminder |
+| PATCH | `/api/reminders/{id}/` | Update reminder |
+| DELETE | `/api/reminders/{id}/` | Delete reminder |
+
+### WhatsApp Templates
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/whatsapp-templates/` | List registered templates |
+| POST | `/api/whatsapp-templates/` | Register a template |
+| PATCH | `/api/whatsapp-templates/{id}/` | Update template |
+| DELETE | `/api/whatsapp-templates/{id}/` | Delete template |
+| GET | `/api/whatsapp-templates/available-vars/` | List available parameter variables |
 
 ### Webhooks
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET/POST | `/api/webhooks/whatsapp/` | Meta WhatsApp webhook |
-
----
-
-## User Roles
-
-| Role | Permissions |
-|------|------------|
-| `super_admin` | Full access — users, events, guests, settings |
-| `event_manager` | Events and guests — create, edit, delete |
-| `check_in_staff` | Check in guests, view lists |
-| `viewer` | Read-only access |
+| GET/POST | `/api/webhooks/whatsapp/` | Meta WhatsApp webhook (verification + delivery status) |
 
 ---
 
@@ -219,65 +296,70 @@ celery -A core worker --loglevel=info
 3. Register and verify your business phone number
 4. Create a message template (category: **Utility**) with:
    - Header: Image
-   - Body: `Hi {{1}}, your pass for *{{2}}* is attached. Please show this at the entrance on the day of the event.`
-5. Add your credentials to `.env`
-6. Register your webhook URL: `https://yourdomain.com/api/webhooks/whatsapp/`
-7. Set `WHATSAPP_MEDIA_BASE_URL` to your public domain so Meta can fetch pass images
+   - Body: `Hi {{1}}, your guest pass for *{{2}}* is ready. Please present this at the entrance on the day of the event. We look forward to welcoming you!`
+5. Wait for Meta approval, then register the template in **Admin → Templates** with its parameter mapping
+6. Add your credentials to `.env`
+7. Register your webhook URL: `https://yourdomain.com/api/webhooks/whatsapp/`
+8. Set `WHATSAPP_MEDIA_BASE_URL` to your public domain so Meta can fetch pass images
 
-> **Note:** Pass images must be served from a publicly accessible URL. Use ngrok for local testing.
+> **Note:** Free-form text messages (`send_message`) only work within 24 hours of the guest messaging your business number first (Meta policy). Pass delivery uses approved templates and has no session requirement.
 
 ---
 
 ## Pass Design
 
-Each event can have a custom design template (PNG/JPG). The pass designer allows you to:
+Each event can have a custom pass template. The designer lets you:
 
-- Upload a design template
-- Draw QR code zone (drag on canvas)
-- Draw guest name zone (drag on canvas)
-- Configure name font, color, and size
-- Set QR background color for contrast on dark templates
+- Upload a background design (PNG/JPG)
+- **Draw QR zone** — drag on the canvas to position and size the QR code
+- **Draw name zone** — drag on the canvas to position the guest name text
+- **Preview tab** — live render of name text on the actual design with the selected font, color, and size
+- Configure font (from the font library), color (hex picker), and size (slider + px input)
+- Set QR background color — useful for dark templates where QR codes need a white backing
 
-Passes are generated by compositing the guest's QR code and name onto the template using Pillow.
+Passes are generated server-side by compositing the QR code and guest name onto the template using Pillow.
 
 ---
 
 ## Deployment (VPS)
 
 ### Stack
-- **Nginx** installed on the server — reverse proxy + SSL
-- **Docker Compose** for all app containers (backend, frontend, celery, redis, postgres)
+- **Nginx** on the host — reverse proxy + SSL termination
+- **Docker Compose** for all app services (backend, frontend, celery, redis, postgres)
 
 ### First-time setup
 
 ```bash
-# 1. Install Docker on the VPS
+# 1. Install Docker
 curl -fsSL https://get.docker.com | sh
 
 # 2. Install Nginx and Certbot
 sudo apt install nginx certbot python3-certbot-nginx -y
 
 # 3. Clone the repo
-git clone <repo-url> /opt/guestops
-cd /opt/guestops
+git clone <repo-url> ~/guest-management-system
+cd ~/guest-management-system
 
 # 4. Configure environment
 cp .env.prod.example .env.prod
-# Edit .env.prod — fill in all values, especially SECRET_KEY and DB_PASSWORD
+# Fill in all values — SECRET_KEY, DB_PASSWORD, WHATSAPP_*, WHATSAPP_MEDIA_BASE_URL
 
 # 5. Configure Nginx
 sudo cp nginx/guestops.conf /etc/nginx/sites-available/guestops
 sudo ln -s /etc/nginx/sites-available/guestops /etc/nginx/sites-enabled/
-# Edit /etc/nginx/sites-available/guestops — replace yourdomain.com with your actual domain
+# Replace yourdomain.com in the config file
 sudo nginx -t && sudo systemctl reload nginx
 
 # 6. Get SSL certificate
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d yourdomain.com
 
-# 7. Build and start containers
+# 7. Build and start
 docker compose -f docker-compose.prod.yml up -d --build
 
-# 8. Create superuser
+# 8. Run migrations
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
+
+# 9. Create superuser
 docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 ```
 
@@ -286,6 +368,7 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 ```bash
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
 ```
 
 ### Useful commands
@@ -295,8 +378,11 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml logs -f backend
 docker compose -f docker-compose.prod.yml logs -f celery
 
-# Run Django management commands
+# Run a Django management command
 docker compose -f docker-compose.prod.yml exec backend python manage.py <command>
+
+# Open a database shell
+docker compose -f docker-compose.prod.yml exec postgres psql -U postgres -d guest_management
 
 # Restart a single service
 docker compose -f docker-compose.prod.yml restart backend
@@ -306,7 +392,7 @@ docker compose -f docker-compose.prod.yml restart backend
 
 - `GUNICORN_WORKERS` — set to `(2 × CPU cores) + 1`. For a 2-core VPS use `5`
 - Media files (passes, QR codes) are stored in a Docker volume — back this up regularly
-- `WHATSAPP_MEDIA_BASE_URL` must match your domain so Meta can fetch pass images
+- `WHATSAPP_MEDIA_BASE_URL` must be your public domain so Meta can fetch pass images for delivery
 
 ---
 
