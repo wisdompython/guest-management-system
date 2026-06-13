@@ -21,15 +21,18 @@ function MessageModal({ guest, onClose }: { guest: Guest; onClose: () => void })
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleSend() {
     if (!message.trim()) return
     setSending(true)
+    setError('')
     try {
       await api.sendMessage(guest.id, message.trim())
       setSent(true)
       setTimeout(onClose, 1200)
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Message failed to send.')
       setSending(false)
     }
   }
@@ -48,9 +51,15 @@ function MessageModal({ guest, onClose }: { guest: Guest; onClose: () => void })
           <button onClick={onClose} className="text-sm" style={{ color: 'var(--muted)' }}>✕</button>
         </div>
         <div className="p-5 space-y-3">
-          <p className="text-xs rounded-lg px-3 py-2" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
-            Only works within 24h of the guest's last message to your business number.
-          </p>
+          {error ? (
+            <p className="text-xs rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {error}
+            </p>
+          ) : (
+            <p className="text-xs rounded-lg px-3 py-2" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
+              Only works within 24h of the guest messaging your business number first.
+            </p>
+          )}
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}

@@ -31,7 +31,7 @@ export default function HomePage() {
         </div>
 
         <h1 className="mb-2 text-4xl font-bold tracking-tight" style={{ color: '#e4e8f0' }}>
-          TWS Guest Pass
+          TWS E-GuestPass
         </h1>
         <p className="mb-10 text-sm" style={{ color: '#6b7585' }}>
           Guest operations platform · The Wedding Store

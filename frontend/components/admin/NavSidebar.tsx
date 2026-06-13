@@ -61,7 +61,7 @@ export function NavSidebar({ user, logout }: Props) {
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-[11px] font-bold"
               style={{ background: 'var(--brand)', color: '#0d1016' }}>T</div>
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>TWS Guest Pass</p>
+              <p className="truncate text-[13px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>TWS E-GuestPass</p>
             </div>
           </div>
         </div>

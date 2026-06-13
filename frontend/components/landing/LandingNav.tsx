@@ -6,7 +6,7 @@ export function LandingNav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5 sm:px-10">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ background: 'var(--brand)' }}>G</div>
-          <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--ink)' }}>TWS Guest Pass</span>
+          <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--ink)' }}>TWS E-GuestPass</span>
           <span className="hidden text-xs font-medium sm:block" style={{ color: 'var(--muted-2)' }}>GMS</span>
         </div>
         <nav className="hidden items-center gap-8 sm:flex">

@@ -124,7 +124,12 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             return Response({'detail': 'Guest has no phone number.'}, status=status.HTTP_400_BAD_REQUEST)
         from ..whatsapp import send_message as wa_send_message
         sent = wa_send_message(guest.phone_number, message)
-        return Response({'sent': sent})
+        if not sent:
+            return Response(
+                {'detail': 'Message not sent. The guest must message your WhatsApp business number first to open a 24-hour session window.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'sent': True})
 
     @action(detail=False, methods=['get'])
     def scan(self, request):

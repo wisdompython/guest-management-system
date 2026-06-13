@@ -7,7 +7,7 @@ export function LandingFooter() {
         <div>
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ background: 'var(--brand)' }}>G</div>
-            <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>TWS Guest Pass</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>TWS E-GuestPass</span>
           </div>
           <p className="mt-3 max-w-xs text-sm leading-6" style={{ color: 'var(--muted)' }}>
             The enterprise standard for high-stakes event guest management. Built for precision and scale.
@@ -27,7 +27,7 @@ export function LandingFooter() {
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-6 py-4 sm:px-10 flex justify-between" style={{ borderTop: '1px solid var(--line)' }}>
-        <p className="text-xs" style={{ color: 'var(--muted-2)' }}>© 2026 TWS Guest Pass. All rights reserved.</p>
+        <p className="text-xs" style={{ color: 'var(--muted-2)' }}>© 2026 TWS E-GuestPass. All rights reserved.</p>
         <p className="text-xs" style={{ color: 'var(--muted-2)' }}>Terms of Service · Cookie Policy</p>
       </div>
     </footer>

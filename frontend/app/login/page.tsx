@@ -40,7 +40,7 @@ function LoginForm() {
           style={{ background: 'var(--brand)' }}>
           T
         </div>
-        <h1 className="font-display text-3xl font-semibold" style={{ color: 'var(--ink)' }}>TWS Guest Pass</h1>
+        <h1 className="font-display text-3xl font-semibold" style={{ color: 'var(--ink)' }}>TWS E-GuestPass</h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Sign in to your account</p>
       </div>
 
@@ -95,7 +95,7 @@ function LoginForm() {
       </div>
 
       <p className="mt-6 text-center text-xs" style={{ color: 'var(--muted-2)' }}>
-        TWS Guest Pass · Luxury Event Management
+        TWS E-GuestPass · Luxury Event Management
       </p>
     </div>
   )
