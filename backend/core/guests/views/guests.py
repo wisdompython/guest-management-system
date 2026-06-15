@@ -83,6 +83,20 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             logger.error("send_whatsapp error for guest %s: %s", guest.id, exc, exc_info=True)
             return Response({'queued': False, 'detail': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=False, methods=['post'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        ids = request.data.get('ids')
+        event_id = request.data.get('event_id')
+        if not ids and not event_id:
+            return Response({'detail': 'Provide ids or event_id.'}, status=status.HTTP_400_BAD_REQUEST)
+        qs = Guest.objects.all()
+        if ids:
+            qs = qs.filter(id__in=ids)
+        elif event_id:
+            qs = qs.filter(event_id=event_id)
+        deleted, _ = qs.delete()
+        return Response({'deleted': deleted})
+
     @action(detail=False, methods=['post'], url_path='bulk_send_whatsapp')
     def bulk_send_whatsapp(self, request):
         event_id = request.data.get('event_id')

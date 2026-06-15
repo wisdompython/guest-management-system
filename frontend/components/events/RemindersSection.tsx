@@ -171,7 +171,7 @@ export function RemindersSection({ eventId }: Props) {
             {(templateMode === 'pick' && templates.length > 0) ? (
               <select value={templateName} onChange={(e) => setTemplateName(e.target.value)}
                 className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
                 {templates.map((t) => (
                   <option key={t.id} value={t.name}>{t.display_name || t.name}</option>
                 ))}

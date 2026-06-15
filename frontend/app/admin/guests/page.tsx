@@ -90,6 +90,30 @@ export default function GuestsPage() {
     } catch {} finally { setDeleting(null) }
   }
 
+  async function handleBulkDelete() {
+    if (selected.size === 0) return
+    if (!confirm(`Delete ${selected.size} selected guest${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    setDeleting('bulk')
+    try {
+      const { deleted } = await api.bulkDeleteGuests(Array.from(selected))
+      setGuests((prev) => prev.filter((g) => !selected.has(g.id)))
+      setCount((c) => c - deleted)
+      setSelected(new Set())
+    } catch {} finally { setDeleting(null) }
+  }
+
+  async function handleDeleteAll() {
+    if (!selectedEvent) return
+    if (!confirm(`Delete ALL ${count} guests from "${selectedEvent.name}"? This cannot be undone.`)) return
+    setDeleting('all')
+    try {
+      await api.deleteAllGuests(selectedEvent.id)
+      setGuests([])
+      setCount(0)
+      setSelected(new Set())
+    } catch {} finally { setDeleting(null) }
+  }
+
   const checkedIn = guests.filter((g) => g.status === 'checked_in').length
   const pending   = guests.filter((g) => g.status !== 'checked_in').length
 
@@ -166,24 +190,45 @@ export default function GuestsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <DownloadAssetsButton eventId={selectedEvent.id} eventName={selectedEvent.name} />
-          <ExportDropdown events={[selectedEvent]} />
-          <Link href={`/admin/guests/bulk-upload?event=${selectedEvent.id}`}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90"
-            style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel-2)' }}>
-            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-            </svg>
-            Bulk upload
-          </Link>
-          <Link href={`/admin/guests/add?event=${selectedEvent.id}`}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
-            style={{ background: 'var(--brand)' }}>
-            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-            Add guest
-          </Link>
+          {selected.size > 0 ? (
+            <button onClick={handleBulkDelete} disabled={deleting === 'bulk'}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90 disabled:opacity-60"
+              style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
+              </svg>
+              {deleting === 'bulk' ? 'Deleting…' : `Delete ${selected.size} selected`}
+            </button>
+          ) : (
+            <>
+              <button onClick={handleDeleteAll} disabled={deleting === 'all' || count === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90 disabled:opacity-40"
+                style={{ border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                </svg>
+                {deleting === 'all' ? 'Clearing…' : 'Clear all'}
+              </button>
+              <DownloadAssetsButton eventId={selectedEvent.id} eventName={selectedEvent.name} />
+              <ExportDropdown events={[selectedEvent]} />
+              <Link href={`/admin/guests/bulk-upload?event=${selectedEvent.id}`}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90"
+                style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel-2)' }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                </svg>
+                Bulk upload
+              </Link>
+              <Link href={`/admin/guests/add?event=${selectedEvent.id}`}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                style={{ background: 'var(--brand)' }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Add guest
+              </Link>
+            </>
+          )}
         </div>
       </div>
 

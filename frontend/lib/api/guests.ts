@@ -11,6 +11,10 @@ export const guestsApi = {
     request<Guest>('/guests/', { method: 'POST', body: JSON.stringify(data) }),
   deleteGuest: (id: string) =>
     request<void>(`/guests/${id}/`, { method: 'DELETE' }),
+  bulkDeleteGuests: (ids: string[]) =>
+    request<{ deleted: number }>('/guests/bulk-delete/', { method: 'POST', body: JSON.stringify({ ids }) }),
+  deleteAllGuests: (eventId: number) =>
+    request<{ deleted: number }>('/guests/bulk-delete/', { method: 'POST', body: JSON.stringify({ event_id: eventId }) }),
   checkIn: (id: string) =>
     request<Guest>(`/guests/${id}/check_in/`, { method: 'POST' }),
   regenerateAssets: (id: string) =>

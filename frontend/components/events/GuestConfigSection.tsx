@@ -52,7 +52,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
               value={whatsappTemplate ?? ''}
               onChange={(e) => onChange({ whatsappTemplate: e.target.value ? Number(e.target.value) : null })}
               className="w-full rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }}
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}
             >
               <option value="">— Use global default —</option>
               {templates.map((t) => (
