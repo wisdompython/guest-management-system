@@ -34,6 +34,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>([])
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [dateValid, setDateValid] = useState(true)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         if (ev.ticket_types?.length) setTicketTypes(ev.ticket_types as TicketTypeDef[])
         if (ev.required_fields?.length) setRequiredFields(ev.required_fields as string[])
         setWhatsappEnabled(ev.whatsapp_enabled ?? true)
+        setWhatsappTemplate(ev.whatsapp_template ?? null)
       })
       .catch(() => setError('Could not load event.')).finally(() => setLoading(false))
   }, [id])
@@ -75,6 +77,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     if (nameTouched) { if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) } else { fd.append('name_zone_x', ''); fd.append('name_zone_y', ''); fd.append('name_zone_w', ''); fd.append('name_zone_h', '') } }
     fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
+    fd.append('whatsapp_template', whatsappTemplate ? String(whatsappTemplate) : '')
     try {
       const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include' })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
@@ -102,9 +105,13 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
           onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
           onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
-        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}
-          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
-            if (tt !== undefined) setTicketTypes(tt); if (rf !== undefined) setRequiredFields(rf); if (wa !== undefined) setWhatsappEnabled(wa)
+        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields}
+          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate}
+          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, whatsappTemplate: wt }) => {
+            if (tt !== undefined) setTicketTypes(tt)
+            if (rf !== undefined) setRequiredFields(rf)
+            if (wa !== undefined) setWhatsappEnabled(wa)
+            if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />

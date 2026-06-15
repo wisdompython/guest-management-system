@@ -56,6 +56,14 @@ class Event(models.Model):
     )
     # When False, WhatsApp delivery is not expected and phone_number is not auto-required
     whatsapp_enabled = models.BooleanField(default=True)
+    # Optional override — if set, this template is used for pass delivery instead of the global default
+    whatsapp_template = models.ForeignKey(
+        'WhatsAppTemplate',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='events',
+        help_text='WhatsApp template to use for this event. Falls back to the global default if not set.',
+    )
     is_ended = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

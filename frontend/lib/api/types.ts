@@ -84,6 +84,8 @@ export interface Event {
   ticket_types: TicketTypeDef[];
   required_fields: string[];
   whatsapp_enabled: boolean;
+  whatsapp_template: number | null;
+  whatsapp_template_name: string | null;
   is_ended: boolean;
   guest_count: number;
   created_at: string;

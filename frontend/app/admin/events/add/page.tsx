@@ -33,6 +33,7 @@ export default function AddEventPage() {
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>(DEFAULT_TICKET_TYPES)
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [dateValid, setDateValid] = useState(false)
 
   useEffect(() => { api.getFonts().then(setFonts).catch(console.error) }, [])
@@ -57,6 +58,7 @@ export default function AddEventPage() {
     if (selectedFont) fd.append('name_font', selectedFont)
     fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
+    if (whatsappTemplate) fd.append('whatsapp_template', String(whatsappTemplate))
     try {
       const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
       const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
@@ -82,9 +84,13 @@ export default function AddEventPage() {
           fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
           onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}
           onQrBgColorChange={() => {}} isEdit={false} />
-        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled}
-          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa }) => {
-            if (tt !== undefined) setTicketTypes(tt); if (rf !== undefined) setRequiredFields(rf); if (wa !== undefined) setWhatsappEnabled(wa)
+        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields}
+          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate}
+          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, whatsappTemplate: wt }) => {
+            if (tt !== undefined) setTicketTypes(tt)
+            if (rf !== undefined) setRequiredFields(rf)
+            if (wa !== undefined) setWhatsappEnabled(wa)
+            if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />

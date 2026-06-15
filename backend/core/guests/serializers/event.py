@@ -34,6 +34,7 @@ class FontSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     guest_count = serializers.IntegerField(source='guests.count', read_only=True)
     name_font_name = serializers.CharField(source='name_font.name', read_only=True)
+    whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
 
     class Meta:
         model = Event
@@ -45,9 +46,10 @@ class EventSerializer(serializers.ModelSerializer):
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
             'ticket_types', 'required_fields', 'whatsapp_enabled',
+            'whatsapp_template', 'whatsapp_template_name',
             'is_ended', 'guest_count', 'created_at',
         )
-        read_only_fields = ('id', 'created_at', 'name_font_name')
+        read_only_fields = ('id', 'created_at', 'name_font_name', 'whatsapp_template_name')
 
     def validate_ticket_types(self, value):
         if not isinstance(value, list):

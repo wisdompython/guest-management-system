@@ -50,24 +50,36 @@ def send_pass(guest) -> bool:
 
         phone = _normalise_phone(guest.phone_number)
         pass_url = _build_pass_url(guest)
-        event_name = guest.event.name if guest.event else 'the event'
 
         if not pass_url or 'localhost' in pass_url or '127.0.0.1' in pass_url:
             logger.error("Pass URL is not publicly accessible for guest %s: %s", guest.id, pass_url)
             return False
 
-        logger.info("Sending WhatsApp to %s | pass_url=%s", phone, pass_url)
+        # Resolve template: event override → global default
+        event = guest.event
+        tmpl = event.whatsapp_template if (event and event.whatsapp_template_id) else None
+
+        if tmpl:
+            template_name = tmpl.name
+            body_param_values = _resolve_template_params(guest, tmpl.body_params or [])
+            has_header_image = tmpl.has_header_image
+        else:
+            # Fall back to global default — image header + guest_name + event_name
+            template_name = settings.WHATSAPP_PASS_TEMPLATE
+            event_name = event.name if event else 'the event'
+            body_param_values = [guest.full_name, event_name]
+            has_header_image = True
+
+        params = []
+        if has_header_image:
+            params.append(HeaderImage.params(image=pass_url))
+        if body_param_values:
+            params.append(BodyText.params(*body_param_values))
+
+        logger.info("Sending WhatsApp to %s | template=%s | pass_url=%s", phone, template_name, pass_url)
 
         wa = _get_client()
-        wa.send_template(
-            to=phone,
-            name=settings.WHATSAPP_PASS_TEMPLATE,
-            language=TemplateLanguage.ENGLISH,
-            params=[
-                HeaderImage.params(image=pass_url),
-                BodyText.params(guest.full_name, event_name),
-            ],
-        )
+        wa.send_template(to=phone, name=template_name, language=TemplateLanguage.ENGLISH, params=params)
         logger.info("WhatsApp pass sent to guest %s (%s)", guest.id, phone)
         return True
 
