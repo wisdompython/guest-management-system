@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, Font } from '@/lib/api'
+import { api, Font, WhatsAppTemplate } from '@/lib/api'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
 import type { Zone } from '@/components/PassDesignPanel'
@@ -34,9 +34,14 @@ export default function AddEventPage() {
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
+  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
 
-  useEffect(() => { api.getFonts().then(setFonts).catch(console.error) }, [])
+  useEffect(() => {
+    Promise.all([api.getFonts(), api.getWhatsAppTemplates()])
+      .then(([fts, wats]) => { setFonts(fts); setWaTemplates(wats) })
+      .catch(console.error)
+  }, [])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -85,7 +90,7 @@ export default function AddEventPage() {
           onFileChange={handleFileChange} onQrChange={setQrZone} onNameChange={setNameZone}
           onQrBgColorChange={() => {}} isEdit={false} />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields}
-          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate}
+          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate} templates={waTemplates}
           onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, whatsappTemplate: wt }) => {
             if (tt !== undefined) setTicketTypes(tt)
             if (rf !== undefined) setRequiredFields(rf)

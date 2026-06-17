@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
+from django.db.models import Count, Q
 
 from ..models import Guest
 from ..serializers import GuestSerializer, GuestListSerializer
@@ -51,7 +52,27 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             qs = qs.filter(status=s)
         if t := params.get('ticket_type'):
             qs = qs.filter(ticket_type=t)
+        wa_sent = params.get('wa_sent')
+        if wa_sent == 'true':
+            qs = qs.filter(whatsapp_sent=True)
+        elif wa_sent == 'false':
+            qs = qs.filter(whatsapp_sent=False)
         return qs
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        # Compute aggregate counts over the full filtered set (ignores pagination).
+        # Re-derive the queryset from scratch to avoid composed querysets that
+        # Django cannot aggregate over (e.g. union from the search OR filter).
+        qs = self.get_queryset()
+        agg = qs.aggregate(
+            checked_in=Count('id', filter=Q(status='checked_in')),
+            pending=Count('id', filter=Q(status='registered')),
+            wa_sent=Count('id', filter=Q(whatsapp_sent=True)),
+            wa_unsent=Count('id', filter=Q(whatsapp_sent=False)),
+        )
+        response.data['stats'] = agg
+        return response
 
     def perform_create(self, serializer):
         guest = serializer.save()
@@ -87,10 +108,14 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
     def bulk_delete(self, request):
         ids = request.data.get('ids')
         event_id = request.data.get('event_id')
-        if not ids and not event_id:
+        # ids=[] (empty list) is falsy — use explicit None check
+        if ids is None and not event_id:
             return Response({'detail': 'Provide ids or event_id.'}, status=status.HTTP_400_BAD_REQUEST)
-        qs = Guest.objects.all()
-        if ids:
+        # Scope through get_queryset() to enforce event/tenant filters
+        qs = self.get_queryset()
+        if ids is not None:
+            if not ids:
+                return Response({'deleted': 0})
             qs = qs.filter(id__in=ids)
         elif event_id:
             qs = qs.filter(event_id=event_id)
@@ -130,12 +155,18 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         Only works within the 24-hour session window after the guest
         has messaged the business number first.
         """
+        from django.conf import settings as django_settings
         guest = self.get_object()
         message = request.data.get('message', '').strip()
         if not message:
             return Response({'detail': 'message is required.'}, status=status.HTTP_400_BAD_REQUEST)
         if not guest.phone_number:
             return Response({'detail': 'Guest has no phone number.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not django_settings.WHATSAPP_PHONE_ID or not django_settings.WHATSAPP_TOKEN:
+            return Response(
+                {'detail': 'WhatsApp is not configured on this server. Add WHATSAPP_PHONE_ID and WHATSAPP_TOKEN to your environment.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         from ..whatsapp import send_message as wa_send_message
         sent = wa_send_message(guest.phone_number, message)
         if not sent:

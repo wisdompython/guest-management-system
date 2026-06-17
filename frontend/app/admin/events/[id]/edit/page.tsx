@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, Event, Font } from '@/lib/api'
+import { api, Event, Font, WhatsAppTemplate } from '@/lib/api'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
 import type { Zone } from '@/components/PassDesignPanel'
@@ -35,12 +35,13 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
+  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(true)
 
   useEffect(() => {
-    Promise.all([api.getEvent(Number(id)), api.getFonts()])
-      .then(([ev, fts]) => {
-        setEvent(ev); setFonts(fts)
+    Promise.all([api.getEvent(Number(id)), api.getFonts(), api.getWhatsAppTemplates()])
+      .then(([ev, fts, wats]) => {
+        setEvent(ev); setFonts(fts); setWaTemplates(wats)
         if (ev.qr_zone_x != null && ev.qr_zone_y != null && ev.qr_zone_w != null && ev.qr_zone_h != null)
           setQrZone({ x: ev.qr_zone_x, y: ev.qr_zone_y, w: ev.qr_zone_w, h: ev.qr_zone_h })
         if (ev.name_zone_x != null && ev.name_zone_y != null && ev.name_zone_w != null && ev.name_zone_h != null)
@@ -106,7 +107,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
           onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
         <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields}
-          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate}
+          whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate} templates={waTemplates}
           onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, whatsappTemplate: wt }) => {
             if (tt !== undefined) setTicketTypes(tt)
             if (rf !== undefined) setRequiredFields(rf)

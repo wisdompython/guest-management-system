@@ -20,7 +20,7 @@ def send_whatsapp_pass(self, guest_id: str):
     from .whatsapp import send_pass
 
     try:
-        guest = Guest.objects.select_related('event').get(pk=guest_id)
+        guest = Guest.objects.select_related('event__whatsapp_template').get(pk=guest_id)
     except Guest.DoesNotExist:
         logger.warning("send_whatsapp_pass: guest %s not found", guest_id)
         return {'sent': False, 'reason': 'guest not found'}

@@ -11,4 +11,4 @@ export const api = {
   ...remindersApi,
 };
 
-export type { EventReminder, WhatsAppTemplate, Guest, GuestList, Event, CreateGuestPayload } from './types';
+export type { EventReminder, WhatsAppTemplate, Guest, GuestList, GuestListStats, Event, CreateGuestPayload } from './types';

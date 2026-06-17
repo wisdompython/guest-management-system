@@ -71,7 +71,7 @@ AVAILABLE_VARS = [
 class WhatsAppTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhatsAppTemplate
-        fields = ['id', 'name', 'display_name', 'description', 'body_params', 'has_header_image', 'is_active', 'created_at']
+        fields = ['id', 'name', 'display_name', 'description', 'body_text', 'body_params', 'has_header_image', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 

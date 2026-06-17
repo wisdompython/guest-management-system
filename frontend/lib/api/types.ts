@@ -44,11 +44,19 @@ export interface Guest {
   registered_at: string;
 }
 
+export interface GuestListStats {
+  checked_in: number;
+  pending: number;
+  wa_sent: number;
+  wa_unsent: number;
+}
+
 export interface GuestList {
   count: number;
   next: string | null;
   previous: string | null;
   results: Guest[];
+  stats: GuestListStats;
 }
 
 export type CreateGuestPayload = Pick<
@@ -113,6 +121,7 @@ export interface WhatsAppTemplate {
   name: string;
   display_name: string;
   description: string;
+  body_text: string;
   body_params: string[];
   has_header_image: boolean;
   is_active: boolean;

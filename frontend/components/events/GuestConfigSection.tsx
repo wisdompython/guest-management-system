@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import EventConfigPanel from '@/components/EventConfigPanel'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
-import { api, WhatsAppTemplate } from '@/lib/api'
+import type { WhatsAppTemplate } from '@/lib/api'
 
 interface Props {
   ticketTypes: TicketTypeDef[]
   requiredFields: string[]
   whatsappEnabled: boolean
   whatsappTemplate: number | null
+  templates: WhatsAppTemplate[]
   onChange: (patch: {
     ticketTypes?: TicketTypeDef[]
     requiredFields?: string[]
@@ -18,12 +18,7 @@ interface Props {
   }) => void
 }
 
-export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, whatsappTemplate, onChange }: Props) {
-  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
-
-  useEffect(() => {
-    api.getWhatsAppTemplates().then(setTemplates).catch(console.error)
-  }, [])
+export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, whatsappTemplate, templates, onChange }: Props) {
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
@@ -65,7 +60,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
             {whatsappTemplate && templates.find((t) => t.id === whatsappTemplate) && (
               <div className="mt-2 rounded-[8px] px-3 py-2 text-xs" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--ink)' }}>Params: </span>
-                {templates.find((t) => t.id === whatsappTemplate)!.body_params.join(', ') || 'none'}
+                {(templates.find((t) => t.id === whatsappTemplate)!.body_params || []).join(', ') || 'none'}
               </div>
             )}
           </div>

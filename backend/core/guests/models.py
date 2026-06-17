@@ -183,6 +183,8 @@ class WhatsAppTemplate(models.Model):
     name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
     display_name = models.CharField(max_length=200, blank=True, help_text="Friendly label shown in the UI")
     description  = models.TextField(blank=True)
+    # The raw template body as approved in Meta, with {{1}}, {{2}} placeholders
+    body_text    = models.TextField(blank=True, help_text="Template body text with {{1}}, {{2}} placeholders — used for preview only")
     # Ordered list of variable keys to pass as body params, e.g. ["guest_name", "event_name", "event_date"]
     body_params  = models.JSONField(default=list, blank=True, help_text="Ordered list of variable keys for body params")
     has_header_image = models.BooleanField(default=False, help_text="Template has a header image (pass image will be sent)")

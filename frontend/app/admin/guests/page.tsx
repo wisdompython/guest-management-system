@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { api, Guest, Event } from '@/lib/api'
+import { api, Guest, Event, GuestListStats } from '@/lib/api'
 import ExportDropdown from '@/components/ExportDropdown'
 import { GuestFilterBar } from '@/components/guests/GuestFilterBar'
 import { GuestTable } from '@/components/guests/GuestTable'
@@ -29,11 +29,13 @@ export default function GuestsPage() {
 
   const [guests, setGuests]             = useState<Guest[]>([])
   const [count, setCount]               = useState(0)
+  const [stats, setStats]               = useState<GuestListStats | null>(null)
   const [loading, setLoading]           = useState(false)
   const [query, setQuery]               = useState('')
   const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Set<string>>(new Set())
   const [deleting, setDeleting]         = useState<string | null>(null)
+  const [deleteError, setDeleteError]   = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 50
@@ -49,7 +51,7 @@ export default function GuestsPage() {
   }, [])
 
   // reset to page 1 when filters or event changes
-  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken])
+  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken, waToken])
 
   useEffect(() => {
     if (!selectedEvent) return
@@ -59,19 +61,15 @@ export default function GuestsPage() {
     if (freeText)    params.search      = freeText
     if (statusToken) params.status      = statusToken === 'pending' ? 'registered' : statusToken
     if (ticketToken) params.ticket_type = ticketToken
+    if (waToken === 'failed')                           params.wa_sent = 'false'
+    else if (waToken === 'sent' || waToken === 'read' || waToken === 'delivered') params.wa_sent = 'true'
     api.getGuests(params)
-      .then((data) => { setGuests(data.results); setCount(data.count) })
+      .then((data) => { setGuests(data.results); setCount(data.count); setStats(data.stats ?? null) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedEvent, freeText, statusToken, ticketToken, page])
+  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, page])
 
-  const filtered = waToken
-    ? guests.filter((g) => {
-        if (waToken === 'failed') return !g.whatsapp_sent
-        if (waToken === 'read' || waToken === 'delivered') return g.whatsapp_sent
-        return true
-      })
-    : guests
+  const filtered = guests
 
   function toggleSelect(id: string) {
     setSelected((s) => { const next = new Set(s); next.has(id) ? next.delete(id) : next.add(id); return next })
@@ -83,39 +81,48 @@ export default function GuestsPage() {
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Remove ${name} from the guest list?`)) return
     setDeleting(id)
+    setDeleteError('')
     try {
       await api.deleteGuest(id)
       setGuests((prev) => prev.filter((g) => g.id !== id))
       setCount((c) => c - 1)
-    } catch {} finally { setDeleting(null) }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : `Failed to remove ${name}.`)
+    } finally { setDeleting(null) }
   }
 
   async function handleBulkDelete() {
     if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} selected guest${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
     setDeleting('bulk')
+    setDeleteError('')
     try {
       const { deleted } = await api.bulkDeleteGuests(Array.from(selected))
       setGuests((prev) => prev.filter((g) => !selected.has(g.id)))
       setCount((c) => c - deleted)
       setSelected(new Set())
-    } catch {} finally { setDeleting(null) }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete guests.')
+    } finally { setDeleting(null) }
   }
 
   async function handleDeleteAll() {
     if (!selectedEvent) return
     if (!confirm(`Delete ALL ${count} guests from "${selectedEvent.name}"? This cannot be undone.`)) return
     setDeleting('all')
+    setDeleteError('')
     try {
       await api.deleteAllGuests(selectedEvent.id)
       setGuests([])
       setCount(0)
       setSelected(new Set())
-    } catch {} finally { setDeleting(null) }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to clear guests.')
+    } finally { setDeleting(null) }
   }
 
-  const checkedIn = guests.filter((g) => g.status === 'checked_in').length
-  const pending   = guests.filter((g) => g.status !== 'checked_in').length
+  const checkedIn = stats?.checked_in ?? 0
+  const pending   = stats?.pending ?? 0
 
   // ── Event picker ──────────────────────────────────────────────────────────
   if (!selectedEvent) {
@@ -173,7 +180,7 @@ export default function GuestsPage() {
       <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => { setSelectedEvent(null); setQuery(''); setGuests([]); setCount(0) }}
+          <button onClick={() => { setSelectedEvent(null); setQuery(''); setGuests([]); setCount(0); setStats(null) }}
             className="text-xs font-semibold transition hover:opacity-70"
             style={{ color: 'var(--muted)' }}>
             ← Events
@@ -231,6 +238,14 @@ export default function GuestsPage() {
           )}
         </div>
       </div>
+
+      {deleteError && (
+        <div className="flex items-center justify-between px-5 py-2 text-xs"
+          style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+          {deleteError}
+          <button onClick={() => setDeleteError('')} className="ml-4 opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
 
       <GuestFilterBar
         query={query} tokens={tokens} freeText={freeText}
