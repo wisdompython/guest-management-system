@@ -173,34 +173,49 @@ function GuestRow({ guest, onSend, onMessage, sending }: {
   )
 }
 
+const PAGE_SIZE = 50
+
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function WhatsAppPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [guestsLoading, setGuestsLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const [bulkSending, setBulkSending] = useState(false)
   const [messageGuest, setMessageGuest] = useState<Guest | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+
   useEffect(() => {
     api.getEvents().then(setEvents).catch(console.error).finally(() => setEventsLoading(false))
   }, [])
 
+  useEffect(() => { setPage(1) }, [selectedEvent?.id])
+
   useEffect(() => {
     if (!selectedEvent) return
     setGuestsLoading(true)
-    api.getGuests({ event: String(selectedEvent.id) })
-      .then((d) => setGuests(d.results.filter((g) => g.phone_number)))
+    api.getGuests({ event: String(selectedEvent.id), page: String(page) })
+      .then((d) => { setGuests(d.results.filter((g) => g.phone_number)); setCount(d.count) })
       .catch(console.error)
       .finally(() => setGuestsLoading(false))
-  }, [selectedEvent])
+  }, [selectedEvent, page])
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 4000)
+  }
+
+  function refreshGuests() {
+    if (!selectedEvent) return
+    api.getGuests({ event: String(selectedEvent.id), page: String(page) })
+      .then((d) => { setGuests(d.results.filter((g) => g.phone_number)); setCount(d.count) })
+      .catch(console.error)
   }
 
   async function handleSend(guest: Guest) {
@@ -208,10 +223,7 @@ export default function WhatsAppPage() {
     try {
       await api.sendWhatsApp(guest.id)
       showToast(`Pass queued for ${guest.full_name}`, true)
-      setTimeout(() => {
-        api.getGuests({ event: String(selectedEvent!.id) })
-          .then((d) => setGuests(d.results.filter((g) => g.phone_number)))
-      }, 3000)
+      setTimeout(refreshGuests, 3000)
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Send failed', false)
     } finally { setSending(null) }
@@ -223,17 +235,14 @@ export default function WhatsAppPage() {
     try {
       const res = await api.bulkSendWhatsApp(selectedEvent.id, resend)
       showToast(`Queued — task ${res.task_id?.slice(0, 8) ?? '?'}`, true)
-      setTimeout(() => {
-        api.getGuests({ event: String(selectedEvent.id) })
-          .then((d) => setGuests(d.results.filter((g) => g.phone_number)))
-      }, 3000)
+      setTimeout(refreshGuests, 3000)
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Bulk send failed', false)
     } finally { setBulkSending(false) }
   }
 
-  const sent    = guests.filter((g) => g.whatsapp_sent).length
-  const unsent  = guests.filter((g) => !g.whatsapp_sent).length
+  const sent   = guests.filter((g) => g.whatsapp_sent).length
+  const unsent = guests.filter((g) => !g.whatsapp_sent).length
 
   // ── Event picker ────────────────────────────────────────────────────────
   if (!selectedEvent) {
@@ -285,7 +294,7 @@ export default function WhatsAppPage() {
       <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => { setSelectedEvent(null); setGuests([]) }}
+          <button onClick={() => { setSelectedEvent(null); setGuests([]); setCount(0); setPage(1) }}
             className="text-xs font-semibold transition hover:opacity-70" style={{ color: 'var(--muted)' }}>
             ← Events
           </button>
@@ -300,7 +309,7 @@ export default function WhatsAppPage() {
           <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--muted)' }}>
             <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{sent}</span> sent</span>
             <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{unsent}</span> pending</span>
-            <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{guests.length}</span> total</span>
+            <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{count}</span> total</span>
           </div>
           <div className="flex items-center gap-2">
             {unsent > 0 && (
@@ -336,6 +345,50 @@ export default function WhatsAppPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-shrink-0 items-center justify-between px-5 py-3"
+          style={{ borderTop: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Page {page} of {totalPages} · {count} guests
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>«</button>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>‹ Prev</button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | '…')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('…')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) => p === '…' ? (
+                <span key={`e-${i}`} className="px-1 text-xs" style={{ color: 'var(--muted-2)' }}>…</span>
+              ) : (
+                <button key={p} onClick={() => setPage(p as number)}
+                  className="min-w-[28px] rounded px-2 py-1 text-xs font-semibold transition"
+                  style={{
+                    background: page === p ? 'var(--brand)' : 'transparent',
+                    color: page === p ? '#fff' : 'var(--muted)',
+                    border: `1px solid ${page === p ? 'var(--brand)' : 'var(--line)'}`,
+                  }}>{p}</button>
+              ))}
+
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>Next ›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>»</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
