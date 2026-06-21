@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { api, Guest, Event, GuestListStats } from '@/lib/api'
 import ExportDropdown from '@/components/ExportDropdown'
@@ -36,6 +36,8 @@ export default function GuestsPage() {
   const [selected, setSelected]         = useState<Set<string>>(new Set())
   const [deleting, setDeleting]         = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState('')
+  const [undoToast, setUndoToast]       = useState<{ id: string; name: string; guest: Guest } | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 50
@@ -78,17 +80,43 @@ export default function GuestsPage() {
     if (selected.size === filtered.length) setSelected(new Set())
     else setSelected(new Set(filtered.map((g) => g.id)))
   }
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Remove ${name} from the guest list?`)) return
-    setDeleting(id)
+  const commitDelete = useCallback(async (id: string, name: string) => {
     setDeleteError('')
     try {
       await api.deleteGuest(id)
-      setGuests((prev) => prev.filter((g) => g.id !== id))
-      setCount((c) => c - 1)
     } catch (err) {
+      // Guest already removed from UI — restore it by refreshing
       setDeleteError(err instanceof Error ? err.message : `Failed to remove ${name}.`)
-    } finally { setDeleting(null) }
+    }
+  }, [])
+
+  function handleDelete(id: string, name: string) {
+    const guest = guests.find((g) => g.id === id)
+    if (!guest) return
+    // Cancel any pending undo, commit that deletion immediately
+    if (undoToast) {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      commitDelete(undoToast.id, undoToast.name)
+      setUndoToast(null)
+    }
+    // Optimistically remove from list
+    setGuests((prev) => prev.filter((g) => g.id !== id))
+    setCount((c) => c - 1)
+    setSelected((s) => { const next = new Set(s); next.delete(id); return next })
+    // Show undo toast for 5s, then commit
+    setUndoToast({ id, name, guest })
+    undoTimerRef.current = setTimeout(() => {
+      commitDelete(id, name)
+      setUndoToast(null)
+    }, 5000)
+  }
+
+  function handleUndoDelete() {
+    if (!undoToast) return
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setGuests((prev) => [undoToast.guest, ...prev])
+    setCount((c) => c + 1)
+    setUndoToast(null)
   }
 
   async function handleBulkDelete() {
@@ -130,7 +158,17 @@ export default function GuestsPage() {
       <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
         <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
           style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Guests</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Guests</h1>
+            <Link href="/admin/guests/search"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full transition hover:opacity-80"
+              style={{ border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--panel)' }}>
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              Search all
+            </Link>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto px-6 py-8">
@@ -177,7 +215,18 @@ export default function GuestsPage() {
   // ── Guest list ─────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
-      <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
+      {undoToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-3 rounded-full px-5 py-2.5 shadow-xl"
+          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+          <span className="text-sm">Removed <strong>{undoToast.name}</strong></span>
+          <button onClick={handleUndoDelete}
+            className="rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80"
+            style={{ background: 'var(--brand)', color: '#fff' }}>
+            Undo
+          </button>
+        </div>
+      )}
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
           <button onClick={() => { setSelectedEvent(null); setQuery(''); setGuests([]); setCount(0); setStats(null) }}

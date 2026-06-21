@@ -56,7 +56,22 @@ export default function EventsPage() {
         {loading ? (
           <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
         ) : events.length === 0 ? (
-          <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>No events yet.</div>
+          <div className="py-20 flex flex-col items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--panel)' }}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ color: 'var(--muted)' }}>
+                <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>No events yet</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>Create your first event to start managing guests.</p>
+            </div>
+            <Link href="/admin/events/add"
+              className="rounded-full px-5 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              style={{ background: 'var(--brand)' }}>
+              + Create Event
+            </Link>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -65,6 +80,7 @@ export default function EventsPage() {
                 <th className="px-5 py-3 text-left">Date</th>
                 <th className="px-5 py-3 text-left">Venue</th>
                 <th className="px-5 py-3 text-left">Guests</th>
+                <th className="px-5 py-3 text-left">Check-ins</th>
                 <th className="px-5 py-3 text-left">Design</th>
                 <th className="px-5 py-3 text-left">Actions</th>
               </tr>
@@ -85,6 +101,19 @@ export default function EventsPage() {
                   <td className="whitespace-nowrap px-5 py-3.5" style={{ color: 'var(--muted)' }}>{new Date(ev.date).toLocaleDateString()}</td>
                   <td className="max-w-[140px] truncate px-5 py-3.5" style={{ color: 'var(--muted)' }}>{ev.venue || '--'}</td>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>{ev.guest_count}</td>
+                  <td className="px-5 py-3.5">
+                    {ev.guest_count > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 max-w-[80px] rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+                          <div className="h-full rounded-full transition-all"
+                            style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--ink)' }}>
+                          {ev.checked_in_count}/{ev.guest_count}
+                        </span>
+                      </div>
+                    ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>—</span>}
+                  </td>
                   <td className="px-5 py-3.5">
                     {ev.design_template ? (
                       <a href={ev.design_template.startsWith('http') ? ev.design_template : `${BASE_URL.replace('/api', '')}${ev.design_template}`}

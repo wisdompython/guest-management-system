@@ -167,6 +167,19 @@ class BulkUpload(models.Model):
         return f"Upload for {self.event} ({self.status})"
 
 
+class TemplateCategory(models.Model):
+    """Grouping label for WhatsApp templates (e.g. Birthday, Wedding, Corporate)."""
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'template categories'
+
+    def __str__(self):
+        return self.name
+
+
 class WhatsAppTemplate(models.Model):
     """Registry of approved Meta WhatsApp templates available for use."""
 
@@ -183,6 +196,13 @@ class WhatsAppTemplate(models.Model):
     name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
     display_name = models.CharField(max_length=200, blank=True, help_text="Friendly label shown in the UI")
     description  = models.TextField(blank=True)
+    category     = models.ForeignKey(
+        TemplateCategory,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='templates',
+        help_text='Optional category for grouping templates.',
+    )
     # The raw template body as approved in Meta, with {{1}}, {{2}} placeholders
     body_text    = models.TextField(blank=True, help_text="Template body text with {{1}}, {{2}} placeholders — used for preview only")
     # Ordered list of variable keys to pass as body params, e.g. ["guest_name", "event_name", "event_date"]
@@ -190,6 +210,9 @@ class WhatsAppTemplate(models.Model):
     has_header_image = models.BooleanField(default=False, help_text="Template has a header image (pass image will be sent)")
     is_active    = models.BooleanField(default=True)
     created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['category__name', 'display_name', 'name']
 
     def __str__(self):
         return self.display_name or self.name

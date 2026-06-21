@@ -2,7 +2,7 @@ from rest_framework import viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
-from ..models import EventReminder, ReminderLog, WhatsAppTemplate
+from ..models import EventReminder, ReminderLog, WhatsAppTemplate, TemplateCategory
 from accounts.permissions import IsEventManagerOrAbove
 
 
@@ -68,11 +68,21 @@ AVAILABLE_VARS = [
 ]
 
 
+class TemplateCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TemplateCategory
+        fields = ['id', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
 class WhatsAppTemplateSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = WhatsAppTemplate
-        fields = ['id', 'name', 'display_name', 'description', 'body_text', 'body_params', 'has_header_image', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'name', 'display_name', 'description', 'category', 'category_name',
+                  'body_text', 'body_params', 'has_header_image', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at', 'category_name']
 
 
 class AvailableVarsView(APIView):
@@ -82,12 +92,21 @@ class AvailableVarsView(APIView):
         return Response(AVAILABLE_VARS)
 
 
+class TemplateCategoryViewSet(viewsets.ModelViewSet):
+    serializer_class = TemplateCategorySerializer
+    permission_classes = [IsEventManagerOrAbove]
+    queryset = TemplateCategory.objects.all()
+    pagination_class = None  # small list, no pagination needed
+
+
 class WhatsAppTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = WhatsAppTemplateSerializer
     permission_classes = [IsEventManagerOrAbove]
 
     def get_queryset(self):
-        qs = WhatsAppTemplate.objects.all().order_by('display_name', 'name')
+        qs = WhatsAppTemplate.objects.select_related('category').all()
         if self.request.query_params.get('active_only') == '1':
             qs = qs.filter(is_active=True)
+        if cat := self.request.query_params.get('category'):
+            qs = qs.filter(category_id=cat)
         return qs

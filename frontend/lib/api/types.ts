@@ -96,6 +96,7 @@ export interface Event {
   whatsapp_template_name: string | null;
   is_ended: boolean;
   guest_count: number;
+  checked_in_count: number;
   created_at: string;
 }
 
@@ -116,11 +117,19 @@ export interface EventReminder {
   logs_sent: number;
 }
 
+export interface TemplateCategory {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
 export interface WhatsAppTemplate {
   id: number;
   name: string;
   display_name: string;
   description: string;
+  category: number | null;
+  category_name: string | null;
   body_text: string;
   body_params: string[];
   has_header_image: boolean;

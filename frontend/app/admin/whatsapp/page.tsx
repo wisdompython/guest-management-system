@@ -85,6 +85,75 @@ function MessageModal({ guest, onClose }: { guest: Guest; onClose: () => void })
   )
 }
 
+// ── Bulk send confirm modal ──────────────────────────────────────────────────
+function BulkSendModal({ guests, resend, onConfirm, onClose }: {
+  guests: Guest[]
+  resend: boolean
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const targets = resend ? guests : guests.filter((g) => !g.whatsapp_sent)
+  const sample = targets.slice(0, 5)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-[20px] overflow-hidden shadow-2xl"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-3">
+          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+            {resend ? 'Resend all passes' : `Send to ${targets.length} guest${targets.length !== 1 ? 's' : ''}`}
+          </p>
+          <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+            {resend
+              ? `This will re-send the pass to all ${targets.length} guests on this page, including those already sent.`
+              : `Queues WhatsApp pass delivery for ${targets.length} unsent guest${targets.length !== 1 ? 's' : ''}.`}
+          </p>
+          {sample.length > 0 && (
+            <div className="rounded-[10px] overflow-hidden" style={{ border: '1px solid var(--line)' }}>
+              <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ background: 'var(--bg)', borderBottom: '1px solid var(--line)', color: 'var(--muted-2)' }}>
+                Recipients {targets.length > 5 ? `(first 5 of ${targets.length})` : ''}
+              </p>
+              {sample.map((g) => (
+                <div key={g.id} className="flex items-center gap-2.5 px-3 py-2"
+                  style={{ borderBottom: '1px solid var(--line)' }}>
+                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                    style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
+                    {showInitials(g.full_name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--ink)' }}>{g.full_name}</p>
+                    <p className="text-[10px] font-mono" style={{ color: 'var(--muted-2)' }}>{g.phone_number}</p>
+                  </div>
+                  {g.whatsapp_sent && (
+                    <span className="text-[10px]" style={{ color: 'var(--brand)' }}>Resend</span>
+                  )}
+                </div>
+              ))}
+              {targets.length > 5 && (
+                <p className="px-3 py-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  + {targets.length - 5} more…
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 px-5 pb-5 pt-2">
+          <button onClick={onClose} className="flex-1 rounded-full py-2.5 text-sm font-semibold"
+            style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Cancel</button>
+          <button onClick={() => { onConfirm(); onClose() }}
+            className="flex-1 rounded-full py-2.5 text-sm font-semibold text-white"
+            style={{ background: 'var(--brand)' }}>
+            {resend ? 'Resend all' : `Send ${targets.length}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Resend confirm modal ─────────────────────────────────────────────────────
 function ResendModal({ guest, onConfirm, onClose }: { guest: Guest; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -111,13 +180,15 @@ function ResendModal({ guest, onConfirm, onClose }: { guest: Guest; onConfirm: (
 }
 
 // ── Guest row ────────────────────────────────────────────────────────────────
-function GuestRow({ guest, onSend, onMessage, sending }: {
+function GuestRow({ guest, onSend, onMessage, sending, polling }: {
   guest: Guest
   onSend: (g: Guest) => void
   onMessage: (g: Guest) => void
   sending: string | null
+  polling: Set<string>
 }) {
   const [showResend, setShowResend] = useState(false)
+  const isPolling = polling.has(guest.id)
 
   function handleSendClick() {
     if (guest.whatsapp_sent) { setShowResend(true); return }
@@ -141,17 +212,23 @@ function GuestRow({ guest, onSend, onMessage, sending }: {
           <p className="text-xs font-mono" style={{ color: 'var(--muted-2)' }}>{guest.phone_number}</p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {guest.whatsapp_sent ? (
+          {isPolling ? (
+            <span className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+              <span className="inline-block h-3 w-3 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: 'var(--muted) transparent var(--muted) var(--muted)' }} />
+              Delivering…
+            </span>
+          ) : guest.whatsapp_sent ? (
             <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--brand)' }}>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand)' }} />
-              Sent
+              Sent {guest.whatsapp_sent_at ? new Date(guest.whatsapp_sent_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
             </span>
           ) : (
             <span className="text-[11px]" style={{ color: 'var(--muted-2)' }}>Not sent</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button onClick={handleSendClick} disabled={sending === guest.id}
+          <button onClick={handleSendClick} disabled={sending === guest.id || isPolling}
             className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition disabled:opacity-50"
             style={{
               background: guest.whatsapp_sent ? 'transparent' : 'var(--brand)',
@@ -185,7 +262,9 @@ export default function WhatsAppPage() {
   const [page, setPage] = useState(1)
   const [guestsLoading, setGuestsLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
+  const [polling, setPolling] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
+  const [bulkModal, setBulkModal] = useState<{ resend: boolean } | null>(null)
   const [messageGuest, setMessageGuest] = useState<Guest | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
@@ -223,7 +302,26 @@ export default function WhatsAppPage() {
     try {
       await api.sendWhatsApp(guest.id)
       showToast(`Pass queued for ${guest.full_name}`, true)
-      setTimeout(refreshGuests, 3000)
+      // Mark as polling and check every 4s for up to 32s
+      setPolling((prev) => new Set(prev).add(guest.id))
+      let attempts = 0
+      const poll = async () => {
+        attempts++
+        try {
+          const updated = await api.getGuest(guest.id)
+          if (updated.whatsapp_sent) {
+            setGuests((prev) => prev.map((g) => g.id === guest.id ? updated : g))
+            setPolling((prev) => { const next = new Set(prev); next.delete(guest.id); return next })
+            return
+          }
+        } catch {}
+        if (attempts < 8) setTimeout(poll, 4000)
+        else {
+          setPolling((prev) => { const next = new Set(prev); next.delete(guest.id); return next })
+          refreshGuests()
+        }
+      }
+      setTimeout(poll, 4000)
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Send failed', false)
     } finally { setSending(null) }
@@ -256,6 +354,13 @@ export default function WhatsAppPage() {
         </div>
         {eventsLoading ? (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
+        ) : events.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 py-16">
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>No events yet.</p>
+            <a href="/admin/events/add"
+              className="rounded-full px-5 py-2 text-xs font-semibold text-white"
+              style={{ background: 'var(--brand)' }}>+ Create an event</a>
+          </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {events.map((ev) => (
@@ -289,6 +394,13 @@ export default function WhatsAppPage() {
     <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
       {toast && <Toast {...toast} />}
       {messageGuest && <MessageModal guest={messageGuest} onClose={() => setMessageGuest(null)} />}
+      {bulkModal && (
+        <BulkSendModal
+          guests={guests} resend={bulkModal.resend}
+          onConfirm={() => handleBulkSend(bulkModal.resend)}
+          onClose={() => setBulkModal(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
@@ -313,13 +425,13 @@ export default function WhatsAppPage() {
           </div>
           <div className="flex items-center gap-2">
             {unsent > 0 && (
-              <button onClick={() => handleBulkSend(false)} disabled={bulkSending}
+              <button onClick={() => setBulkModal({ resend: false })} disabled={bulkSending}
                 className="rounded-full px-4 py-2 text-xs font-semibold text-white transition disabled:opacity-60"
                 style={{ background: 'var(--brand)' }}>
                 {bulkSending ? 'Sending…' : `Send to ${unsent} unsent`}
               </button>
             )}
-            <button onClick={() => handleBulkSend(true)} disabled={bulkSending}
+            <button onClick={() => setBulkModal({ resend: true })} disabled={bulkSending}
               className="rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-60"
               style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
               Resend all
@@ -333,13 +445,28 @@ export default function WhatsAppPage() {
         {guestsLoading ? (
           <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
         ) : guests.length === 0 ? (
-          <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>
-            No guests with phone numbers for this event.
+          <div className="py-20 flex flex-col items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--panel)' }}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ color: 'var(--muted)' }}>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.08 5.18 2 2 0 0 1 5.06 3h3a2 2 0 0 1 2 1.72c.128.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.8 12.8 0 0 0 2.81.7A2 2 0 0 1 23 17l-.08.08v-.16z"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>No guests with phone numbers</p>
+              <p className="mt-1 text-xs max-w-xs" style={{ color: 'var(--muted)' }}>
+                Add phone numbers to guests for this event to send WhatsApp passes.
+              </p>
+            </div>
+            <a href={`/admin/guests/bulk-upload?event=${selectedEvent?.id}`}
+              className="rounded-full px-5 py-2 text-xs font-semibold transition"
+              style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel-2)' }}>
+              Bulk upload guests
+            </a>
           </div>
         ) : (
           <div>
             {guests.map((g) => (
-              <GuestRow key={g.id} guest={g} sending={sending}
+              <GuestRow key={g.id} guest={g} sending={sending} polling={polling}
                 onSend={handleSend} onMessage={setMessageGuest} />
             ))}
           </div>
