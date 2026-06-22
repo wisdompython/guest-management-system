@@ -13,20 +13,27 @@ export default function GlobalGuestSearchPage() {
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
     if (!query.trim()) { setGuests([]); setCount(0); return }
     timerRef.current = setTimeout(async () => {
+      const controller = new AbortController()
+      abortRef.current = controller
       setLoading(true)
       try {
-        const data = await api.getGuests({ search: query.trim(), page_size: '20' })
+        const data = await api.getGuests({ search: query.trim(), page_size: '20' }, controller.signal)
         setGuests(data.results)
         setCount(data.count)
-      } catch { setGuests([]); setCount(0) }
-      finally { setLoading(false) }
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') { setGuests([]); setCount(0) }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }, 350)
   }, [query])
 

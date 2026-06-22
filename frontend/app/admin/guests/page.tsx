@@ -43,6 +43,10 @@ export default function GuestsPage() {
   const PAGE_SIZE = 50
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
+  useEffect(() => {
+    return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }
+  }, [])
+
   const { tokens, freeText } = parseTokens(query)
   const statusToken = tokens.find((t) => t.key === 'status')?.value ?? ''
   const ticketToken = tokens.find((t) => t.key === 'ticket')?.value ?? ''
@@ -103,6 +107,15 @@ export default function GuestsPage() {
     setGuests((prev) => prev.filter((g) => g.id !== id))
     setCount((c) => c - 1)
     setSelected((s) => { const next = new Set(s); next.delete(id); return next })
+    setStats((s) => {
+      if (!s) return s
+      const wasCheckedIn = guest.status === 'checked_in'
+      return {
+        ...s,
+        checked_in: s.checked_in - (wasCheckedIn ? 1 : 0),
+        pending: s.pending - (wasCheckedIn ? 0 : 1),
+      }
+    })
     // Show undo toast for 5s, then commit
     setUndoToast({ id, name, guest })
     undoTimerRef.current = setTimeout(() => {
@@ -116,6 +129,15 @@ export default function GuestsPage() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
     setGuests((prev) => [undoToast.guest, ...prev])
     setCount((c) => c + 1)
+    setStats((s) => {
+      if (!s) return s
+      const wasCheckedIn = undoToast.guest.status === 'checked_in'
+      return {
+        ...s,
+        checked_in: s.checked_in + (wasCheckedIn ? 1 : 0),
+        pending: s.pending + (wasCheckedIn ? 0 : 1),
+      }
+    })
     setUndoToast(null)
   }
 

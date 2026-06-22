@@ -86,14 +86,16 @@ function MessageModal({ guest, onClose }: { guest: Guest; onClose: () => void })
 }
 
 // ── Bulk send confirm modal ──────────────────────────────────────────────────
-function BulkSendModal({ guests, resend, onConfirm, onClose }: {
+function BulkSendModal({ guests, resend, totalCount, unsentCount, onConfirm, onClose }: {
   guests: Guest[]
   resend: boolean
+  totalCount: number
+  unsentCount: number
   onConfirm: () => void
   onClose: () => void
 }) {
-  const targets = resend ? guests : guests.filter((g) => !g.whatsapp_sent)
-  const sample = targets.slice(0, 5)
+  const targetCount = resend ? totalCount : unsentCount
+  const sample = (resend ? guests : guests.filter((g) => !g.whatsapp_sent)).slice(0, 5)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -103,18 +105,18 @@ function BulkSendModal({ guests, resend, onConfirm, onClose }: {
         onClick={(e) => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-3">
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--ink)' }}>
-            {resend ? 'Resend all passes' : `Send to ${targets.length} guest${targets.length !== 1 ? 's' : ''}`}
+            {resend ? 'Resend all passes' : `Send to ${targetCount} guest${targetCount !== 1 ? 's' : ''}`}
           </p>
           <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
             {resend
-              ? `This will re-send the pass to all ${targets.length} guests on this page, including those already sent.`
-              : `Queues WhatsApp pass delivery for ${targets.length} unsent guest${targets.length !== 1 ? 's' : ''}.`}
+              ? `This will re-send the pass to all ${targetCount} guests in this event, including those already sent.`
+              : `Queues WhatsApp pass delivery for ${targetCount} unsent guest${targetCount !== 1 ? 's' : ''} across all pages.`}
           </p>
           {sample.length > 0 && (
             <div className="rounded-[10px] overflow-hidden" style={{ border: '1px solid var(--line)' }}>
               <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
                 style={{ background: 'var(--bg)', borderBottom: '1px solid var(--line)', color: 'var(--muted-2)' }}>
-                Recipients {targets.length > 5 ? `(first 5 of ${targets.length})` : ''}
+                Sample recipients {targetCount > 5 ? `(first 5 of ${targetCount})` : ''}
               </p>
               {sample.map((g) => (
                 <div key={g.id} className="flex items-center gap-2.5 px-3 py-2"
@@ -132,9 +134,9 @@ function BulkSendModal({ guests, resend, onConfirm, onClose }: {
                   )}
                 </div>
               ))}
-              {targets.length > 5 && (
+              {targetCount > 5 && (
                 <p className="px-3 py-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-                  + {targets.length - 5} more…
+                  + {targetCount - 5} more…
                 </p>
               )}
             </div>
@@ -146,7 +148,7 @@ function BulkSendModal({ guests, resend, onConfirm, onClose }: {
           <button onClick={() => { onConfirm(); onClose() }}
             className="flex-1 rounded-full py-2.5 text-sm font-semibold text-white"
             style={{ background: 'var(--brand)' }}>
-            {resend ? 'Resend all' : `Send ${targets.length}`}
+            {resend ? `Resend all ${targetCount}` : `Send ${targetCount}`}
           </button>
         </div>
       </div>
@@ -259,6 +261,8 @@ export default function WhatsAppPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [count, setCount] = useState(0)
+  const [waSent, setWaSent] = useState(0)
+  const [waUnsent, setWaUnsent] = useState(0)
   const [page, setPage] = useState(1)
   const [guestsLoading, setGuestsLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
@@ -279,8 +283,13 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (!selectedEvent) return
     setGuestsLoading(true)
-    api.getGuests({ event: String(selectedEvent.id), page: String(page) })
-      .then((d) => { setGuests(d.results.filter((g) => g.phone_number)); setCount(d.count) })
+    api.getGuests({ event: String(selectedEvent.id), page: String(page), has_phone: '1' })
+      .then((d) => {
+        setGuests(d.results)
+        setCount(d.count)
+        setWaSent(d.stats?.wa_sent ?? 0)
+        setWaUnsent(d.stats?.wa_unsent ?? 0)
+      })
       .catch(console.error)
       .finally(() => setGuestsLoading(false))
   }, [selectedEvent, page])
@@ -292,8 +301,13 @@ export default function WhatsAppPage() {
 
   function refreshGuests() {
     if (!selectedEvent) return
-    api.getGuests({ event: String(selectedEvent.id), page: String(page) })
-      .then((d) => { setGuests(d.results.filter((g) => g.phone_number)); setCount(d.count) })
+    api.getGuests({ event: String(selectedEvent.id), page: String(page), has_phone: '1' })
+      .then((d) => {
+        setGuests(d.results)
+        setCount(d.count)
+        setWaSent(d.stats?.wa_sent ?? 0)
+        setWaUnsent(d.stats?.wa_unsent ?? 0)
+      })
       .catch(console.error)
   }
 
@@ -339,8 +353,8 @@ export default function WhatsAppPage() {
     } finally { setBulkSending(false) }
   }
 
-  const sent   = guests.filter((g) => g.whatsapp_sent).length
-  const unsent = guests.filter((g) => !g.whatsapp_sent).length
+  const sent   = waSent
+  const unsent = waUnsent
 
   // ── Event picker ────────────────────────────────────────────────────────
   if (!selectedEvent) {
@@ -397,6 +411,7 @@ export default function WhatsAppPage() {
       {bulkModal && (
         <BulkSendModal
           guests={guests} resend={bulkModal.resend}
+          totalCount={count} unsentCount={waUnsent}
           onConfirm={() => handleBulkSend(bulkModal.resend)}
           onClose={() => setBulkModal(null)}
         />

@@ -32,13 +32,19 @@ class FontSerializer(serializers.ModelSerializer):
 
 
 class EventSerializer(serializers.ModelSerializer):
-    guest_count = serializers.IntegerField(source='guests.count', read_only=True)
+    guest_count = serializers.SerializerMethodField()
     checked_in_count = serializers.SerializerMethodField()
     name_font_name = serializers.CharField(source='name_font.name', read_only=True)
     whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
 
+    def get_guest_count(self, obj):
+        # Use annotation when available (list view), fall back for single-object endpoints.
+        ann = getattr(obj, 'guest_count_ann', None)
+        return ann if ann is not None else obj.guests.count()
+
     def get_checked_in_count(self, obj):
-        return obj.guests.filter(status='checked_in').count()
+        ann = getattr(obj, 'checked_in_count_ann', None)
+        return ann if ann is not None else obj.guests.filter(status='checked_in').count()
 
     class Meta:
         model = Event

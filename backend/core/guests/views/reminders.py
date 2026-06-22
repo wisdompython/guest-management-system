@@ -15,7 +15,7 @@ class EventReminderSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'logs_sent']
 
     def get_logs_sent(self, obj):
-        return obj.logs.filter(success=True).count()
+        return sum(1 for log in obj.logs.all() if log.success)
 
 
 class EventReminderViewSet(viewsets.ModelViewSet):

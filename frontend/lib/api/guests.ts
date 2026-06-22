@@ -2,9 +2,9 @@ import { request } from './request';
 import type { Guest, GuestList, CreateGuestPayload } from './types';
 
 export const guestsApi = {
-  getGuests: (params?: Record<string, string>) => {
+  getGuests: (params?: Record<string, string>, signal?: AbortSignal) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request<GuestList>(`/guests/${qs}`);
+    return request<GuestList>(`/guests/${qs}`, signal ? { signal } : undefined);
   },
   getGuest: (id: string) => request<Guest>(`/guests/${id}/`),
   createGuest: (data: CreateGuestPayload) =>

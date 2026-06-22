@@ -57,6 +57,8 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             qs = qs.filter(whatsapp_sent=True)
         elif wa_sent == 'false':
             qs = qs.filter(whatsapp_sent=False)
+        if params.get('has_phone') == '1':
+            qs = qs.exclude(phone_number__in=['', None])
         return qs
 
     def list(self, request, *args, **kwargs):

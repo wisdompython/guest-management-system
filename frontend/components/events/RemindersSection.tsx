@@ -42,7 +42,6 @@ export function RemindersSection({ eventId }: Props) {
     ]).then(([r, t]) => {
       setReminders(r)
       setTemplates(t)
-      if (t.length > 0) setTemplateName(t[0].name)
     }).catch(() => setError('Could not load reminders.'))
       .finally(() => setLoading(false))
   }, [eventId])
@@ -158,8 +157,7 @@ export function RemindersSection({ eventId }: Props) {
                   <button key={m} type="button"
                     onClick={() => {
                       setTemplateMode(m)
-                      if (m === 'pick' && templates.length > 0) setTemplateName(templates[0].name)
-                      else setTemplateName('')
+                      setTemplateName('')
                     }}
                     className="px-3 py-1 text-xs font-semibold rounded-full transition"
                     style={{ background: templateMode === m ? 'var(--brand-soft)' : 'transparent', color: templateMode === m ? 'var(--brand)' : 'var(--muted)', border: '1px solid var(--line)' }}>
@@ -172,6 +170,7 @@ export function RemindersSection({ eventId }: Props) {
               <select value={templateName} onChange={(e) => setTemplateName(e.target.value)}
                 className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
+                <option value="">— Select a template —</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.name}>{t.display_name || t.name}</option>
                 ))}
