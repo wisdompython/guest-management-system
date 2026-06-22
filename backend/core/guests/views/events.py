@@ -8,6 +8,7 @@ from accounts.permissions import ReadOnlyOrEventManager
 
 
 class EventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.none()  # satisfies DRF router; actual queryset built in get_queryset
     serializer_class = EventSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [ReadOnlyOrEventManager]
