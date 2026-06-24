@@ -87,7 +87,8 @@ export default function EventsPage() {
             </thead>
             <tbody>
               {events.map((ev) => (
-                <tr key={ev.id} className="transition-colors hover:bg-[var(--bg)]" style={{ borderTop: '1px solid var(--line)' }}>
+                <tr key={ev.id} className="group cursor-pointer transition-colors hover:bg-[var(--panel)]" style={{ borderTop: '1px solid var(--line)' }}
+                  onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
                     <div className="flex items-center gap-2">
                       {ev.name}

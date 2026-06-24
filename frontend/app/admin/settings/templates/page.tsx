@@ -59,7 +59,7 @@ function PreviewBubble({ bodyText, bodyParams, hasHeaderImage }: {
       {mismatch && (
         <p className="mb-2 text-xs rounded-lg px-3 py-2"
           style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-          ⚠ Body text has {placeholderCount} placeholder{placeholderCount !== 1 ? 's' : ''} but {bodyParams.length} parameter{bodyParams.length !== 1 ? 's' : ''} are defined. These must match.
+          ⚠ Body has {placeholderCount} placeholder{placeholderCount !== 1 ? 's' : ''} but {bodyParams.length} parameter{bodyParams.length !== 1 ? 's' : ''} defined — these must match.
         </p>
       )}
       <div className="inline-block max-w-sm rounded-[16px] rounded-tl-[4px] px-4 py-3 text-sm leading-relaxed"
@@ -121,8 +121,12 @@ function TemplateForm({
   const mismatch = form.body_text.trim() && placeholderCount !== form.body_params.length
 
   return (
-    <form onSubmit={onSubmit} className="p-5 space-y-4" style={{ borderBottom: '1px solid var(--line)', background: 'var(--bg)' }}>
-      {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
+    <form onSubmit={onSubmit} className="space-y-5">
+      {error && (
+        <p className="rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+          {error}
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -131,7 +135,7 @@ function TemplateForm({
           </label>
           <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             placeholder="e.g. birthday_invite_v1"
-            className="w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
           <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>Exact name from Meta Business Manager</p>
         </div>
@@ -141,12 +145,11 @@ function TemplateForm({
           </label>
           <input value={form.display_name} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
             placeholder="e.g. Birthday Invite"
-            className="w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
         </div>
       </div>
 
-      {/* Category */}
       <div>
         <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
           Category
@@ -154,7 +157,7 @@ function TemplateForm({
         <select
           value={form.category ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, category: e.target.value ? Number(e.target.value) : null }))}
-          className="w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+          className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
           style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
           <option value="">— No category —</option>
           {categories.map((c) => (
@@ -165,18 +168,18 @@ function TemplateForm({
 
       <div>
         <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
-          Template body text
+          Body text
         </label>
         <textarea
           value={form.body_text}
           onChange={(e) => setForm((f) => ({ ...f, body_text: e.target.value }))}
-          rows={5}
+          rows={6}
           placeholder={"Hello {{1}}, you're invited to {{2}} on {{3}}.\n\nPlease find your guest pass attached."}
-          className="w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] resize-none"
+          className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] resize-none"
           style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${mismatch ? 'rgba(239,68,68,0.5)' : 'var(--line)'}`, color: 'var(--ink)' }}
         />
         <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
-          Paste the body text exactly as approved in Meta. Use {'{{1}}'}, {'{{2}}'} for variables.
+          Paste exactly as approved in Meta. Use {'{{1}}'}, {'{{2}}'} for variables.
         </p>
       </div>
 
@@ -190,22 +193,22 @@ function TemplateForm({
         </button>
         <div>
           <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Header image</p>
-          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Template has an image header — the guest pass image will be sent</p>
+          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Template has an image header — guest pass will be sent</p>
         </div>
       </div>
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--muted)' }}>
-          Body parameters (in order)
+          Body parameters <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--muted-2)' }}>(in order)</span>
         </p>
         {form.body_params.length === 0 && (
-          <p className="text-xs mb-2" style={{ color: 'var(--muted-2)' }}>No parameters yet. Add variables below.</p>
+          <p className="text-xs mb-2" style={{ color: 'var(--muted-2)' }}>No parameters yet.</p>
         )}
         {form.body_params.map((key, i) => (
           <div key={i} className="flex items-center gap-2 mb-2">
             <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[10px] font-bold text-white"
               style={{ background: 'var(--brand)' }}>{i + 1}</span>
-            <span className="flex-1 rounded px-3 py-1.5 text-xs font-semibold"
+            <span className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold"
               style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}>
               {varLabel(key)}
               <span className="ml-1.5 font-normal font-mono" style={{ color: 'var(--muted)' }}>({key})</span>
@@ -236,7 +239,7 @@ function TemplateForm({
 
       <PreviewBubble bodyText={form.body_text} bodyParams={form.body_params} hasHeaderImage={form.has_header_image} />
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 pt-1">
         <button type="submit" disabled={submitting || !!mismatch}
           className="rounded-full px-5 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           style={{ background: 'var(--brand)' }}>
@@ -261,22 +264,17 @@ export default function TemplatesPage() {
   const [categories, setCategories] = useState<TemplateCategory[]>([])
   const [availableVars, setAvailableVars] = useState<{ key: string; label: string }[]>([])
   const [loading, setLoading] = useState(true)
-  const [adding, setAdding] = useState(false)
-  const [addForm, setAddForm] = useState<FormState>(EMPTY_FORM)
-  const [addSubmitting, setAddSubmitting] = useState(false)
-  const [addError, setAddError] = useState('')
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM)
-  const [editSubmitting, setEditSubmitting] = useState(false)
-  const [editError, setEditError] = useState('')
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | 'new' | null>(null)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
   const [toast, setToast] = useState('')
-  // Category management
   const [newCatName, setNewCatName] = useState('')
   const [addingCat, setAddingCat] = useState(false)
   const [catSubmitting, setCatSubmitting] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const selectedTemplate = templates.find((t) => t.id === selectedId)
 
   useEffect(() => { setPage(1) }, [categoryFilter])
 
@@ -298,41 +296,43 @@ export default function TemplatesPage() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
-  function startEdit(t: WhatsAppTemplate) {
-    setEditingId(t.id)
-    setEditForm({
+  function openNew() {
+    setSelectedId('new')
+    setForm(EMPTY_FORM)
+    setFormError('')
+  }
+
+  function openEdit(t: WhatsAppTemplate) {
+    setSelectedId(t.id)
+    setForm({
       name: t.name, display_name: t.display_name || '', description: t.description || '',
       category: t.category, body_text: t.body_text || '',
       body_params: t.body_params || [], has_header_image: t.has_header_image,
     })
-    setEditError(''); setExpandedId(null); setAdding(false)
-  }
-  function cancelEdit() { setEditingId(null); setEditError('') }
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault(); setAddError(''); setAddSubmitting(true)
-    try {
-      const t = await api.createWhatsAppTemplate({ ...addForm, is_active: true })
-      setTemplates((prev) => [t, ...prev])
-      setCount((c) => c + 1)
-      setAddForm(EMPTY_FORM); setAdding(false)
-      showToast('Template added.')
-    } catch (err: unknown) {
-      setAddError(err instanceof Error ? err.message : 'Failed to add template.')
-    } finally { setAddSubmitting(false) }
+    setFormError('')
   }
 
-  async function handleEdit(e: React.FormEvent) {
+  function closePanel() { setSelectedId(null); setFormError('') }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (editingId === null) return
-    setEditError(''); setEditSubmitting(true)
+    setFormError(''); setSubmitting(true)
     try {
-      const updated = await api.updateWhatsAppTemplate(editingId, editForm)
-      setTemplates((prev) => prev.map((t) => t.id === editingId ? updated : t))
-      setEditingId(null); showToast('Template saved.')
+      if (selectedId === 'new') {
+        const t = await api.createWhatsAppTemplate({ ...form, is_active: true })
+        setTemplates((prev) => [t, ...prev])
+        setCount((c) => c + 1)
+        showToast('Template added.')
+        closePanel()
+      } else if (typeof selectedId === 'number') {
+        const updated = await api.updateWhatsAppTemplate(selectedId, form)
+        setTemplates((prev) => prev.map((t) => t.id === selectedId ? updated : t))
+        showToast('Template saved.')
+        closePanel()
+      }
     } catch (err: unknown) {
-      setEditError(err instanceof Error ? err.message : 'Failed to save template.')
-    } finally { setEditSubmitting(false) }
+      setFormError(err instanceof Error ? err.message : 'Failed to save template.')
+    } finally { setSubmitting(false) }
   }
 
   async function handleDelete(id: number) {
@@ -340,8 +340,7 @@ export default function TemplatesPage() {
     await api.deleteWhatsAppTemplate(id)
     setTemplates((prev) => prev.filter((t) => t.id !== id))
     setCount((c) => c - 1)
-    if (expandedId === id) setExpandedId(null)
-    if (editingId === id) setEditingId(null)
+    if (selectedId === id) closePanel()
     showToast('Template removed.')
   }
 
@@ -369,248 +368,231 @@ export default function TemplatesPage() {
 
   const varLabel = (key: string) => availableVars.find((v) => v.key === key)?.label ?? key
 
+  const panelOpen = selectedId !== null
+
   return (
-    <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
+    <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg"
           style={{ background: 'var(--brand)' }}>{toast}</div>
       )}
 
-      <div className="mb-8 border-b pb-6" style={{ borderColor: 'var(--line)' }}>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--brand)' }}>Admin</p>
-        <h1 className="mt-2 font-display text-4xl" style={{ color: 'var(--ink)' }}>WhatsApp Templates</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-          Register approved Meta templates and define which guest/event variables to pass as parameters.
-        </p>
-      </div>
-
-      {/* How it works */}
-      <div className="mb-6 rounded-[12px] px-5 py-4 text-sm" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-        <p className="font-semibold mb-2" style={{ color: 'var(--ink)' }}>How parameters work</p>
-        <p className="text-xs leading-5" style={{ color: 'var(--muted)' }}>
-          Meta templates have numbered placeholders like{' '}
-          <code className="px-1 rounded text-xs" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{1}}'}</code>,{' '}
-          <code className="px-1 rounded text-xs" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{2}}'}</code>, etc.
-          Paste the body text exactly as approved in Meta, then add variables below <strong>in the same order</strong>.
-          The preview shows how the message will look with real guest data.
-        </p>
-      </div>
-
-      {/* Categories manager */}
-      <div className="mb-6 rounded-[12px] overflow-hidden" style={{ border: '1px solid var(--line)' }}>
-        <div className="flex items-center justify-between px-5 py-3"
-          style={{ background: 'var(--panel)', borderBottom: categories.length || addingCat ? '1px solid var(--line)' : undefined }}>
-          <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Categories</p>
-          <button onClick={() => setAddingCat((v) => !v)}
-            className="px-3 py-1 text-xs font-semibold rounded-full transition"
-            style={{ background: addingCat ? 'var(--danger-bg)' : 'var(--brand-soft)', color: addingCat ? 'var(--danger)' : 'var(--brand)' }}>
-            {addingCat ? 'Cancel' : '+ New category'}
-          </button>
+      {/* Top bar */}
+      <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>Admin</p>
+          <h1 className="text-xl font-bold mt-0.5" style={{ color: 'var(--ink)' }}>WhatsApp Templates</h1>
         </div>
-        {addingCat && (
-          <form onSubmit={handleAddCategory} className="flex gap-2 px-5 py-3"
-            style={{ borderBottom: categories.length ? '1px solid var(--line)' : undefined, background: 'var(--bg)' }}>
-            <input required autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-              placeholder="e.g. Birthday"
-              className="flex-1 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
-            <button type="submit" disabled={catSubmitting}
-              className="rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-              style={{ background: 'var(--brand)' }}>
-              {catSubmitting ? 'Adding…' : 'Add'}
-            </button>
-          </form>
-        )}
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-5 py-3">
-            {categories.map((cat) => (
-              <span key={cat.id} className="flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1 text-xs font-semibold"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
-                {cat.name}
-                <button onClick={() => handleDeleteCategory(cat)}
-                  className="flex items-center justify-center rounded-full h-4 w-4 text-[10px] transition hover:bg-[rgba(239,68,68,0.2)]"
-                  style={{ color: 'var(--muted)' }}>✕</button>
-              </span>
-            ))}
-          </div>
-        )}
+        <button onClick={openNew}
+          className="rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+          style={{ background: 'var(--brand)' }}>
+          + Add template
+        </button>
       </div>
 
-      {/* Templates list */}
-      <div className="overflow-hidden rounded-[12px]" style={{ border: '1px solid var(--line)' }}>
-        {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3 px-5 py-4"
-          style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-          <div className="flex items-center gap-3">
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              Registered templates
-              {count > 0 && <span className="ml-2 text-xs font-normal" style={{ color: 'var(--muted)' }}>({count})</span>}
-            </p>
-            {categories.length > 0 && (
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-2 py-1 text-xs rounded-full focus:outline-none"
-                style={{ background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
-                <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+      {/* Body: list + optional panel */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Left: categories + list */}
+        <div className="flex flex-col overflow-hidden" style={{ width: panelOpen ? '380px' : '100%', flexShrink: 0, borderRight: panelOpen ? '1px solid var(--line)' : 'none', transition: 'width 0.2s' }}>
+
+          {/* Categories */}
+          <div className="flex-shrink-0 px-5 py-3" style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-2)' }}>Categories</p>
+              <button onClick={() => setAddingCat((v) => !v)}
+                className="text-xs font-semibold transition hover:opacity-70"
+                style={{ color: addingCat ? 'var(--danger)' : 'var(--brand)' }}>
+                {addingCat ? 'Cancel' : '+ New'}
+              </button>
+            </div>
+            {addingCat && (
+              <form onSubmit={handleAddCategory} className="flex gap-2 mb-2">
+                <input required autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Category name"
+                  className="flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+                <button type="submit" disabled={catSubmitting}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  style={{ background: 'var(--brand)' }}>
+                  {catSubmitting ? '…' : 'Add'}
+                </button>
+              </form>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setCategoryFilter('')}
+                className="rounded-full px-2.5 py-1 text-xs font-semibold transition"
+                style={{
+                  background: !categoryFilter ? 'var(--brand)' : 'rgba(255,255,255,0.06)',
+                  color: !categoryFilter ? '#fff' : 'var(--muted)',
+                  border: `1px solid ${!categoryFilter ? 'var(--brand)' : 'var(--line)'}`,
+                }}>
+                All
+              </button>
+              {categories.map((cat) => (
+                <span key={cat.id} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-1"
+                  style={{
+                    background: categoryFilter === String(cat.id) ? 'var(--brand-soft)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${categoryFilter === String(cat.id) ? 'var(--brand)' : 'var(--line)'}`,
+                  }}>
+                  <button
+                    onClick={() => setCategoryFilter(categoryFilter === String(cat.id) ? '' : String(cat.id))}
+                    className="text-xs font-semibold"
+                    style={{ color: categoryFilter === String(cat.id) ? 'var(--brand)' : 'var(--muted)' }}>
+                    {cat.name}
+                  </button>
+                  <button onClick={() => handleDeleteCategory(cat)}
+                    className="flex items-center justify-center rounded-full h-4 w-4 text-[10px] transition hover:bg-[rgba(239,68,68,0.2)]"
+                    style={{ color: 'var(--muted-2)' }}>✕</button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Template list */}
+          <div className="flex-1 overflow-auto">
+            {loading ? (
+              <div className="py-12 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
+            ) : templates.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                  {categoryFilter ? 'No templates in this category.' : 'No templates yet.'}
+                </p>
+              </div>
+            ) : (
+              <div>
+                {templates.map((t) => {
+                  const isActive = selectedId === t.id
+                  return (
+                    <button key={t.id}
+                      onClick={() => isActive ? closePanel() : openEdit(t)}
+                      className="w-full text-left px-5 py-4 transition-colors"
+                      style={{
+                        borderBottom: '1px solid var(--line)',
+                        background: isActive ? 'var(--brand-soft)' : 'transparent',
+                      }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate" style={{ color: isActive ? 'var(--brand)' : 'var(--ink)' }}>
+                            {t.display_name || t.name}
+                          </p>
+                          {t.display_name && (
+                            <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--muted-2)' }}>{t.name}</p>
+                          )}
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {t.category_name && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded-full"
+                                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                                {t.category_name}
+                              </span>
+                            )}
+                            {t.has_header_image && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded-full"
+                                style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
+                                Image
+                              </span>
+                            )}
+                            {t.body_params?.length > 0 && (
+                              <span className="text-[10px]" style={{ color: 'var(--muted-2)' }}>
+                                {t.body_params.length} param{t.body_params.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                          style={{ color: isActive ? 'var(--brand)' : 'var(--muted-2)', flexShrink: 0, marginTop: 2 }}>
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             )}
           </div>
-          <button onClick={() => { setAdding((v) => !v); setAddError(''); cancelEdit() }}
-            className="px-3 py-1.5 text-xs font-semibold rounded-full transition flex-shrink-0"
-            style={{ background: adding ? 'var(--danger-bg)' : 'var(--brand-soft)', color: adding ? 'var(--danger)' : 'var(--brand)' }}>
-            {adding ? 'Cancel' : '+ Add template'}
-          </button>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-shrink-0 items-center justify-between px-5 py-3"
+              style={{ borderTop: '1px solid var(--line)', background: 'var(--panel)' }}>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                {count} templates · Page {page}/{totalPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+                  style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>‹</button>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+                  style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>›</button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {adding && (
-          <TemplateForm
-            form={addForm} setForm={setAddForm} categories={categories}
-            availableVars={availableVars} error={addError} submitting={addSubmitting}
-            submitLabel="Add Template" onSubmit={handleAdd}
-            onCancel={() => { setAdding(false); setAddError('') }}
-          />
+        {/* Right: detail / edit panel */}
+        {panelOpen && (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Panel header */}
+            <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
+              style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-2)' }}>
+                  {selectedId === 'new' ? 'New template' : 'Edit template'}
+                </p>
+                {selectedTemplate && (
+                  <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>
+                    {selectedTemplate.display_name || selectedTemplate.name}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {typeof selectedId === 'number' && (
+                  <button onClick={() => handleDelete(selectedId)}
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
+                    style={{ border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}>
+                    Remove
+                  </button>
+                )}
+                <button onClick={closePanel}
+                  className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-[rgba(255,255,255,0.06)]"
+                  style={{ color: 'var(--muted)' }}>✕</button>
+              </div>
+            </div>
+
+            {/* Info banner */}
+            {selectedId === 'new' && (
+              <div className="flex-shrink-0 px-6 py-3 text-xs" style={{ background: 'rgba(184,150,62,0.07)', borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}>
+                Meta templates use numbered placeholders like{' '}
+                <code className="px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{1}}'}</code>,{' '}
+                <code className="px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{2}}'}</code>.
+                Paste the body text exactly as approved, then map each placeholder to a guest variable below.
+              </div>
+            )}
+
+            {/* Form */}
+            <div className="flex-1 overflow-auto px-6 py-5">
+              <TemplateForm
+                form={form} setForm={setForm} categories={categories}
+                availableVars={availableVars} error={formError} submitting={submitting}
+                submitLabel={selectedId === 'new' ? 'Add Template' : 'Save Changes'}
+                onSubmit={handleSubmit} onCancel={closePanel}
+              />
+            </div>
+          </div>
         )}
 
-        <div className="divide-y" style={{ borderColor: 'var(--line)' }}>
-          {loading && <p className="px-5 py-4 text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>}
-          {!loading && templates.length === 0 && (
-            <p className="px-5 py-5 text-sm" style={{ color: 'var(--muted)' }}>
-              {categoryFilter ? 'No templates in this category.' : 'No templates registered yet.'}
-            </p>
-          )}
-          {templates.map((t) => {
-            const isExpanded = expandedId === t.id
-            const isEditing = editingId === t.id
-
-            if (isEditing) {
-              return (
-                <div key={t.id}>
-                  <div className="flex items-center justify-between px-5 py-3"
-                    style={{ background: 'var(--brand-soft)', borderBottom: '1px solid var(--line)' }}>
-                    <p className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                      Editing: {t.display_name || t.name}
-                    </p>
-                  </div>
-                  <TemplateForm
-                    form={editForm} setForm={setEditForm} categories={categories}
-                    availableVars={availableVars} error={editError} submitting={editSubmitting}
-                    submitLabel="Save Changes" onSubmit={handleEdit} onCancel={cancelEdit}
-                  />
-                </div>
-              )
-            }
-
-            return (
-              <div key={t.id} className="px-5 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{t.display_name || t.name}</p>
-                      {t.category_name && (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
-                          {t.category_name}
-                        </span>
-                      )}
-                      {t.has_header_image && (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded"
-                          style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>Header image</span>
-                      )}
-                      {!t.is_active && (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded"
-                          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>Inactive</span>
-                      )}
-                    </div>
-                    {t.display_name && (
-                      <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--muted)' }}>{t.name}</p>
-                    )}
-                    {t.body_params?.length > 0 && (
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        {t.body_params.map((key, i) => (
-                          <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px]"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
-                            <span className="font-bold" style={{ color: 'var(--brand)' }}>{i + 1}</span>
-                            {varLabel(key)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {t.body_text && (
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : t.id)}
-                        className="mt-2 flex items-center gap-1 text-xs font-semibold transition hover:opacity-70"
-                        style={{ color: 'var(--brand)' }}>
-                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                          <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                        {isExpanded ? 'Hide preview' : 'Show preview'}
-                      </button>
-                    )}
-                    {isExpanded && (
-                      <PreviewBubble bodyText={t.body_text} bodyParams={t.body_params || []} hasHeaderImage={t.has_header_image} />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => startEdit(t)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-full transition"
-                      style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(t.id)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-full transition"
-                      style={{ border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3"
-            style={{ borderTop: '1px solid var(--line)', background: 'var(--panel)' }}>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Page {page} of {totalPages} · {count} templates
-            </p>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setPage(1)} disabled={page === 1}
-                className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
-                style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>«</button>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
-                style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>‹ Prev</button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                .reduce<(number | '…')[]>((acc, p, idx, arr) => {
-                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('…')
-                  acc.push(p)
-                  return acc
-                }, [])
-                .map((p, i) => p === '…' ? (
-                  <span key={`e-${i}`} className="px-1 text-xs" style={{ color: 'var(--muted-2)' }}>…</span>
-                ) : (
-                  <button key={p} onClick={() => setPage(p as number)}
-                    className="min-w-[28px] rounded px-2 py-1 text-xs font-semibold transition"
-                    style={{
-                      background: page === p ? 'var(--brand)' : 'transparent',
-                      color: page === p ? '#fff' : 'var(--muted)',
-                      border: `1px solid ${page === p ? 'var(--brand)' : 'var(--line)'}`,
-                    }}>{p}</button>
-                ))}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
-                style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>Next ›</button>
-              <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-                className="rounded px-2 py-1 text-xs transition disabled:opacity-30"
-                style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>»</button>
+        {/* Empty right panel prompt */}
+        {!panelOpen && !loading && templates.length > 0 && (
+          <div className="hidden lg:flex flex-1 items-center justify-center" style={{ borderLeft: '1px solid var(--line)' }}>
+            <div className="text-center">
+              <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.2" viewBox="0 0 24 24"
+                className="mx-auto mb-3" style={{ color: 'var(--muted-2)' }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Select a template to edit</p>
             </div>
           </div>
         )}

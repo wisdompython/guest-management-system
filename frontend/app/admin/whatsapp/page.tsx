@@ -359,46 +359,89 @@ export default function WhatsAppPage() {
   // ── Event picker ────────────────────────────────────────────────────────
   if (!selectedEvent) {
     return (
-      <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
+      <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
         {toast && <Toast {...toast} />}
-        <div className="mb-8 border-b pb-6" style={{ borderColor: 'var(--line)' }}>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--brand)' }}>Comms</p>
-          <h1 className="mt-2 font-display text-4xl" style={{ color: 'var(--ink)' }}>WhatsApp</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Select an event to manage pass delivery.</p>
+        <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
+          style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>Comms</p>
+            <h1 className="text-xl font-bold mt-0.5" style={{ color: 'var(--ink)' }}>WhatsApp</h1>
+          </div>
+          <a href="/admin/events/add"
+            className="rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+            style={{ background: 'var(--brand)' }}>+ New Event</a>
         </div>
-        {eventsLoading ? (
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
-        ) : events.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 py-16">
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>No events yet.</p>
-            <a href="/admin/events/add"
-              className="rounded-full px-5 py-2 text-xs font-semibold text-white"
-              style={{ background: 'var(--brand)' }}>+ Create an event</a>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {events.map((ev) => (
-              <button key={ev.id} onClick={() => setSelectedEvent(ev)}
-                className="text-left rounded-[12px] px-5 py-4 transition hover:border-[var(--brand)]"
-                style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</p>
-                  {ev.is_ended && (
-                    <span className="flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                      style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>Ended</span>
-                  )}
-                </div>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {new Date(ev.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {ev.venue ? ` · ${ev.venue}` : ''}
-                </p>
-                <p className="mt-2 text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                  {ev.guest_count} guest{ev.guest_count !== 1 ? 's' : ''} →
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
+
+        <div className="flex-1 overflow-auto">
+          {eventsLoading ? (
+            <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
+          ) : events.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 py-20">
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>No events yet.</p>
+              <a href="/admin/events/add"
+                className="rounded-full px-5 py-2 text-xs font-semibold text-white"
+                style={{ background: 'var(--brand)' }}>+ Create an event</a>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--panel)' }}>
+                  <th className="px-6 py-3 text-left">Event</th>
+                  <th className="px-6 py-3 text-left">Date</th>
+                  <th className="px-6 py-3 text-left">Venue</th>
+                  <th className="px-6 py-3 text-left">Guests</th>
+                  <th className="px-6 py-3 text-left">WA Sent</th>
+                  <th className="px-6 py-3 text-left w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((ev) => (
+                  <tr key={ev.id}
+                    className="group cursor-pointer transition-colors hover:bg-[var(--panel)]"
+                    style={{ borderBottom: '1px solid var(--line)' }}
+                    onClick={() => setSelectedEvent(ev)}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</span>
+                        {ev.is_ended && (
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                            style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>Ended</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-xs" style={{ color: 'var(--muted)' }}>
+                      {new Date(ev.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="max-w-[160px] truncate px-6 py-4 text-xs" style={{ color: 'var(--muted)' }}>
+                      {ev.venue || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                      {ev.guest_count}
+                    </td>
+                    <td className="px-6 py-4">
+                      {ev.guest_count > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-20 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+                            <div className="h-full rounded-full transition-all"
+                              style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                            {ev.checked_in_count}/{ev.guest_count}
+                          </span>
+                        </div>
+                      ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>—</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ color: 'var(--brand)' }}>Open →</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     )
   }
