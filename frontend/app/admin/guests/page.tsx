@@ -182,7 +182,7 @@ export default function GuestsPage() {
           style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Guests</h1>
-            <Link href="/admin/guests/search"
+            <Link href="/admin/guests/search" data-tour="guests-search-link"
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full transition hover:opacity-80"
               style={{ border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--panel)' }}>
               <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -207,8 +207,8 @@ export default function GuestsPage() {
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((ev) => (
-                <button key={ev.id} onClick={() => setSelectedEvent(ev)}
+              {events.map((ev, i) => (
+                <button key={ev.id} onClick={() => setSelectedEvent(ev)} data-tour={i === 0 ? 'guests-pick-event' : undefined}
                   className="text-left rounded-[12px] px-5 py-4 transition hover:border-[var(--brand)]"
                   style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
                   <div className="flex items-start justify-between gap-2 mb-1">
@@ -289,7 +289,7 @@ export default function GuestsPage() {
               </button>
               <DownloadAssetsButton eventId={selectedEvent.id} eventName={selectedEvent.name} />
               <ExportDropdown events={[selectedEvent]} />
-              <Link href={`/admin/guests/bulk-upload?event=${selectedEvent.id}`}
+              <Link href={`/admin/guests/bulk-upload?event=${selectedEvent.id}`} data-tour="guests-bulk-upload-button"
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90"
                 style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel-2)' }}>
                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -297,7 +297,7 @@ export default function GuestsPage() {
                 </svg>
                 Bulk upload
               </Link>
-              <Link href={`/admin/guests/add?event=${selectedEvent.id}`}
+              <Link href={`/admin/guests/add?event=${selectedEvent.id}`} data-tour="guests-add-button"
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
                 style={{ background: 'var(--brand)' }}>
                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">

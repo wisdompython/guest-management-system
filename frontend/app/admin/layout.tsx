@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAuth, useRequireAuth } from '@/lib/auth'
 import { NavSidebar } from '@/components/admin/NavSidebar'
 import { MobileNav } from '@/components/admin/MobileNav'
+import { TourProvider } from '@/components/tour/TourProvider'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth()
@@ -23,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
+    <TourProvider>
     <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
 
       {/* Desktop sidebar */}
@@ -57,5 +59,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
     </div>
+    </TourProvider>
   )
 }

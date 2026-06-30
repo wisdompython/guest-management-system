@@ -384,7 +384,7 @@ export default function TemplatesPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>Admin</p>
           <h1 className="text-xl font-bold mt-0.5" style={{ color: 'var(--ink)' }}>WhatsApp Templates</h1>
         </div>
-        <button onClick={openNew}
+        <button onClick={openNew} data-tour="templates-add-button"
           className="rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
           style={{ background: 'var(--brand)' }}>
           + Add template

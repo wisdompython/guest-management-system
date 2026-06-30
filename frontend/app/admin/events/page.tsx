@@ -47,7 +47,7 @@ export default function EventsPage() {
           <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Events</h1>
           <p className="mt-0.5 text-sm" style={{ color: 'var(--muted)' }}>{events.length} total events</p>
         </div>
-        <Link href="/admin/events/add" className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ background: 'var(--brand)' }}>
+        <Link href="/admin/events/add" data-tour="events-new-button" className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ background: 'var(--brand)' }}>
           + New Event
         </Link>
       </div>

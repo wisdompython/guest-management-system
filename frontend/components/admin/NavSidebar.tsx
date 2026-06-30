@@ -23,22 +23,22 @@ const Ic = {
 
 const NAV_GROUPS = [
   { label: 'LIVE', items: [
-    { href: '/admin/dashboard',  label: 'Dashboard',        icon: Ic.grid },
-    { href: '/admin/check-in',   label: 'Scanner stations', icon: Ic.scanner },
+    { href: '/admin/dashboard',  label: 'Dashboard',        icon: Ic.grid,    tourId: 'nav-dashboard' },
+    { href: '/admin/check-in',   label: 'Scanner stations', icon: Ic.scanner, tourId: 'nav-checkin' },
   ]},
   { label: 'PLAN', items: [
-    { href: '/admin/events',             label: 'Events',       icon: Ic.events },
-    { href: '/admin/guests',             label: 'Guests',       icon: Ic.guests },
+    { href: '/admin/events',             label: 'Events',       icon: Ic.events, tourId: 'nav-events' },
+    { href: '/admin/guests',             label: 'Guests',       icon: Ic.guests, tourId: 'nav-guests' },
     { href: '/admin/guests/bulk-upload', label: 'Bulk Upload',  icon: Ic.upload,  minRole: 'event_manager' as const },
     { href: '/admin/fonts',              label: 'Pass Designer', icon: Ic.design, minRole: 'event_manager' as const },
   ]},
   { label: 'COMMS', items: [
-    { href: '/admin/whatsapp',   label: 'WhatsApp',  icon: Ic.whatsapp },
-    { href: '/admin/reminders',  label: 'Reminders', icon: Ic.reminders },
+    { href: '/admin/whatsapp',   label: 'WhatsApp',  icon: Ic.whatsapp,  tourId: 'nav-whatsapp' },
+    { href: '/admin/reminders',  label: 'Reminders', icon: Ic.reminders, tourId: 'nav-reminders' },
   ]},
   { label: 'ADMIN', items: [
-    { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const },
-    { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const },
+    { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const, tourId: 'nav-team' },
+    { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const, tourId: 'nav-templates' },
     { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs },
   ]},
 ]
@@ -76,7 +76,7 @@ export function NavSidebar({ user, logout }: Props) {
               <div key={label}>
                 <p className="mb-1 px-2 text-[11px] font-semibold tracking-[0.14em]" style={{ color: 'var(--muted-2)' }}>{label}</p>
                 <div className="space-y-0.5">
-                  {visible.map(({ href, label: itemLabel, icon }) => {
+                  {visible.map(({ href, label: itemLabel, icon, tourId }) => {
                     const active = pathname === href || (
                       href !== '/admin/dashboard' &&
                       href !== '/admin/settings' &&
@@ -86,7 +86,7 @@ export function NavSidebar({ user, logout }: Props) {
                     )
                     const badge = 0
                     return (
-                      <Link key={href} href={href}
+                      <Link key={href} href={href} data-tour={tourId}
                         className="flex items-center gap-2.5 rounded px-2 py-2 text-[14px] transition-colors"
                         style={{ background: active ? 'var(--brand-soft)' : 'transparent', color: active ? 'var(--brand)' : 'var(--muted)' }}>
                         <span style={{ opacity: active ? 1 : 0.7, color: active ? 'var(--brand)' : 'inherit' }}>{icon}</span>
