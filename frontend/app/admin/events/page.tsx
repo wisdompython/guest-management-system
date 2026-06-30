@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { api, Event } from '@/lib/api'
 
@@ -10,15 +10,74 @@ function exportEvent(eventId: number) {
   window.location.href = `${BASE_URL}/guests/export/?event=${eventId}`
 }
 
+type StatusFilter = 'all' | 'upcoming' | 'ended'
+type SortKey = 'date_desc' | 'date_asc' | 'name_asc' | 'guests_desc' | 'checkin_desc'
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'date_desc',    label: 'Date (newest first)' },
+  { value: 'date_asc',     label: 'Date (oldest first)' },
+  { value: 'name_asc',     label: 'Name (A–Z)' },
+  { value: 'guests_desc',  label: 'Guest count (high–low)' },
+  { value: 'checkin_desc', label: 'Check-in % (high–low)' },
+]
+
+const selectCls = 'rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none'
+
 export default function EventsPage() {
   const [events, setEvents]   = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [togglingId, setTogglingId] = useState<number | null>(null)
 
+  const [search, setSearch]         = useState('')
+  const [status, setStatus]         = useState<StatusFilter>('all')
+  const [dateFrom, setDateFrom]     = useState('')
+  const [dateTo, setDateTo]         = useState('')
+  const [sort, setSort]             = useState<SortKey>('date_desc')
+
   useEffect(() => {
     api.getEvents().then(setEvents).catch(console.error).finally(() => setLoading(false))
   }, [])
+
+  const filteredEvents = useMemo(() => {
+    let result = events
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      result = result.filter((ev) => ev.name.toLowerCase().includes(q) || ev.venue?.toLowerCase().includes(q))
+    }
+
+    if (status !== 'all') {
+      result = result.filter((ev) => (status === 'ended' ? ev.is_ended : !ev.is_ended))
+    }
+
+    if (dateFrom) {
+      result = result.filter((ev) => ev.date >= dateFrom)
+    }
+    if (dateTo) {
+      result = result.filter((ev) => ev.date <= dateTo)
+    }
+
+    const sorted = [...result]
+    switch (sort) {
+      case 'date_desc':    sorted.sort((a, b) => b.date.localeCompare(a.date)); break
+      case 'date_asc':     sorted.sort((a, b) => a.date.localeCompare(b.date)); break
+      case 'name_asc':     sorted.sort((a, b) => a.name.localeCompare(b.name)); break
+      case 'guests_desc':  sorted.sort((a, b) => b.guest_count - a.guest_count); break
+      case 'checkin_desc': sorted.sort((a, b) => {
+        const pctA = a.guest_count > 0 ? a.checked_in_count / a.guest_count : 0
+        const pctB = b.guest_count > 0 ? b.checked_in_count / b.guest_count : 0
+        return pctB - pctA
+      }); break
+    }
+    return sorted
+  }, [events, search, status, dateFrom, dateTo, sort])
+
+  const hasActiveFilters = search.trim() !== '' || status !== 'all' || dateFrom !== '' || dateTo !== ''
+
+  function clearFilters() {
+    setSearch(''); setStatus('all'); setDateFrom(''); setDateTo('')
+  }
 
   async function handleToggleEnded(ev: Event) {
     setTogglingId(ev.id)
@@ -45,12 +104,60 @@ export default function EventsPage() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Events</h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--muted)' }}>{events.length} total events</p>
+          <p className="mt-0.5 text-sm" style={{ color: 'var(--muted)' }}>
+            {hasActiveFilters ? `${filteredEvents.length} of ${events.length} events` : `${events.length} total events`}
+          </p>
         </div>
         <Link href="/admin/events/add" data-tour="events-new-button" className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ background: 'var(--brand)' }}>
           + New Event
         </Link>
       </div>
+
+      {events.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[12px] px-4 py-3"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name or venue…"
+            className="min-w-[180px] flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none"
+            style={{ border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)' }}
+          />
+
+          <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}
+            className={selectCls} style={{ border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)' }}>
+            <option value="all">All statuses</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="ended">Ended</option>
+          </select>
+
+          <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="rounded-lg px-2.5 py-2 text-xs focus:outline-none"
+              style={{ border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)' }} />
+            <span>to</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="rounded-lg px-2.5 py-2 text-xs focus:outline-none"
+              style={{ border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)' }} />
+          </div>
+
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
+            className={selectCls} style={{ border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)' }}>
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          {hasActiveFilters && (
+            <button onClick={clearFilters}
+              className="rounded-lg px-3 py-2 text-xs font-semibold transition hover:opacity-70"
+              style={{ color: 'var(--muted)' }}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-[12px]" style={{ border: '1px solid var(--line)' }}>
         {loading ? (
@@ -72,6 +179,23 @@ export default function EventsPage() {
               + Create Event
             </Link>
           </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="py-20 flex flex-col items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--panel)' }}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ color: 'var(--muted)' }}>
+                <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>No events match your filters</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>Try adjusting your search, status, or date range.</p>
+            </div>
+            <button onClick={clearFilters}
+              className="rounded-full px-5 py-2 text-xs font-semibold transition hover:opacity-90"
+              style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>
+              Clear filters
+            </button>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -86,7 +210,7 @@ export default function EventsPage() {
               </tr>
             </thead>
             <tbody>
-              {events.map((ev) => (
+              {filteredEvents.map((ev) => (
                 <tr key={ev.id} className="group cursor-pointer transition-colors hover:bg-[var(--panel)]" style={{ borderTop: '1px solid var(--line)' }}
                   onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
