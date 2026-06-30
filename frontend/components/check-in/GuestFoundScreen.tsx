@@ -17,7 +17,7 @@ export function GuestFoundScreen({
   onCancel: () => void
 }) {
   return (
-    <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto" style={{ background: 'var(--bg)' }}>
+    <div className="h-full overflow-auto flex flex-col px-4 py-8 max-w-lg mx-auto" style={{ background: 'var(--bg)' }}>
       <div className="flex items-center gap-3 mb-8">
         <button onClick={onCancel}
           className="w-10 h-10 rounded-sm border flex items-center justify-center transition hover:bg-[var(--bg)]"

@@ -16,7 +16,7 @@ function GuestInfoRow({ label, value }: { label: string; value: string }) {
 
 export function DuplicateScreen({ guest, onNext }: { guest: Guest; onNext: () => void }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 text-white" style={{ background: '#4a3000' }}>
+    <div className="h-full overflow-auto flex flex-col items-center justify-center px-6 py-12 text-white" style={{ background: '#4a3000' }}>
       <div className="w-20 h-20 rounded-sm flex items-center justify-center mb-6" style={{ background: 'rgba(255,255,255,0.12)' }}>
         <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M12 3C6.477 3 2 7.477 2 12s4.477 9 10 9 10-4.477 10-9S17.523 3 12 3z" />

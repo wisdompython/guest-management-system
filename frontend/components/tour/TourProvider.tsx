@@ -141,7 +141,7 @@ function TourOverlay({
 
   const tooltipStyle = (() => {
     if (!rect) {
-      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' } as React.CSSProperties
+      return { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' } as React.CSSProperties
     }
     const base: React.CSSProperties = { position: 'fixed' }
     if (placement === 'bottom') return { ...base, top: rect.top + rect.height + 14, left: Math.max(12, rect.left) }
