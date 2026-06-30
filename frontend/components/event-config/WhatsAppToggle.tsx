@@ -8,6 +8,7 @@ interface Props {
 export function WhatsAppToggle({ whatsappEnabled, onChange }: Props) {
   return (
     <div
+      data-tour="event-whatsapp-toggle"
       className="flex items-start justify-between gap-4 rounded-[14px] p-4"
       style={{ border: '1px solid var(--line)', background: whatsappEnabled ? 'var(--brand-soft)' : 'var(--bg)' }}
     >

@@ -38,7 +38,7 @@ export function PassDesignSection({
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
+        <h2 data-tour="event-pass-design-section" className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
         <p className="mt-0.5 text-xs text-[var(--muted)]">
           {isEdit
             ? 'Leave the file picker empty to keep the existing design.'
@@ -59,7 +59,7 @@ export function PassDesignSection({
           <label className={label}>
             {isEdit ? (newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)') : 'Design Template (PNG / JPG)'}
           </label>
-          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={onFileChange}
+          <input data-tour="event-design-upload" ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={onFileChange}
             className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]" />
         </div>
         {previewUrl && (

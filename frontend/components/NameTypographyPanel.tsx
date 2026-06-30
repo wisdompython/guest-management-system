@@ -35,7 +35,7 @@ export default function NameTypographyPanel({
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Name Typography</h2>
+        <h2 data-tour="event-typography-section" className="text-sm font-semibold text-[var(--ink)]">Name Typography</h2>
         <p className="mt-0.5 text-xs text-[var(--muted)]">
           Controls how the guest name is rendered inside the name zone.
           <a href="/admin/fonts" className="ml-1 font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Manage fonts →</a>

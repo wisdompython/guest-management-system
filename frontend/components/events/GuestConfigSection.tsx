@@ -23,7 +23,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
+        <h2 data-tour="event-guest-config-section" className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
         <p className="mt-0.5 text-xs text-[var(--muted)]">Set ticket categories, required fields, and delivery options for this event.</p>
       </div>
       <div className="p-6 space-y-6">
@@ -44,6 +44,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
               Defaults to the global template if none is selected.
             </p>
             <select
+              data-tour="event-whatsapp-template"
               value={whatsappTemplate ?? ''}
               onChange={(e) => onChange({ whatsappTemplate: e.target.value ? Number(e.target.value) : null })}
               className="w-full rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"

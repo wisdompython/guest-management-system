@@ -170,7 +170,7 @@ export function DualZoneCanvas({
   ]
 
   return (
-    <div className="space-y-2">
+    <div data-tour="event-zone-canvas" className="space-y-2">
       <div className="flex gap-2 flex-wrap">
         {tabs.map((tab) => (
           <button

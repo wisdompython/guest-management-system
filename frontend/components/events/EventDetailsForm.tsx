@@ -63,20 +63,21 @@ export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange
   return (
     <div className="overflow-hidden" style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
       <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Event Details</h2>
+        <h2 data-tour="event-details-section" className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Event Details</h2>
         {subtitle && <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
       </div>
       <div className="grid gap-5 p-6 sm:grid-cols-2">
 
         <div className="sm:col-span-2">
           <label className={label} style={labelStyle}>Event Name *</label>
-          <input name="name" type="text" required defaultValue={event?.name}
+          <input data-tour="event-name-field" name="name" type="text" required defaultValue={event?.name}
             placeholder="e.g. Annual Gala 2026" className={field} style={fieldStyle} />
         </div>
 
         <div>
           <label className={label} style={labelStyle}>Date & Time *</label>
           <input
+            data-tour="event-date-field"
             name="date"
             type="datetime-local"
             required

@@ -100,7 +100,7 @@ export default function AddEventPage() {
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
         <div className="flex gap-3 pt-1">
-          <button type="submit" disabled={submitting}
+          <button data-tour="event-submit-button" type="submit" disabled={submitting}
             className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">
             {submitting ? 'Creating…' : 'Create Event'}
           </button>
