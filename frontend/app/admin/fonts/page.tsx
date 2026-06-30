@@ -97,7 +97,7 @@ export default function FontsPage() {
 
           {/* Upload form */}
           <div className="p-5" style={{ borderBottom: '1px solid var(--line)' }}>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+            <p data-tour="fonts-upload-section" className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
               Upload Font
             </p>
 
@@ -115,6 +115,7 @@ export default function FontsPage() {
             <form onSubmit={handleUpload} className="space-y-3">
               {/* Drag and drop zone */}
               <div
+                data-tour="fonts-drop-zone"
                 onDrop={onDrop}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
@@ -137,6 +138,7 @@ export default function FontsPage() {
               </div>
 
               <input
+                data-tour="fonts-name-input"
                 type="text"
                 placeholder="Font name"
                 value={fontName}
@@ -146,7 +148,7 @@ export default function FontsPage() {
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}
               />
 
-              <button type="submit" disabled={uploading || !selectedFile}
+              <button data-tour="fonts-upload-button" type="submit" disabled={uploading || !selectedFile}
                 className="w-full py-2 text-[12px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
                 style={{ background: 'var(--brand)' }}>
                 {uploading ? 'Uploading…' : 'Upload Font'}
@@ -157,7 +159,7 @@ export default function FontsPage() {
           {/* Font list */}
           <div className="flex-1 overflow-y-auto">
             <div className="px-5 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
+              <p data-tour="fonts-library" className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted)' }}>
                 Library · {fonts.length} font{fonts.length !== 1 ? 's' : ''}
               </p>
             </div>
@@ -213,7 +215,7 @@ export default function FontsPage() {
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex flex-shrink-0 items-center justify-between px-6 py-3"
             style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>
+            <p data-tour="fonts-preview-panel" className="text-[12px]" style={{ color: 'var(--muted)' }}>
               {ev ? `${ev.name} · Pass template preview` : 'Select an event to preview'}
             </p>
             {ev && (

@@ -20,6 +20,18 @@ export const TOURS: Tour[] = [
     ],
   },
   {
+    id: 'fonts',
+    steps: [
+      { target: 'nav-fonts',          path: '/admin/fonts',  title: 'Pass Designer',       body: 'The Pass Designer is where you manage your font library and preview how guest passes will look for each event.',                                                                   placement: 'right'  },
+      { target: 'fonts-upload-section', path: '/admin/fonts', title: 'Upload a font',      body: 'Upload a .ttf or .otf font file here. Uploaded fonts become available in the Name Typography panel when creating or editing events.',                                            placement: 'bottom' },
+      { target: 'fonts-drop-zone',    path: '/admin/fonts',  title: 'Drop zone',           body: 'Drag a font file directly here, or click to open the file picker. Only .ttf and .otf formats are supported.',                                                                     placement: 'right'  },
+      { target: 'fonts-name-input',   path: '/admin/fonts',  title: 'Font name',           body: 'Give the font a friendly display name. The name fills in automatically from the filename, but you can change it to anything you like.',                                           placement: 'right'  },
+      { target: 'fonts-upload-button', path: '/admin/fonts', title: 'Upload',              body: 'Click "Upload Font" to save the font to your library. It will appear instantly in the library panel below and in the event typography settings.',                                 placement: 'right'  },
+      { target: 'fonts-library',      path: '/admin/fonts',  title: 'Font library',        body: 'All uploaded fonts appear here with a live preview using the actual typeface. The "Active" badge shows which font is assigned to the currently selected event.',                  placement: 'right'  },
+      { target: 'fonts-preview-panel', path: '/admin/fonts', title: 'Pass preview',        body: 'The right panel shows a live preview of the selected event\'s pass template, including the QR and name zone positions and typography settings. Switch the event using the dropdown in the top bar.', placement: 'left' },
+    ],
+  },
+  {
     id: 'guests',
     steps: [
       { target: 'nav-guests', path: '/admin/guests', title: 'Open Guests', body: 'Guests are managed per event. Pick an event first.', placement: 'right' },

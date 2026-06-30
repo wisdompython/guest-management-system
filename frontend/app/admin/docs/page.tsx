@@ -10,15 +10,17 @@ const Ic = {
   whatsapp:  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>,
   templates: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   team:      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 15c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4z"/><circle cx="12" cy="8" r="4"/></svg>,
+  fonts:     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>,
 }
 
 const GUIDES: { id: string; title: string; description: string; icon: React.ReactNode }[] = [
-  { id: 'events',   title: 'Creating an event',          description: 'Set up a new event with a date, venue, and pass design.', icon: Ic.events },
-  { id: 'guests',   title: 'Adding guests',               description: 'Add guests one at a time, or bulk-upload a spreadsheet.', icon: Ic.guests },
-  { id: 'checkin',  title: 'Checking guests in',           description: 'Scan QR codes at the door and watch arrivals live.', icon: Ic.scanner },
-  { id: 'whatsapp', title: 'Sending WhatsApp messages',    description: 'Send guest passes and reminders over WhatsApp.', icon: Ic.whatsapp },
+  { id: 'events',    title: 'Creating an event',          description: 'Set up a new event with a date, venue, and pass design.', icon: Ic.events },
+  { id: 'fonts',     title: 'Adding fonts',               description: 'Upload custom typefaces to use on guest passes.', icon: Ic.fonts },
+  { id: 'guests',    title: 'Adding guests',               description: 'Add guests one at a time, or bulk-upload a spreadsheet.', icon: Ic.guests },
+  { id: 'checkin',   title: 'Checking guests in',          description: 'Scan QR codes at the door and watch arrivals live.', icon: Ic.scanner },
+  { id: 'whatsapp',  title: 'Sending WhatsApp messages',   description: 'Send guest passes and reminders over WhatsApp.', icon: Ic.whatsapp },
   { id: 'templates', title: 'Managing WhatsApp templates', description: 'Create and preview templates approved in Meta Business.', icon: Ic.templates },
-  { id: 'team',     title: 'Managing your team',           description: 'Invite teammates and control what they can see and do.', icon: Ic.team },
+  { id: 'team',      title: 'Managing your team',          description: 'Invite teammates and control what they can see and do.', icon: Ic.team },
 ]
 
 export default function DocsPage() {

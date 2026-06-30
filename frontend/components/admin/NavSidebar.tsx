@@ -30,7 +30,7 @@ const NAV_GROUPS = [
     { href: '/admin/events',             label: 'Events',       icon: Ic.events, tourId: 'nav-events' },
     { href: '/admin/guests',             label: 'Guests',       icon: Ic.guests, tourId: 'nav-guests' },
     { href: '/admin/guests/bulk-upload', label: 'Bulk Upload',  icon: Ic.upload,  minRole: 'event_manager' as const },
-    { href: '/admin/fonts',              label: 'Pass Designer', icon: Ic.design, minRole: 'event_manager' as const },
+    { href: '/admin/fonts',              label: 'Pass Designer', icon: Ic.design, minRole: 'event_manager' as const, tourId: 'nav-fonts' },
   ]},
   { label: 'COMMS', items: [
     { href: '/admin/whatsapp',   label: 'WhatsApp',  icon: Ic.whatsapp,  tourId: 'nav-whatsapp' },
