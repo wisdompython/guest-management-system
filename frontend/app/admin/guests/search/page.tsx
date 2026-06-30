@@ -2,12 +2,29 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { api, Guest } from '@/lib/api'
+import { api, Guest, Event } from '@/lib/api'
 import { useRequireAuth } from '@/lib/auth'
+
+const PAGE_SIZE = 20
+
+type SortKey = '' | 'name' | '-name' | 'registered' | '-registered' | 'checked_in' | '-checked_in'
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: '',            label: 'Best match' },
+  { value: '-registered', label: 'Registered (newest)' },
+  { value: 'registered',  label: 'Registered (oldest)' },
+  { value: 'name',        label: 'Name (A–Z)' },
+  { value: '-checked_in', label: 'Checked in (newest)' },
+]
 
 export default function GlobalGuestSearchPage() {
   useRequireAuth()
   const [query, setQuery] = useState('')
+  const [eventFilter, setEventFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sort, setSort] = useState<SortKey>('')
+  const [page, setPage] = useState(1)
+  const [events, setEvents] = useState<Event[]>([])
   const [guests, setGuests] = useState<Guest[]>([])
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -15,18 +32,28 @@ export default function GlobalGuestSearchPage() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const hasFilters = query.trim() !== '' || eventFilter !== '' || statusFilter !== ''
+
   useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => { api.getEvents().then(setEvents).catch(console.error) }, [])
+  useEffect(() => { setPage(1) }, [query, eventFilter, statusFilter, sort])
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
-    if (!query.trim()) { setGuests([]); setCount(0); return }
+    if (!hasFilters) { setGuests([]); setCount(0); return }
     timerRef.current = setTimeout(async () => {
       const controller = new AbortController()
       abortRef.current = controller
       setLoading(true)
       try {
-        const data = await api.getGuests({ search: query.trim(), page_size: '20' }, controller.signal)
+        const params: Record<string, string> = { page_size: String(PAGE_SIZE), page: String(page) }
+        if (query.trim())   params.search = query.trim()
+        if (eventFilter)    params.event = eventFilter
+        if (statusFilter)   params.status = statusFilter
+        if (sort)            params.ordering = sort
+        const data = await api.getGuests(params, controller.signal)
         setGuests(data.results)
         setCount(data.count)
       } catch (err) {
@@ -35,7 +62,11 @@ export default function GlobalGuestSearchPage() {
         if (!controller.signal.aborted) setLoading(false)
       }
     }, 350)
-  }, [query])
+  }, [query, eventFilter, statusFilter, sort, page, hasFilters])
+
+  function clearFilters() {
+    setQuery(''); setEventFilter(''); setStatusFilter(''); setSort('')
+  }
 
   const initials = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -68,23 +99,57 @@ export default function GlobalGuestSearchPage() {
           <button onClick={() => setQuery('')} className="text-xs" style={{ color: 'var(--muted)' }}>✕</button>
         )}
         {loading && <span className="text-xs" style={{ color: 'var(--muted)' }}>Searching…</span>}
-        {!loading && query && (
+        {!loading && hasFilters && (
           <span className="text-xs" style={{ color: 'var(--muted)' }}>{count} result{count !== 1 ? 's' : ''}</span>
         )}
       </div>
 
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 px-5 py-2.5"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
+        <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}
+          className="px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}>
+          <option value="">All events</option>
+          {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+        </select>
+
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}>
+          <option value="">All statuses</option>
+          <option value="registered">Pending</option>
+          <option value="checked_in">Checked in</option>
+        </select>
+
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
+          className="px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}>
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+
+        {(eventFilter || statusFilter || sort) && (
+          <button onClick={clearFilters}
+            className="px-2.5 py-1.5 text-xs font-semibold transition hover:opacity-70"
+            style={{ color: 'var(--muted)' }}>
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 overflow-auto">
-        {!query.trim() ? (
+        {!hasFilters ? (
           <div className="flex h-full flex-col items-center justify-center gap-3">
             <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.2" viewBox="0 0 24 24" style={{ color: 'var(--muted-2)' }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>Type a name or phone number to search all events</p>
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>Type a name or phone number, or pick an event/status filter to search all events</p>
           </div>
         ) : guests.length === 0 && !loading ? (
           <div className="flex h-full flex-col items-center justify-center gap-2">
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>No guests found</p>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>Try a different name or phone number.</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Try a different name, phone number, or filter.</p>
           </div>
         ) : (
           <table className="w-full text-[13px]">
@@ -153,12 +218,25 @@ export default function GlobalGuestSearchPage() {
             </tbody>
           </table>
         )}
-        {count > 20 && !loading && (
-          <p className="px-5 py-3 text-xs" style={{ color: 'var(--muted)', borderTop: '1px solid var(--line)' }}>
-            Showing top 20 of {count} results — refine your search to narrow down.
-          </p>
-        )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-shrink-0 items-center justify-between px-5 py-3"
+          style={{ borderTop: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Page {page} of {totalPages} · {count} results
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>‹ Prev</button>
+            <span className="px-2 text-xs" style={{ color: 'var(--muted)' }}>{page} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded px-2.5 py-1 text-xs transition disabled:opacity-30"
+              style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>Next ›</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

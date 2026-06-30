@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { api, Guest, Event, GuestListStats } from '@/lib/api'
 import ExportDropdown from '@/components/ExportDropdown'
-import { GuestFilterBar } from '@/components/guests/GuestFilterBar'
+import { GuestFilterBar, GuestSortKey } from '@/components/guests/GuestFilterBar'
 import { GuestTable } from '@/components/guests/GuestTable'
 import { DownloadAssetsButton } from '@/components/guests/DownloadAssetsButton'
 
@@ -32,6 +32,9 @@ export default function GuestsPage() {
   const [stats, setStats]               = useState<GuestListStats | null>(null)
   const [loading, setLoading]           = useState(false)
   const [query, setQuery]               = useState('')
+  const [sort, setSort]                 = useState<GuestSortKey>('')
+  const [registeredFrom, setRegisteredFrom] = useState('')
+  const [registeredTo, setRegisteredTo]     = useState('')
   const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Set<string>>(new Set())
   const [deleting, setDeleting]         = useState<string | null>(null)
@@ -57,7 +60,7 @@ export default function GuestsPage() {
   }, [])
 
   // reset to page 1 when filters or event changes
-  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken, waToken])
+  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken, waToken, sort, registeredFrom, registeredTo])
 
   useEffect(() => {
     if (!selectedEvent) return
@@ -69,11 +72,14 @@ export default function GuestsPage() {
     if (ticketToken) params.ticket_type = ticketToken
     if (waToken === 'failed')                           params.wa_sent = 'false'
     else if (waToken === 'sent' || waToken === 'read' || waToken === 'delivered') params.wa_sent = 'true'
+    if (sort)           params.ordering          = sort
+    if (registeredFrom) params.registered_after  = registeredFrom
+    if (registeredTo)   params.registered_before = registeredTo
     api.getGuests(params)
       .then((data) => { setGuests(data.results); setCount(data.count); setStats(data.stats ?? null) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, page])
+  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, sort, registeredFrom, registeredTo, page])
 
   const filtered = guests
 
@@ -251,7 +257,7 @@ export default function GuestsPage() {
       <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => { setSelectedEvent(null); setQuery(''); setGuests([]); setCount(0); setStats(null) }}
+          <button onClick={() => { setSelectedEvent(null); setQuery(''); setSort(''); setRegisteredFrom(''); setRegisteredTo(''); setGuests([]); setCount(0); setStats(null) }}
             className="text-xs font-semibold transition hover:opacity-70"
             style={{ color: 'var(--muted)' }}>
             ← Events
@@ -322,6 +328,9 @@ export default function GuestsPage() {
         query={query} tokens={tokens} freeText={freeText}
         filteredCount={filtered.length} selectedCount={selected.size}
         inputRef={inputRef} onQueryChange={setQuery}
+        sort={sort} onSortChange={setSort}
+        registeredFrom={registeredFrom} registeredTo={registeredTo}
+        onRegisteredFromChange={setRegisteredFrom} onRegisteredToChange={setRegisteredTo}
       />
 
       <div className="flex-1 overflow-auto">

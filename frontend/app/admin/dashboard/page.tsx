@@ -12,34 +12,40 @@ export default function DashboardPage() {
   const [events, setEvents]   = useState<Event[]>([])
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
+  const [guestsLoading, setGuestsLoading] = useState(false)
   const [time, setTime]       = useState(new Date())
 
   useEffect(() => {
-    Promise.all([api.getGuests(), api.getEvents()])
-      .then(([g, e]) => {
-        setGuests(g.results)
+    api.getEvents()
+      .then((e) => {
         setEvents(e)
         setActiveEvent(e[0] ?? null)
+        if (e.length === 0) setLoading(false)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
+    if (!activeEvent) { setGuests([]); return }
+    setGuestsLoading(true)
+    api.getGuests({ event: String(activeEvent.id), page_size: '200' })
+      .then((g) => setGuests(g.results))
+      .catch(console.error)
+      .finally(() => setGuestsLoading(false))
+  }, [activeEvent?.id])
+
+  useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  const filteredGuests = activeEvent
-    ? guests.filter((g) => g.event === activeEvent.id)
-    : guests
-
-  const total         = filteredGuests.length
-  const checkedIn     = filteredGuests.filter((g) => g.status === 'checked_in').length
-  const waSent        = filteredGuests.filter((g) => g.whatsapp_sent).length
+  const total         = guests.length
+  const checkedIn     = guests.filter((g) => g.status === 'checked_in').length
+  const waSent        = guests.filter((g) => g.whatsapp_sent).length
   const attendancePct = total > 0 ? Math.round((checkedIn / total) * 100) : 0
 
-  const recentArrivals = [...filteredGuests]
+  const recentArrivals = [...guests]
     .filter((g) => g.status === 'checked_in')
     .sort((a, b) => (b.checked_in_at ?? '').localeCompare(a.checked_in_at ?? ''))
     .slice(0, 10)
@@ -100,7 +106,7 @@ export default function DashboardPage() {
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
         <StatCards
-          loading={loading}
+          loading={loading || guestsLoading}
           checkedIn={checkedIn}
           total={total}
           waSent={waSent}
@@ -109,7 +115,7 @@ export default function DashboardPage() {
           activeEventLabel={activeEvent ? 'Active event running' : 'No active event'}
         />
         <div className="grid gap-4 xl:grid-cols-2">
-          <ArrivalsFeed guests={recentArrivals} loading={loading} />
+          <ArrivalsFeed guests={recentArrivals} loading={loading || guestsLoading} />
           <EventsPanel events={events} loading={loading} />
         </div>
       </div>

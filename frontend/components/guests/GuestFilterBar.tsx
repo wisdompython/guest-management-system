@@ -4,6 +4,18 @@ import { RefObject } from 'react'
 
 type FilterToken = { key: string; value: string }
 
+export type GuestSortKey = '' | 'name' | '-name' | 'registered' | '-registered' | 'checked_in' | '-checked_in'
+
+const SORT_OPTIONS: { value: GuestSortKey; label: string }[] = [
+  { value: '',            label: 'Default order' },
+  { value: '-registered', label: 'Registered (newest)' },
+  { value: 'registered',  label: 'Registered (oldest)' },
+  { value: 'name',        label: 'Name (A–Z)' },
+  { value: '-name',       label: 'Name (Z–A)' },
+  { value: '-checked_in', label: 'Checked in (newest)' },
+  { value: 'checked_in',  label: 'Checked in (oldest)' },
+]
+
 interface Props {
   query: string
   tokens: FilterToken[]
@@ -12,15 +24,22 @@ interface Props {
   selectedCount: number
   inputRef: RefObject<HTMLInputElement | null>
   onQueryChange: (q: string) => void
+  sort: GuestSortKey
+  onSortChange: (s: GuestSortKey) => void
+  registeredFrom: string
+  registeredTo: string
+  onRegisteredFromChange: (v: string) => void
+  onRegisteredToChange: (v: string) => void
 }
 
 export function GuestFilterBar({
   query, tokens, freeText, filteredCount, selectedCount, inputRef, onQueryChange,
+  sort, onSortChange, registeredFrom, registeredTo, onRegisteredFromChange, onRegisteredToChange,
 }: Props) {
   return (
-    <div className="flex flex-shrink-0 items-center gap-2 px-4 py-2.5"
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 px-4 py-2.5"
       style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-      <div className="flex flex-1 items-center gap-2 px-3 py-1.5"
+      <div className="flex min-w-[220px] flex-1 items-center gap-2 px-3 py-1.5"
         style={{ border: '1px solid var(--line)', background: 'var(--panel-2)' }}>
         <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"
           style={{ color: 'var(--muted)', flexShrink: 0 }}>
@@ -60,6 +79,26 @@ export function GuestFilterBar({
         <kbd className="hidden xl:block text-[10px] px-1.5 py-0.5 font-mono flex-shrink-0"
           style={{ border: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--panel)' }}>⌘K</kbd>
       </div>
+
+      <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+        <span>Registered</span>
+        <input type="date" value={registeredFrom} onChange={(e) => onRegisteredFromChange(e.target.value)}
+          className="px-1.5 py-1 text-[11px] focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
+        <span>to</span>
+        <input type="date" value={registeredTo} onChange={(e) => onRegisteredToChange(e.target.value)}
+          className="px-1.5 py-1 text-[11px] focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
+      </div>
+
+      <select value={sort} onChange={(e) => onSortChange(e.target.value as GuestSortKey)}
+        className="px-2 py-1.5 text-[11px] font-semibold focus:outline-none"
+        style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}>
+        {SORT_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+
       <div className="text-[11px] tabular-nums" style={{ color: 'var(--muted)' }}>
         {filteredCount} matched · {selectedCount} selected
       </div>

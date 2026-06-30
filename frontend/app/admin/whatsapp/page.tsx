@@ -264,6 +264,8 @@ export default function WhatsAppPage() {
   const [waSent, setWaSent] = useState(0)
   const [waUnsent, setWaUnsent] = useState(0)
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [waFilter, setWaFilter] = useState<'all' | 'sent' | 'unsent'>('all')
   const [guestsLoading, setGuestsLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const [polling, setPolling] = useState<Set<string>>(new Set())
@@ -278,12 +280,20 @@ export default function WhatsAppPage() {
     api.getEvents().then(setEvents).catch(console.error).finally(() => setEventsLoading(false))
   }, [])
 
-  useEffect(() => { setPage(1) }, [selectedEvent?.id])
+  useEffect(() => { setPage(1) }, [selectedEvent?.id, search, waFilter])
+
+  function buildParams() {
+    const params: Record<string, string> = { event: String(selectedEvent!.id), page: String(page), has_phone: '1' }
+    if (search.trim()) params.search = search.trim()
+    if (waFilter === 'sent') params.wa_sent = 'true'
+    else if (waFilter === 'unsent') params.wa_sent = 'false'
+    return params
+  }
 
   useEffect(() => {
     if (!selectedEvent) return
     setGuestsLoading(true)
-    api.getGuests({ event: String(selectedEvent.id), page: String(page), has_phone: '1' })
+    api.getGuests(buildParams())
       .then((d) => {
         setGuests(d.results)
         setCount(d.count)
@@ -292,7 +302,7 @@ export default function WhatsAppPage() {
       })
       .catch(console.error)
       .finally(() => setGuestsLoading(false))
-  }, [selectedEvent, page])
+  }, [selectedEvent, page, search, waFilter])
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok })
@@ -301,7 +311,7 @@ export default function WhatsAppPage() {
 
   function refreshGuests() {
     if (!selectedEvent) return
-    api.getGuests({ event: String(selectedEvent.id), page: String(page), has_phone: '1' })
+    api.getGuests(buildParams())
       .then((d) => {
         setGuests(d.results)
         setCount(d.count)
@@ -464,7 +474,7 @@ export default function WhatsAppPage() {
       <div className="flex flex-shrink-0 items-center justify-between px-6 py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => { setSelectedEvent(null); setGuests([]); setCount(0); setPage(1) }}
+          <button onClick={() => { setSelectedEvent(null); setGuests([]); setCount(0); setPage(1); setSearch(''); setWaFilter('all') }}
             className="text-xs font-semibold transition hover:opacity-70" style={{ color: 'var(--muted)' }}>
             ← Events
           </button>
@@ -496,6 +506,39 @@ export default function WhatsAppPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Search + filter */}
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 px-6 py-2.5"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or phone…"
+          className="min-w-[200px] flex-1 px-3 py-1.5 text-xs focus:outline-none"
+          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}
+        />
+        <div className="flex items-center gap-1">
+          {(['all', 'sent', 'unsent'] as const).map((f) => (
+            <button key={f} onClick={() => setWaFilter(f)}
+              className="px-2.5 py-1.5 text-xs font-semibold transition"
+              style={{
+                border: '1px solid var(--line)',
+                background: waFilter === f ? 'var(--brand)' : 'var(--panel-2)',
+                color: waFilter === f ? '#fff' : 'var(--muted)',
+              }}>
+              {f === 'all' ? 'All' : f === 'sent' ? 'Sent' : 'Unsent'}
+            </button>
+          ))}
+        </div>
+        {(search || waFilter !== 'all') && (
+          <button onClick={() => { setSearch(''); setWaFilter('all') }}
+            className="px-2 py-1.5 text-xs font-semibold transition hover:opacity-70"
+            style={{ color: 'var(--muted)' }}>
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Guest list */}

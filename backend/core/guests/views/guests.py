@@ -41,6 +41,15 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             return GuestListSerializer
         return GuestSerializer
 
+    ORDERING_FIELDS = {
+        'name':         'full_name',
+        '-name':        '-full_name',
+        'registered':   'registered_at',
+        '-registered':  '-registered_at',
+        'checked_in':   'checked_in_at',
+        '-checked_in':  '-checked_in_at',
+    }
+
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
@@ -59,6 +68,16 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             qs = qs.filter(whatsapp_sent=False)
         if params.get('has_phone') == '1':
             qs = qs.exclude(phone_number__in=['', None])
+        if registered_after := params.get('registered_after'):
+            qs = qs.filter(registered_at__gte=registered_after)
+        if registered_before := params.get('registered_before'):
+            qs = qs.filter(registered_at__lte=registered_before)
+        if checked_in_after := params.get('checked_in_after'):
+            qs = qs.filter(checked_in_at__gte=checked_in_after)
+        if checked_in_before := params.get('checked_in_before'):
+            qs = qs.filter(checked_in_at__lte=checked_in_before)
+        if ordering := self.ORDERING_FIELDS.get(params.get('ordering', '')):
+            qs = qs.order_by(ordering)
         return qs
 
     def list(self, request, *args, **kwargs):
