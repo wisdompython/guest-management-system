@@ -21,7 +21,7 @@ export default function RemindersPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--brand)' }}>
           Comms
         </p>
-        <h1 className="mt-2 font-display text-4xl" style={{ color: 'var(--ink)' }}>Reminders</h1>
+        <h1 data-tour="reminders-title" className="mt-2 font-display text-4xl" style={{ color: 'var(--ink)' }}>Reminders</h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
           Configure WhatsApp reminders per event. Each reminder fires automatically before the event date.
         </p>
@@ -69,7 +69,7 @@ function EventGroup({ title, events, muted }: { title: string; events: Event[]; 
                 {ev.venue ? ` · ${ev.venue}` : ''}
               </p>
             </div>
-            <Link href={`/admin/events/${ev.id}/reminders`}
+            <Link href={`/admin/events/${ev.id}/reminders`} data-tour="reminders-configure-button"
               className="ml-4 flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition hover:opacity-80"
               style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
               Configure →

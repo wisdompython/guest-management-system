@@ -22,12 +22,12 @@ export function UploadForm({
   return (
     <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[var(--line)] px-6 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Upload details</h2>
+        <h2 data-tour="bulk-upload-header" className="text-sm font-semibold text-[var(--ink)]">Upload details</h2>
       </div>
       <div className="space-y-4 p-6">
         <div>
           <label className={label}>Event *</label>
-          <select name="event" required className={field} onChange={(e) => onEventChange(e.target.value)}>
+          <select data-tour="bulk-event-select" name="event" required className={field} onChange={(e) => onEventChange(e.target.value)}>
             <option value="">Select an event…</option>
             {events.map(ev => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -79,7 +79,7 @@ export function UploadForm({
 
         <div>
           <label className={label}>CSV File *</label>
-          <input name="csv_file" type="file" accept=".csv"
+          <input data-tour="bulk-csv-input" name="csv_file" type="file" accept=".csv"
             className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]" />
           {!selectedEvent && (
             <p className="mt-1.5 text-xs text-[var(--muted)]">Select an event above to see which columns are required.</p>
@@ -88,7 +88,7 @@ export function UploadForm({
       </div>
 
       <div className="border-t border-[var(--line)] px-6 py-4">
-        <button type="submit" disabled={submitting}
+        <button data-tour="bulk-submit-button" type="submit" disabled={submitting}
           className="w-full rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">
           {submitting ? 'Uploading…' : 'Upload Guests'}
         </button>

@@ -31,19 +31,19 @@ export function GuestForm({
   return (
     <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[var(--line)] px-6 py-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Guest information</h2>
+        <h2 data-tour="guest-form-header" className="text-sm font-semibold text-[var(--ink)]">Guest information</h2>
         <p className="mt-0.5 text-xs text-[var(--muted)]">Fields marked * are required.</p>
       </div>
 
       <div className="grid gap-4 p-6 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className={labelCls}>Full Name *</label>
-          <input name="full_name" type="text" required placeholder="e.g. Adaeze Okonkwo" className={field} />
+          <input data-tour="guest-name-field" name="full_name" type="text" required placeholder="e.g. Adaeze Okonkwo" className={field} />
         </div>
 
         <div className="sm:col-span-2">
           <label className={labelCls}>Event *</label>
-          <select name="event" required className={select} onChange={(e) => onEventChange(e.target.value)}>
+          <select data-tour="guest-event-select" name="event" required className={select} onChange={(e) => onEventChange(e.target.value)}>
             <option value="">Select an event…</option>
             {events.map(ev => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -86,7 +86,7 @@ export function GuestForm({
       )}
 
       <div className="flex gap-3 border-t border-[var(--line)] px-6 py-4">
-        <button type="submit" disabled={submitting}
+        <button data-tour="guest-submit-button" type="submit" disabled={submitting}
           className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">
           {submitting ? 'Adding…' : 'Add Guest'}
         </button>

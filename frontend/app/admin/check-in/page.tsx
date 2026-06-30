@@ -153,12 +153,12 @@ export default function CheckInPage() {
       {/* Header */}
       <div className="px-5 py-4 text-center" style={{ borderBottom: '1px solid var(--line)' }}>
         <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand)' }}>Door Operations</p>
-        <h1 className="font-display text-2xl font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>QR Check-In</h1>
+        <h1 data-tour="checkin-title" className="font-display text-2xl font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>QR Check-In</h1>
       </div>
 
       {/* Camera viewfinder */}
       {!manualMode && (
-        <div className="relative flex-1 min-h-0 overflow-hidden" style={{ background: '#000' }}>
+        <div data-tour="checkin-camera" className="relative flex-1 min-h-0 overflow-hidden" style={{ background: '#000' }}>
           <video
             ref={videoRef}
             autoPlay

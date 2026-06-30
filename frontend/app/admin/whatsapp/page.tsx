@@ -365,7 +365,7 @@ export default function WhatsAppPage() {
           style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>Comms</p>
-            <h1 className="text-xl font-bold mt-0.5" style={{ color: 'var(--ink)' }}>WhatsApp</h1>
+            <h1 data-tour="whatsapp-title" className="text-xl font-bold mt-0.5" style={{ color: 'var(--ink)' }}>WhatsApp</h1>
           </div>
           <a href="/admin/events/add"
             className="rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
@@ -383,7 +383,7 @@ export default function WhatsAppPage() {
                 style={{ background: 'var(--brand)' }}>+ Create an event</a>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table data-tour="whatsapp-event-table" className="w-full text-sm">
               <thead>
                 <tr className="text-xs font-semibold uppercase tracking-widest"
                   style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--panel)' }}>
@@ -481,7 +481,7 @@ export default function WhatsAppPage() {
             <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{unsent}</span> pending</span>
             <span><span className="font-bold" style={{ color: 'var(--ink)' }}>{count}</span> total</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div data-tour="whatsapp-bulk-actions" className="flex items-center gap-2">
             {unsent > 0 && (
               <button onClick={() => setBulkModal({ resend: false })} disabled={bulkSending}
                 className="rounded-full px-4 py-2 text-xs font-semibold text-white transition disabled:opacity-60"
