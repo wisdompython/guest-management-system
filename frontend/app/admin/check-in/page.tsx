@@ -158,7 +158,9 @@ export default function CheckInPage() {
 
       {/* Camera viewfinder */}
       {!manualMode && (
-        <div data-tour="checkin-camera" className="relative flex-1 min-h-0 overflow-hidden" style={{ background: '#000' }}>
+        <div className="relative flex-1 min-h-0 overflow-hidden" style={{ background: '#000' }}>
+          {/* Tour anchor at top-center of camera — tooltip appears below it, inside the viewfinder */}
+          <span data-tour="checkin-camera" className="absolute top-4 left-1/2 -translate-x-1/2 w-1 h-1 pointer-events-none" />
           <video
             ref={videoRef}
             autoPlay
