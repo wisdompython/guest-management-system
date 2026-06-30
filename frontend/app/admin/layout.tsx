@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <TourProvider>
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+    <div className="flex h-screen" style={{ background: 'var(--bg)' }}>
 
       {/* Desktop sidebar */}
       <NavSidebar user={user} logout={logout} />

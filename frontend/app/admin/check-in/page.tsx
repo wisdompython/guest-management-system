@@ -148,10 +148,10 @@ export default function CheckInPage() {
   )
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="h-full flex flex-col" style={{ background: 'var(--bg)' }}>
 
       {/* Header */}
-      <div className="px-5 py-4 text-center" style={{ borderBottom: '1px solid var(--line)' }}>
+      <div className="flex-shrink-0 px-5 py-4 text-center" style={{ borderBottom: '1px solid var(--line)' }}>
         <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand)' }}>Door Operations</p>
         <h1 data-tour="checkin-title" className="font-display text-2xl font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>QR Check-In</h1>
       </div>
@@ -204,7 +204,7 @@ export default function CheckInPage() {
       )}
 
       {/* Bottom panel */}
-      <div className="p-5 space-y-3" style={{ borderTop: '1px solid var(--line)', background: 'var(--panel)' }}>
+      <div className="flex-shrink-0 p-5 space-y-3" style={{ borderTop: '1px solid var(--line)', background: 'var(--panel)' }}>
         {cameraError && (
           <p className="text-xs text-center" style={{ color: 'var(--danger)' }}>{cameraError}</p>
         )}
