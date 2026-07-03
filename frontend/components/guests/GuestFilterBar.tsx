@@ -21,6 +21,9 @@ interface Props {
   tokens: FilterToken[]
   freeText: string
   filteredCount: number
+  totalCount: number
+  page: number
+  pageSize: number
   selectedCount: number
   inputRef: RefObject<HTMLInputElement | null>
   onQueryChange: (q: string) => void
@@ -33,9 +36,11 @@ interface Props {
 }
 
 export function GuestFilterBar({
-  query, tokens, freeText, filteredCount, selectedCount, inputRef, onQueryChange,
+  query, tokens, freeText, filteredCount, totalCount, page, pageSize, selectedCount, inputRef, onQueryChange,
   sort, onSortChange, registeredFrom, registeredTo, onRegisteredFromChange, onRegisteredToChange,
 }: Props) {
+  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const end   = Math.min(page * pageSize, totalCount)
   return (
     <div className="flex flex-shrink-0 flex-wrap items-center gap-2 px-4 py-2.5"
       style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
@@ -100,7 +105,8 @@ export function GuestFilterBar({
       </select>
 
       <div className="text-[11px] tabular-nums" style={{ color: 'var(--muted)' }}>
-        {filteredCount} matched · {selectedCount} selected
+        {totalCount > 0 ? `${start}–${end} of ${totalCount}` : `${filteredCount} guests`}
+        {selectedCount > 0 && ` · ${selectedCount} selected`}
       </div>
     </div>
   )

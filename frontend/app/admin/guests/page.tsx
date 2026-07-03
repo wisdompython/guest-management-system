@@ -328,7 +328,8 @@ export default function GuestsPage() {
 
       <GuestFilterBar
         query={query} tokens={tokens} freeText={freeText}
-        filteredCount={filtered.length} selectedCount={selected.size}
+        filteredCount={filtered.length} totalCount={count} page={page} pageSize={PAGE_SIZE}
+        selectedCount={selected.size}
         inputRef={inputRef} onQueryChange={setQuery}
         sort={sort} onSortChange={setSort}
         registeredFrom={registeredFrom} registeredTo={registeredTo}
@@ -344,7 +345,7 @@ export default function GuestsPage() {
         />
       </div>
 
-      {totalPages > 1 && (
+      {count > 0 && (
         <div className="flex flex-shrink-0 items-center justify-between px-5 py-3"
           style={{ borderTop: '1px solid var(--line)', background: 'var(--sidebar)' }}>
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
