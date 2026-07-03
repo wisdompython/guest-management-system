@@ -62,20 +62,29 @@ export default function CheckInPage() {
   }, [])
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // BarcodeDetector created once and reused — avoid per-frame allocation
+  const detectorRef = useRef<{ detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]> } | null>(null)
+  const lastFrameRef = useRef<number>(0)
 
   async function scanFrame() {
     if (!scanningRef.current || !videoRef.current) return
     const video = videoRef.current
     if (video.readyState < 2) { requestAnimationFrame(scanFrame); return }
 
+    // Throttle to ~10fps to avoid blocking the main thread on mobile
+    const now = performance.now()
+    if (now - lastFrameRef.current < 100) { requestAnimationFrame(scanFrame); return }
+    lastFrameRef.current = now
+
     try {
       // @ts-expect-error BarcodeDetector not in TS lib yet
-      const hasBarcodeDetector = typeof BarcodeDetector !== 'undefined'
-
-      if (hasBarcodeDetector) {
-        // @ts-expect-error BarcodeDetector not in TS lib yet
-        const detector = new BarcodeDetector({ formats: ['qr_code'] })
-        const codes = await detector.detect(video)
+      if (typeof BarcodeDetector !== 'undefined') {
+        // Reuse detector instance across frames
+        if (!detectorRef.current) {
+          // @ts-expect-error BarcodeDetector not in TS lib yet
+          detectorRef.current = new BarcodeDetector({ formats: ['qr_code'] })
+        }
+        const codes = await detectorRef.current!.detect(video)
         if (codes.length > 0 && scanningRef.current) {
           scanningRef.current = false
           stopCamera()
@@ -83,17 +92,19 @@ export default function CheckInPage() {
           return
         }
       } else {
-        // jsQR fallback for Safari/iPhone
+        // jsQR fallback — scale canvas to 640px wide max to keep decode fast
         const canvas = canvasRef.current
         if (!canvas) { requestAnimationFrame(scanFrame); return }
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) { requestAnimationFrame(scanFrame); return }
-        canvas.width  = video.videoWidth
-        canvas.height = video.videoHeight
-        ctx.imageSmoothingEnabled = false
+        const scale = Math.min(1, 640 / video.videoWidth)
+        canvas.width  = Math.round(video.videoWidth  * scale)
+        canvas.height = Math.round(video.videoHeight * scale)
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        const code = jsQR(imageData.data, imageData.width, imageData.height)
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert', // skip inversion pass — faster
+        })
         if (code && scanningRef.current) {
           scanningRef.current = false
           stopCamera()
@@ -233,25 +244,38 @@ export default function CheckInPage() {
             </div>
           </div>
 
-          {/* Scan overlay */}
+          {/* Scan box — absolutely centered, never depends on flex height */}
           {state !== 'loading' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-64 h-64">
-                {['top-0 left-0', 'top-0 right-0', 'bottom-0 left-0', 'bottom-0 right-0'].map((pos, i) => (
-                  <div key={i} className={`absolute w-10 h-10 ${pos}`} style={{
-                    borderTop:    i < 2  ? '3px solid var(--brand)' : undefined,
-                    borderBottom: i >= 2 ? '3px solid var(--brand)' : undefined,
-                    borderLeft:   i % 2 === 0 ? '3px solid var(--brand)' : undefined,
-                    borderRight:  i % 2 === 1 ? '3px solid var(--brand)' : undefined,
-                  }} />
-                ))}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Dark vignette around the scan zone */}
+              <div className="absolute inset-0" style={{
+                background: 'radial-gradient(ellipse 55% 50% at 50% 50%, transparent 48%, rgba(0,0,0,0.55) 100%)',
+              }} />
+              {/* Corner brackets — centered with transform */}
+              <div className="absolute" style={{
+                width: 240, height: 240,
+                top: '50%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}>
+                {/* Top-left */}
+                <div className="absolute top-0 left-0 w-10 h-10" style={{ borderTop: '3px solid var(--brand)', borderLeft: '3px solid var(--brand)' }} />
+                {/* Top-right */}
+                <div className="absolute top-0 right-0 w-10 h-10" style={{ borderTop: '3px solid var(--brand)', borderRight: '3px solid var(--brand)' }} />
+                {/* Bottom-left */}
+                <div className="absolute bottom-0 left-0 w-10 h-10" style={{ borderBottom: '3px solid var(--brand)', borderLeft: '3px solid var(--brand)' }} />
+                {/* Bottom-right */}
+                <div className="absolute bottom-0 right-0 w-10 h-10" style={{ borderBottom: '3px solid var(--brand)', borderRight: '3px solid var(--brand)' }} />
+                {/* Scan line */}
                 <div className="absolute left-2 right-2 h-0.5 animate-scan-line"
                   style={{ background: 'var(--brand)', top: '50%' }} />
               </div>
-              <p className="absolute bottom-6 text-xs font-medium px-4 py-1.5 rounded-full"
-                style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
-                Point camera at guest QR code
-              </p>
+              {/* Hint text below the box */}
+              <div className="absolute" style={{ top: 'calc(50% + 132px)', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                <span className="text-xs font-medium px-4 py-1.5 rounded-full"
+                  style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
+                  Point camera at guest QR code
+                </span>
+              </div>
             </div>
           )}
 
