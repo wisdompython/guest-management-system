@@ -44,7 +44,8 @@ def generate_pass_image(guest) -> bool:
             x = tw - qr_size - padding
             y = th - qr_size - padding
 
-        qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
+        # Use NEAREST for QR resize — preserves sharp module edges, no anti-aliasing blur
+        qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
 
         composite = template.copy()
 

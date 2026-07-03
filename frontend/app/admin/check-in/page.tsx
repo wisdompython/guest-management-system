@@ -11,6 +11,7 @@ import {
   GuestFoundScreen,
 } from '@/components/check-in/CheckInScreens'
 import type { InvalidReason } from '@/components/check-in/CheckInScreens'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 type ScanState = 'idle' | 'scanning' | 'loading' | 'found' | 'checked_in' | 'duplicate' | 'invalid'
 
@@ -310,11 +311,7 @@ export default function CheckInPage() {
               {isScanner ? 'Find Guest' : 'Manual Entry'}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              {isScanner
-                ? events.length === 1
-                  ? events[0].name
-                  : 'Select event then search by name'
-                : 'Paste or type the guest token / UUID'}
+              {isScanner ? 'Pick event · search by name' : 'Paste or type the guest token / UUID'}
             </p>
           </div>
 
@@ -324,19 +321,21 @@ export default function CheckInPage() {
 
           <div className="flex-shrink-0 px-5 pb-3 space-y-2">
             {isScanner ? (
-              /* Scanner role: event selector + name search */
+              /* Scanner role: searchable event selector + name search */
               <>
-                {events.length > 1 && (
-                  <select
-                    value={selectedEventId}
-                    onChange={(e) => handleEventChange(e.target.value)}
-                    className="w-full px-4 py-3 text-sm focus:outline-none"
-                    style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
-                    {events.map((ev) => (
-                      <option key={ev.id} value={ev.id}>{ev.name}</option>
-                    ))}
-                  </select>
-                )}
+                <SearchableSelect
+                  options={events.map((ev) => ({
+                    value: String(ev.id),
+                    label: ev.name,
+                    sublabel: new Date(ev.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      + (ev.venue ? ' · ' + ev.venue : ''),
+                  }))}
+                  value={selectedEventId}
+                  onChange={handleEventChange}
+                  placeholder="Select event…"
+                  searchPlaceholder="Search events…"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '2px' }}
+                />
                 <input
                   autoFocus
                   type="text"

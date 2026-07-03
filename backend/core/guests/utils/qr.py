@@ -22,8 +22,8 @@ def generate_qr_code(guest) -> bool:
     try:
         qr = qrcode.QRCode(
             version=None,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
-            box_size=12,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,  # highest redundancy — survives partial damage
+            box_size=20,   # larger modules = more pixels per cell = sharper at any display size
             border=4,
         )
         qr.add_data(build_qr_payload(guest))

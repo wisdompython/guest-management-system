@@ -190,9 +190,17 @@ export function DualZoneCanvas({
       </div>
 
       {active === 'qr' && (
-        <ZoneSelector imageUrl={imageUrl} zone={qrZone} onChange={onQrChange}
-          label="QR Zone" color="indigo" borderColor="#6366f1"
-          bgColor="rgba(99,102,241,0.10)" dotColor="#6366f1" />
+        <>
+          <ZoneSelector imageUrl={imageUrl} zone={qrZone} onChange={onQrChange}
+            label="QR Zone" color="indigo" borderColor="#6366f1"
+            bgColor="rgba(99,102,241,0.10)" dotColor="#6366f1" />
+          {qrZone && Math.min(qrZone.w, qrZone.h) < 0.15 && (
+            <ZoneWarning>
+              QR zone is small — scanner stations may struggle to read it at arm&apos;s length.
+              Make the zone at least 15% of the design width for reliable scanning.
+            </ZoneWarning>
+          )}
+        </>
       )}
       {active === 'name' && (
         <ZoneSelector imageUrl={imageUrl} zone={nameZone} onChange={onNameChange}

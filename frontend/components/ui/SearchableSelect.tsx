@@ -14,6 +14,7 @@ interface Props {
   onChange: (value: string) => void
   placeholder?: string
   searchPlaceholder?: string
+  dropUp?: boolean
   className?: string
   style?: React.CSSProperties
   'data-tour'?: string
@@ -23,6 +24,7 @@ export function SearchableSelect({
   options, value, onChange,
   placeholder = 'Select…',
   searchPlaceholder = 'Search…',
+  dropUp = false,
   className = '',
   style,
   'data-tour': dataTour,
@@ -84,8 +86,12 @@ export function SearchableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-[12px] shadow-xl overflow-hidden"
-          style={{ background: '#1a2030', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div className="absolute z-50 w-full rounded-[12px] shadow-xl overflow-hidden"
+          style={{
+            background: '#1a2030',
+            border: '1px solid rgba(255,255,255,0.12)',
+            ...(dropUp ? { bottom: 'calc(100% + 4px)' } : { top: 'calc(100% + 4px)' }),
+          }}>
           <div className="flex items-center gap-2 px-3 py-2"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
