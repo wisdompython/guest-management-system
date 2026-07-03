@@ -69,53 +69,54 @@ export default function DashboardPage() {
     <div className="flex h-full flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
 
       {/* Top bar */}
-      <div className="flex-shrink-0 px-4 py-3 space-y-2"
+      <div className="flex-shrink-0 px-4 py-3"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
-        {/* Row 1: event switcher + action buttons */}
-        <div className="flex items-center justify-between gap-2">
-          {/* Event switcher */}
-          {events.length > 1 ? (
-            <select
-              value={activeEvent?.id ?? ''}
-              onChange={(e) => setActiveEvent(events.find((ev) => ev.id === Number(e.target.value)) ?? null)}
-              className="min-w-0 flex-1 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[var(--brand)] px-2 py-1 truncate"
-              style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)', maxWidth: '60%' }}>
-              {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
-            </select>
-          ) : (
-            <p className="text-sm font-semibold truncate min-w-0 flex-1" style={{ color: 'var(--ink)' }}>
-              {loading ? '—' : activeEvent ? activeEvent.name : 'No active event'}
-              {activeEvent && <span style={{ color: 'var(--brand)' }}> · Live</span>}
+        <div className="flex items-center gap-2">
+          {/* Event switcher — grows but never pushes buttons off screen */}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {events.length > 1 ? (
+              <select
+                value={activeEvent?.id ?? ''}
+                onChange={(e) => setActiveEvent(events.find((ev) => ev.id === Number(e.target.value)) ?? null)}
+                className="w-full max-w-[200px] text-sm font-semibold focus:outline-none px-2 py-1"
+                style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+                {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+              </select>
+            ) : (
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                {loading ? '—' : activeEvent ? activeEvent.name : 'No active event'}
+                {activeEvent && <span style={{ color: 'var(--brand)' }}> · Live</span>}
+              </p>
+            )}
+            {/* Date + time on its own line, venue truncated */}
+            <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
+              {activeEvent
+                ? new Date(activeEvent.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                : '--'}
+              {' · '}{timeStr}
+              {activeEvent?.venue ? ' · ' + activeEvent.venue : ''}
             </p>
-          )}
+          </div>
 
+          {/* Action buttons — fixed width, never shrink */}
           <div className="flex flex-shrink-0 items-center gap-2">
             <Link href="/admin/check-in"
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition hover:opacity-80"
-              style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel)' }}>
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              className="flex items-center justify-center w-8 h-8 transition hover:opacity-80"
+              style={{ border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--panel)' }}
+              title="Open scanner">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
                 <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/>
                 <rect x="7" y="14" width="3" height="3" rx="0.5"/>
               </svg>
-              <span className="hidden sm:inline">Open scanner</span>
             </Link>
             <Link href="/admin/whatsapp"
-              className="px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+              className="px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 whitespace-nowrap"
               style={{ background: 'var(--brand)' }}>
               WhatsApp
             </Link>
           </div>
         </div>
-
-        {/* Row 2: date · time · venue — wraps naturally on mobile */}
-        <p className="text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-          {activeEvent
-            ? new Date(activeEvent.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
-            : '--'}
-          {' · '}{timeStr}
-          {activeEvent?.venue ? <> · <span className="truncate">{activeEvent.venue}</span></> : null}
-        </p>
       </div>
 
       <div className="flex-1 overflow-auto p-4 md:p-6 space-y-4">
