@@ -4,9 +4,10 @@ import { Guest } from '@/lib/api'
 
 interface Props {
   guest: Guest
+  showPhone?: boolean
 }
 
-export function GuestDetailsCard({ guest }: Props) {
+export function GuestDetailsCard({ guest, showPhone = false }: Props) {
   return (
     <div className="space-y-4">
       <div className="overflow-hidden rounded-[20px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
@@ -14,9 +15,9 @@ export function GuestDetailsCard({ guest }: Props) {
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Guest Details</h2>
         </div>
         <dl className="divide-y divide-[var(--line)]">
-          {[
+          {([
             { label: 'Full Name',   value: guest.full_name },
-            { label: 'Phone',       value: guest.phone_number },
+            showPhone ? { label: 'Phone', value: guest.phone_number || '—' } : null,
             { label: 'Email',       value: guest.email || '—' },
             { label: 'Event',       value: guest.event_name || '—' },
             { label: 'Ticket',      value: guest.ticket_type.toUpperCase() },
@@ -24,7 +25,7 @@ export function GuestDetailsCard({ guest }: Props) {
             { label: 'Seat',        value: guest.seat_number || '—' },
             { label: 'Registered',  value: new Date(guest.registered_at).toLocaleString() },
             { label: 'Checked In',  value: guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : '—' },
-          ].map(({ label, value }) => (
+          ] as ({ label: string; value: string } | null)[]).filter((r): r is { label: string; value: string } => r !== null).map(({ label, value }) => (
             <div key={label} className="flex items-start justify-between gap-4 px-6 py-3">
               <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)] w-28 flex-shrink-0">{label}</dt>
               <dd className="text-sm text-[var(--ink)] text-right">{value}</dd>

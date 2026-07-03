@@ -10,14 +10,15 @@ interface Props {
   query: string
   selected: Set<string>
   deleting: string | null
+  showPhone?: boolean
   onToggleAll: () => void
   onToggleSelect: (id: string) => void
   onDelete: (id: string, name: string) => void
   onClearQuery: () => void
 }
 
-function GuestCard({ g, isSel, deleting, onToggleSelect, onDelete }: {
-  g: Guest; isSel: boolean; deleting: string | null
+function GuestCard({ g, isSel, deleting, showPhone, onToggleSelect, onDelete }: {
+  g: Guest; isSel: boolean; deleting: string | null; showPhone?: boolean
   onToggleSelect: (id: string) => void
   onDelete: (id: string, name: string) => void
 }) {
@@ -44,7 +45,7 @@ function GuestCard({ g, isSel, deleting, onToggleSelect, onDelete }: {
           </span>
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-          {g.phone_number && <span className="font-mono">{g.phone_number}</span>}
+          {showPhone && g.phone_number && <span className="font-mono">{g.phone_number}</span>}
           {g.ticket_type && <span>{g.ticket_type.toUpperCase()}</span>}
           {g.table_number && <span>T-{g.table_number}</span>}
           {g.whatsapp_sent && <span style={{ color: 'var(--brand)' }}>● WA sent</span>}
@@ -66,7 +67,7 @@ function GuestCard({ g, isSel, deleting, onToggleSelect, onDelete }: {
   )
 }
 
-export function GuestTable({ guests, loading, query, selected, deleting, onToggleAll, onToggleSelect, onDelete, onClearQuery }: Props) {
+export function GuestTable({ guests, loading, query, selected, deleting, showPhone = false, onToggleAll, onToggleSelect, onDelete, onClearQuery }: Props) {
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
   }
@@ -111,7 +112,7 @@ export function GuestTable({ guests, loading, query, selected, deleting, onToggl
           </span>
         </div>
         {guests.map((g) => (
-          <GuestCard key={g.id} g={g} isSel={selected.has(g.id)} deleting={deleting}
+          <GuestCard key={g.id} g={g} isSel={selected.has(g.id)} deleting={deleting} showPhone={showPhone}
             onToggleSelect={onToggleSelect} onDelete={onDelete} />
         ))}
       </div>
@@ -137,7 +138,7 @@ export function GuestTable({ guests, loading, query, selected, deleting, onToggl
         </thead>
         <tbody>
           {guests.map((g) => (
-            <GuestTableRow key={g.id} g={g} isSel={selected.has(g.id)} deleting={deleting}
+            <GuestTableRow key={g.id} g={g} isSel={selected.has(g.id)} deleting={deleting} showPhone={showPhone}
               onToggleSelect={onToggleSelect} onDelete={onDelete} />
           ))}
         </tbody>

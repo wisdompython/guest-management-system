@@ -45,7 +45,13 @@ export default function AddEventPage() {
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
-    setQrZone(null); setNameZone(null); setPreviewUrl(URL.createObjectURL(file))
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setError('Only PNG and JPG files are supported.'); e.target.value = ''; return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB.'); e.target.value = ''; return
+    }
+    setError(''); setQrZone(null); setNameZone(null); setPreviewUrl(URL.createObjectURL(file))
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

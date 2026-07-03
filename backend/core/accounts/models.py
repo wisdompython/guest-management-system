@@ -6,13 +6,15 @@ class Role(models.TextChoices):
     SUPER_ADMIN    = 'super_admin',    'Super Admin'
     EVENT_MANAGER  = 'event_manager',  'Event Manager'
     CHECK_IN_STAFF = 'check_in_staff', 'Check-In Staff'
+    SCANNER        = 'scanner',        'Scanner'
     VIEWER         = 'viewer',         'Viewer'
 
 
 ROLE_HIERARCHY = {
-    Role.SUPER_ADMIN:    4,
-    Role.EVENT_MANAGER:  3,
-    Role.CHECK_IN_STAFF: 2,
+    Role.SUPER_ADMIN:    5,
+    Role.EVENT_MANAGER:  4,
+    Role.CHECK_IN_STAFF: 3,
+    Role.SCANNER:        2,
     Role.VIEWER:         1,
 }
 
@@ -41,3 +43,8 @@ class User(AbstractUser):
     @property
     def is_check_in_staff(self) -> bool:
         return self.is_superuser or self.has_min_role(Role.CHECK_IN_STAFF)
+
+    @property
+    def is_scanner(self) -> bool:
+        """Scanner role — can only scan QR codes. Cannot view guest lists."""
+        return self.role == Role.SCANNER

@@ -9,12 +9,13 @@ const TICKET_COLORS: Record<string, { bg: string; color: string; border: string 
 }
 
 export function GuestFoundScreen({
-  guest, checkingIn, onConfirm, onCancel,
+  guest, checkingIn, onConfirm, onCancel, showPhone = false,
 }: {
   guest: Guest
   checkingIn: boolean
   onConfirm: () => void
   onCancel: () => void
+  showPhone?: boolean
 }) {
   return (
     <div className="h-full overflow-auto flex flex-col px-4 py-8 max-w-lg mx-auto" style={{ background: 'var(--bg)' }}>
@@ -46,12 +47,12 @@ export function GuestFoundScreen({
           </div>
         </div>
         <div className="grid grid-cols-2 divide-x divide-y" style={{ borderColor: 'var(--line)' }}>
-          {[
-            { label: 'Phone', value: guest.phone_number || '—' },
+          {([
+            showPhone ? { label: 'Phone', value: guest.phone_number || '—' } : null,
             { label: 'Registered', value: new Date(guest.registered_at).toLocaleDateString() },
             { label: 'Table', value: guest.table_number || '—' },
             { label: 'Seat', value: guest.seat_number || '—' },
-          ].map(({ label, value }) => (
+          ] as ({ label: string; value: string } | null)[]).filter((r): r is { label: string; value: string } => r !== null).map(({ label, value }) => (
             <div key={label} className="px-5 py-4" style={{ borderColor: 'var(--line)' }}>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-0.5" style={{ color: 'var(--muted-2)' }}>{label}</p>
               <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{value}</p>

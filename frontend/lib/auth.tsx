@@ -15,13 +15,15 @@ interface AuthContextValue {
   isSuperAdmin: boolean
   isEventManager: boolean   // event_manager OR super_admin
   isCheckInStaff: boolean   // check_in_staff OR above
+  isScanner: boolean        // scanner role only — QR scan access, no guest list
   can: (minRole: UserRole) => boolean
 }
 
 const ROLE_RANK: Record<UserRole, number> = {
-  super_admin:    4,
-  event_manager:  3,
-  check_in_staff: 2,
+  super_admin:    5,
+  event_manager:  4,
+  check_in_staff: 3,
+  scanner:        2,
   viewer:         1,
 }
 
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSuperAdmin:   user?.role === 'super_admin',
     isEventManager: can('event_manager'),
     isCheckInStaff: can('check_in_staff'),
+    isScanner:      user?.role === 'scanner',
     can,
   }
 
@@ -85,6 +88,10 @@ export function useRequireAuth(minRole?: UserRole) {
   useEffect(() => {
     if (loading) return
     if (!user) { router.replace('/login'); return }
+    // Scanners can only access the check-in page
+    if (user.role === 'scanner' && minRole && minRole !== 'scanner') {
+      router.replace('/admin/check-in'); return
+    }
     if (minRole && !can(minRole)) { router.replace('/admin/dashboard'); return }
   }, [user, loading, minRole, can, router])
 

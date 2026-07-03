@@ -27,6 +27,21 @@ class IsCheckInStaffOrAbove(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_check_in_staff)
 
 
+class IsScanner(BasePermission):
+    """Scanner-only role — QR scan and check-in actions only, no guest list access."""
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_scanner)
+
+
+class IsCheckInOrScanner(BasePermission):
+    """Check-in staff, scanner, or above — for scan and check_in actions."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and
+            (request.user.is_check_in_staff or request.user.is_scanner)
+        )
+
+
 class IsAuthenticatedAnyRole(BasePermission):
     """Any authenticated user (including viewer)."""
     def has_permission(self, request, view):

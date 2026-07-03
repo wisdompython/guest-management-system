@@ -60,7 +60,13 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
-    setNewFileChosen(true); setQrZone(null); setQrTouched(false); setNameZone(null); setNameTouched(false)
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setError('Only PNG and JPG files are supported.'); e.target.value = ''; return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB.'); e.target.value = ''; return
+    }
+    setError(''); setNewFileChosen(true); setQrZone(null); setQrTouched(false); setNameZone(null); setNameTouched(false)
     setPreviewUrl(URL.createObjectURL(file))
   }
 

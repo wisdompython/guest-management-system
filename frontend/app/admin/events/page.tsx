@@ -197,77 +197,117 @@ export default function EventsPage() {
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs font-semibold uppercase tracking-widest" style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--bg)' }}>
-                <th className="px-5 py-3 text-left">Name</th>
-                <th className="px-5 py-3 text-left">Date</th>
-                <th className="px-5 py-3 text-left">Venue</th>
-                <th className="px-5 py-3 text-left">Guests</th>
-                <th className="px-5 py-3 text-left">Check-ins</th>
-                <th className="px-5 py-3 text-left">Design</th>
-                <th className="px-5 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Mobile cards — shown below md */}
+            <div className="md:hidden divide-y" style={{ borderColor: 'var(--line)' }}>
               {filteredEvents.map((ev) => (
-                <tr key={ev.id} className="group cursor-pointer transition-colors hover:bg-[var(--panel)]" style={{ borderTop: '1px solid var(--line)' }}
+                <div key={ev.id} className="px-4 py-4 cursor-pointer transition-colors hover:bg-[var(--panel)]"
                   onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
-                  <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
-                    <div className="flex items-center gap-2">
-                      {ev.name}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                        {new Date(ev.date).toLocaleDateString()}{ev.venue ? ` · ${ev.venue}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       {ev.is_ended && (
-                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>
-                          Ended
-                        </span>
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>Ended</span>
                       )}
+                      <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>{ev.guest_count} guests</span>
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5" style={{ color: 'var(--muted)' }}>{new Date(ev.date).toLocaleDateString()}</td>
-                  <td className="max-w-[140px] truncate px-5 py-3.5" style={{ color: 'var(--muted)' }}>{ev.venue || '--'}</td>
-                  <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>{ev.guest_count}</td>
-                  <td className="px-5 py-3.5">
-                    {ev.guest_count > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 max-w-[80px] rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
-                          <div className="h-full rounded-full transition-all"
-                            style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--ink)' }}>
-                          {ev.checked_in_count}/{ev.guest_count}
-                        </span>
+                  </div>
+                  {ev.guest_count > 0 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+                        <div className="h-full rounded-full" style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
                       </div>
-                    ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>—</span>}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {ev.design_template ? (
-                      <a href={ev.design_template.startsWith('http') ? ev.design_template : `${BASE_URL.replace('/api', '')}${ev.design_template}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>
-                        View ↗
-                      </a>
-                    ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>None</span>}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Edit</Link>
-                      <button onClick={() => exportEvent(ev.id)}
-                        className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>
-                        Export
-                      </button>
-                      <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
-                        className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40"
-                        style={{ color: ev.is_ended ? 'var(--brand)' : 'var(--muted)' }}>
-                        {togglingId === ev.id ? '…' : ev.is_ended ? 'Reopen' : 'End'}
-                      </button>
-                      <button onClick={() => handleDelete(ev.id, ev.name)} disabled={deleting === ev.id}
-                        className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40" style={{ color: 'var(--danger)' }}>Delete</button>
+                      <span className="text-xs flex-shrink-0" style={{ color: 'var(--muted)' }}>{ev.checked_in_count}/{ev.guest_count} checked in</span>
                     </div>
-                  </td>
-                </tr>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>Edit</Link>
+                    <button onClick={() => exportEvent(ev.id)} className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Export</button>
+                    <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
+                      className="text-xs font-semibold disabled:opacity-40"
+                      style={{ color: ev.is_ended ? 'var(--brand)' : 'var(--muted)' }}>
+                      {togglingId === ev.id ? '…' : ev.is_ended ? 'Reopen' : 'End'}
+                    </button>
+                    <button onClick={() => handleDelete(ev.id, ev.name)} disabled={deleting === ev.id}
+                      className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--danger)' }}>Delete</button>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop table — hidden below md */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs font-semibold uppercase tracking-widest" style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--bg)' }}>
+                    <th className="px-5 py-3 text-left">Name</th>
+                    <th className="px-5 py-3 text-left">Date</th>
+                    <th className="px-5 py-3 text-left">Venue</th>
+                    <th className="px-5 py-3 text-left">Guests</th>
+                    <th className="px-5 py-3 text-left">Check-ins</th>
+                    <th className="px-5 py-3 text-left">Design</th>
+                    <th className="px-5 py-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEvents.map((ev) => (
+                    <tr key={ev.id} className="group cursor-pointer transition-colors hover:bg-[var(--panel)]" style={{ borderTop: '1px solid var(--line)' }}
+                      onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
+                      <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
+                        <div className="flex items-center gap-2">
+                          {ev.name}
+                          {ev.is_ended && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(156,163,175,0.15)', color: 'var(--muted)' }}>Ended</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5" style={{ color: 'var(--muted)' }}>{new Date(ev.date).toLocaleDateString()}</td>
+                      <td className="max-w-[140px] truncate px-5 py-3.5" style={{ color: 'var(--muted)' }}>{ev.venue || '--'}</td>
+                      <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>{ev.guest_count}</td>
+                      <td className="px-5 py-3.5">
+                        {ev.guest_count > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 max-w-[80px] rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+                              <div className="h-full rounded-full transition-all"
+                                style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
+                            </div>
+                            <span className="text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--ink)' }}>{ev.checked_in_count}/{ev.guest_count}</span>
+                          </div>
+                        ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>—</span>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {ev.design_template ? (
+                          <a href={ev.design_template.startsWith('http') ? ev.design_template : `${BASE_URL.replace('/api', '')}${ev.design_template}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>
+                            View ↗
+                          </a>
+                        ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>None</span>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Edit</Link>
+                          <button onClick={() => exportEvent(ev.id)} className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>Export</button>
+                          <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
+                            className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40"
+                            style={{ color: ev.is_ended ? 'var(--brand)' : 'var(--muted)' }}>
+                            {togglingId === ev.id ? '…' : ev.is_ended ? 'Reopen' : 'End'}
+                          </button>
+                          <button onClick={() => handleDelete(ev.id, ev.name)} disabled={deleting === ev.id}
+                            className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40" style={{ color: 'var(--danger)' }}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

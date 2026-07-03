@@ -3,19 +3,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import jsQR from 'jsqr'
 import { api, Guest } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import {
   CheckedInScreen,
   DuplicateScreen,
   InvalidScreen,
   GuestFoundScreen,
 } from '@/components/check-in/CheckInScreens'
+import type { InvalidReason } from '@/components/check-in/CheckInScreens'
 
 type ScanState = 'idle' | 'scanning' | 'loading' | 'found' | 'checked_in' | 'duplicate' | 'invalid'
 
 export default function CheckInPage() {
+  const { isSuperAdmin } = useAuth()
   const [token, setToken]           = useState('')
   const [state, setState]           = useState<ScanState>('idle')
   const [guest, setGuest]           = useState<Guest | null>(null)
+  const [invalidReason, setInvalidReason] = useState<InvalidReason>('not_found')
   const [checkingIn, setCheckingIn] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [manualMode, setManualMode] = useState(false)
@@ -109,7 +113,15 @@ export default function CheckInPage() {
       const g = await api.scanGuest(raw.trim())
       setGuest(g)
       setState(g.status === 'checked_in' ? 'duplicate' : 'found')
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (!navigator.onLine || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+        setInvalidReason('offline')
+      } else if (msg.includes('404') || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('invalid')) {
+        setInvalidReason('not_found')
+      } else {
+        setInvalidReason('server_error')
+      }
       setState('invalid')
     }
   }
@@ -124,27 +136,32 @@ export default function CheckInPage() {
   async function handleCheckIn() {
     if (!guest) return
     setCheckingIn(true)
+    // Optimistic: show success immediately so door staff aren't blocked on slow connections
+    const optimisticGuest = { ...guest, status: 'checked_in' as const }
+    setGuest(optimisticGuest)
+    setState('checked_in')
     try {
       const updated = await api.checkIn(guest.id)
       setGuest(updated)
-      setState('checked_in')
     } catch (err: unknown) {
-      setState(err instanceof Error && err.message.includes('409') ? 'duplicate' : 'invalid')
+      // Revert if server rejects
+      setGuest(guest)
+      setState(err instanceof Error && err.message.includes('409') ? 'duplicate' : 'found')
     } finally {
       setCheckingIn(false)
     }
   }
 
   function reset() {
-    setToken(''); setState('idle'); setGuest(null); setCheckingIn(false)
+    setToken(''); setState('idle'); setGuest(null); setCheckingIn(false); setInvalidReason('not_found')
     scanningRef.current = false
   }
 
   if (state === 'checked_in' && guest) return <CheckedInScreen guest={guest} onNext={reset} />
   if (state === 'duplicate'  && guest) return <DuplicateScreen guest={guest} onNext={reset} />
-  if (state === 'invalid')             return <InvalidScreen onReset={reset} />
+  if (state === 'invalid')             return <InvalidScreen onReset={reset} reason={invalidReason} />
   if (state === 'found'      && guest) return (
-    <GuestFoundScreen guest={guest} checkingIn={checkingIn} onConfirm={handleCheckIn} onCancel={reset} />
+    <GuestFoundScreen guest={guest} checkingIn={checkingIn} onConfirm={handleCheckIn} onCancel={reset} showPhone={isSuperAdmin} />
   )
 
   return (

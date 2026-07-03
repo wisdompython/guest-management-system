@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Guest } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import { GuestDetailsCard } from '@/components/guests/GuestDetailsCard'
 import { GuestAssetsCard } from '@/components/guests/GuestAssetsCard'
 
@@ -24,6 +25,7 @@ function absoluteUrl(path: string | null): string | null {
 export default function GuestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { isSuperAdmin } = useAuth()
   const [guest, setGuest] = useState<Guest | null>(null)
   const [loading, setLoading] = useState(true)
   const [checkingIn, setCheckingIn] = useState(false)
@@ -136,7 +138,7 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
       </div>
       {error && <div className="mb-5 px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <div className="grid lg:grid-cols-2 gap-5">
-        <GuestDetailsCard guest={guest} />
+        <GuestDetailsCard guest={guest} showPhone={isSuperAdmin} />
         <GuestAssetsCard guest={guest} passUrl={passUrl} qrUrl={qrUrl} />
       </div>
     </div>

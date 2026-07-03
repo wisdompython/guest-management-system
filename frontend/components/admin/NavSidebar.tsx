@@ -23,23 +23,23 @@ const Ic = {
 
 const NAV_GROUPS = [
   { label: 'LIVE', items: [
-    { href: '/admin/dashboard',  label: 'Dashboard',        icon: Ic.grid,    tourId: 'nav-dashboard' },
+    { href: '/admin/dashboard',  label: 'Dashboard',        icon: Ic.grid,    tourId: 'nav-dashboard', minRole: 'check_in_staff' as const },
     { href: '/admin/check-in',   label: 'Scanner stations', icon: Ic.scanner, tourId: 'nav-checkin' },
   ]},
   { label: 'PLAN', items: [
-    { href: '/admin/events',             label: 'Events',       icon: Ic.events, tourId: 'nav-events' },
-    { href: '/admin/guests',             label: 'Guests',       icon: Ic.guests, tourId: 'nav-guests' },
+    { href: '/admin/events',             label: 'Events',       icon: Ic.events, tourId: 'nav-events',  minRole: 'check_in_staff' as const },
+    { href: '/admin/guests',             label: 'Guests',       icon: Ic.guests, tourId: 'nav-guests',  minRole: 'check_in_staff' as const },
     { href: '/admin/guests/bulk-upload', label: 'Bulk Upload',  icon: Ic.upload,  minRole: 'event_manager' as const },
     { href: '/admin/fonts',              label: 'Pass Designer', icon: Ic.design, minRole: 'event_manager' as const, tourId: 'nav-fonts' },
   ]},
   { label: 'COMMS', items: [
-    { href: '/admin/whatsapp',   label: 'WhatsApp',  icon: Ic.whatsapp,  tourId: 'nav-whatsapp' },
-    { href: '/admin/reminders',  label: 'Reminders', icon: Ic.reminders, tourId: 'nav-reminders' },
+    { href: '/admin/whatsapp',   label: 'WhatsApp',  icon: Ic.whatsapp,  tourId: 'nav-whatsapp',  minRole: 'check_in_staff' as const },
+    { href: '/admin/reminders',  label: 'Reminders', icon: Ic.reminders, tourId: 'nav-reminders', minRole: 'check_in_staff' as const },
   ]},
   { label: 'ADMIN', items: [
     { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const, tourId: 'nav-team' },
     { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const, tourId: 'nav-templates' },
-    { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs },
+    { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs,      minRole: 'check_in_staff' as const },
   ]},
 ]
 

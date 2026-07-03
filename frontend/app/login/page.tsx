@@ -9,6 +9,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/admin/dashboard'
+  const sessionExpired = searchParams.get('session') === 'expired'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -45,6 +46,11 @@ function LoginForm() {
       </div>
 
       <div style={{ background: 'var(--panel)', border: '1px solid rgba(255,255,255,0.07)' }} className="p-8">
+        {sessionExpired && !error && (
+          <div className="mb-5 px-4 py-3 text-sm" style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+            Your session expired. Please sign in again.
+          </div>
+        )}
         {error && (
           <div className="mb-5 px-4 py-3 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid #fca5a5' }}>
             {error}

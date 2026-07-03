@@ -19,11 +19,12 @@ interface Props {
   g: Guest
   isSel: boolean
   deleting: string | null
+  showPhone?: boolean
   onToggleSelect: (id: string) => void
   onDelete: (id: string, name: string) => void
 }
 
-export function GuestTableRow({ g, isSel, deleting, onToggleSelect, onDelete }: Props) {
+export function GuestTableRow({ g, isSel, deleting, showPhone = false, onToggleSelect, onDelete }: Props) {
   const initials = g.full_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
   const st = g.status === 'checked_in' ? STATUS_STYLE.checked_in : STATUS_STYLE.registered
   const checkedInTime = g.checked_in_at
@@ -54,7 +55,7 @@ export function GuestTableRow({ g, isSel, deleting, onToggleSelect, onDelete }: 
       </td>
       <td className="px-4 py-3">
         <p className="text-[12px] truncate max-w-[160px]" style={{ color: 'var(--muted)' }}>{g.email || '—'}</p>
-        <p className="text-[11px] font-mono" style={{ color: 'var(--muted-2)' }}>{g.phone_number || '—'}</p>
+        {showPhone && <p className="text-[11px] font-mono" style={{ color: 'var(--muted-2)' }}>{g.phone_number || '—'}</p>}
       </td>
       <td className="px-4 py-3"><span className="text-[12px] font-medium" style={{ color: 'var(--ink)' }}>{ticketLabel}</span></td>
       <td className="px-4 py-3">

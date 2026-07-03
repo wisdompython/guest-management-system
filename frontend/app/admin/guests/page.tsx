@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { api, Guest, Event, GuestListStats } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 import ExportDropdown from '@/components/ExportDropdown'
 import { GuestFilterBar, GuestSortKey } from '@/components/guests/GuestFilterBar'
 import { GuestTable } from '@/components/guests/GuestTable'
@@ -23,6 +24,7 @@ function parseTokens(input: string): { tokens: FilterToken[]; freeText: string }
 }
 
 export default function GuestsPage() {
+  const { isSuperAdmin } = useAuth()
   const [events, setEvents]             = useState<Event[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -336,7 +338,7 @@ export default function GuestsPage() {
       <div className="flex-1 overflow-auto">
         <GuestTable
           guests={filtered} loading={loading} query={query}
-          selected={selected} deleting={deleting}
+          selected={selected} deleting={deleting} showPhone={isSuperAdmin}
           onToggleAll={toggleAll} onToggleSelect={toggleSelect}
           onDelete={handleDelete} onClearQuery={() => setQuery('')}
         />

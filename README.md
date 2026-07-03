@@ -396,6 +396,37 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+## Roadmap
+
+Features planned for future releases. These are not yet implemented and will be scoped and priced separately.
+
+### Guest Self-Registration
+Allow event organizers to share a public registration link with guests directly.
+
+- Each event gets a unique public URL: `yourdomain.com/register/{event-slug}`
+- Guests fill in their own details (name, phone, ticket type) — no list compilation needed
+- Registration triggers automatic pass generation and WhatsApp delivery
+- Organizer sees registrations appear in the guest list in real time
+- Optional: organizer can set a registration deadline and guest cap
+- Eliminates the CSV upload step entirely for events where guests can self-register
+- Particularly valuable for large events (500–1000+ guests) where collecting a full list upfront is impractical
+
+### Google Sheets Import
+Direct import from a Google Sheets URL instead of CSV upload.
+
+- Organizer shares their Google Sheet link
+- System pulls guest data directly — no download/upload step
+- Can re-sync as new guests are added to the sheet
+
+### WhatsApp Registration Bot
+Guests text the business WhatsApp number to register themselves.
+
+- Guest sends their name and ticket type via WhatsApp
+- Bot registers them and sends the pass back in the same conversation
+- Zero friction for guests — no link, no form, no app
+
+---
+
 ## License
 
 Private — all rights reserved.

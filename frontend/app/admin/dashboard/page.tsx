@@ -7,13 +7,16 @@ import { StatCards } from '@/components/dashboard/StatCards'
 import { ArrivalsFeed } from '@/components/dashboard/ArrivalsFeed'
 import { EventsPanel } from '@/components/dashboard/EventsPanel'
 
+interface DashboardStats { checked_in: number; pending: number; wa_sent: number; wa_unsent: number }
+
 export default function DashboardPage() {
-  const [guests, setGuests]   = useState<Guest[]>([])
-  const [events, setEvents]   = useState<Event[]>([])
+  const [recentArrivals, setRecentArrivals] = useState<Guest[]>([])
+  const [stats, setStats]       = useState<DashboardStats | null>(null)
+  const [events, setEvents]     = useState<Event[]>([])
   const [activeEvent, setActiveEvent] = useState<Event | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]   = useState(true)
   const [guestsLoading, setGuestsLoading] = useState(false)
-  const [time, setTime]       = useState(new Date())
+  const [time, setTime]         = useState(new Date())
 
   useEffect(() => {
     api.getEvents()
@@ -27,10 +30,17 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (!activeEvent) { setGuests([]); return }
+    if (!activeEvent) { setRecentArrivals([]); setStats(null); return }
     setGuestsLoading(true)
-    api.getGuests({ event: String(activeEvent.id), page_size: '200' })
-      .then((g) => setGuests(g.results))
+    // page_size=10 for recent arrivals feed; stats come from server-side aggregates (full queryset)
+    Promise.all([
+      api.getGuests({ event: String(activeEvent.id), ordering: '-checked_in', status: 'checked_in', page_size: '10' }),
+      api.getGuests({ event: String(activeEvent.id), page_size: '1' }),
+    ])
+      .then(([arrivals, overview]) => {
+        setRecentArrivals(arrivals.results)
+        setStats(overview.stats ?? null)
+      })
       .catch(console.error)
       .finally(() => setGuestsLoading(false))
   }, [activeEvent?.id])
@@ -40,15 +50,10 @@ export default function DashboardPage() {
     return () => clearInterval(t)
   }, [])
 
-  const total         = guests.length
-  const checkedIn     = guests.filter((g) => g.status === 'checked_in').length
-  const waSent        = guests.filter((g) => g.whatsapp_sent).length
+  const total         = stats ? stats.checked_in + stats.pending : 0
+  const checkedIn     = stats?.checked_in ?? 0
+  const waSent        = stats?.wa_sent ?? 0
   const attendancePct = total > 0 ? Math.round((checkedIn / total) * 100) : 0
-
-  const recentArrivals = [...guests]
-    .filter((g) => g.status === 'checked_in')
-    .sort((a, b) => (b.checked_in_at ?? '').localeCompare(a.checked_in_at ?? ''))
-    .slice(0, 10)
 
   const timeStr = time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 

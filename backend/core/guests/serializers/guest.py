@@ -3,6 +3,11 @@ from ..models import Guest
 from .event import CONFIGURABLE_FIELDS, _event_required_fields, _event_valid_ticket_values
 
 
+def _can_see_phone(request) -> bool:
+    """Only super admins may see guest phone numbers."""
+    return bool(request and request.user and request.user.is_authenticated and request.user.is_super_admin)
+
+
 class GuestSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='event.name', read_only=True)
 
@@ -21,6 +26,12 @@ class GuestSerializer(serializers.ModelSerializer):
             'status', 'checked_in_at',
             'whatsapp_sent', 'whatsapp_sent_at', 'registered_at',
         )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not _can_see_phone(self.context.get('request')):
+            data['phone_number'] = None
+        return data
 
     def validate(self, data):
         # On update, merge with existing instance values so partial updates work
@@ -61,3 +72,9 @@ class GuestListSerializer(serializers.ModelSerializer):
             'email', 'ticket_type', 'table_number',
             'status', 'whatsapp_sent', 'registered_at',
         )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not _can_see_phone(self.context.get('request')):
+            data['phone_number'] = None
+        return data

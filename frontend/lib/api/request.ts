@@ -16,6 +16,13 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     headers,
     credentials: 'include',
   });
+  if (res.status === 401) {
+    // Session expired — redirect to login from any page
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login?session=expired'
+    }
+    throw new Error('Session expired. Please log in again.')
+  }
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.detail ?? `Request failed: ${res.status}`);

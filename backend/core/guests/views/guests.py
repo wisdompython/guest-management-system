@@ -14,6 +14,7 @@ from accounts.permissions import (
     IsAuthenticatedAnyRole,
     IsEventManagerOrAbove,
     IsCheckInStaffOrAbove,
+    IsCheckInOrScanner,
 )
 from .guest_actions import GuestBulkExportMixin
 
@@ -26,13 +27,13 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     def get_permissions(self):
         """
-        list/retrieve/scan/export  → any authenticated user
-        check_in                   → check-in staff or above
+        scan/check_in              → scanner, check-in staff, or above
+        list/retrieve/export       → check-in staff or above (scanners excluded)
         create/update/delete/bulk  → event manager or above
         """
-        if self.action in ('list', 'retrieve', 'scan', 'export', 'download_assets'):
-            return [IsAuthenticatedAnyRole()]
-        if self.action == 'check_in':
+        if self.action in ('scan', 'check_in'):
+            return [IsCheckInOrScanner()]
+        if self.action in ('list', 'retrieve', 'export', 'download_assets'):
             return [IsCheckInStaffOrAbove()]
         return [IsEventManagerOrAbove()]
 
@@ -56,7 +57,12 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         if e := params.get('event'):
             qs = qs.filter(event_id=e)
         if search := params.get('search'):
-            qs = qs.filter(full_name__icontains=search) | qs.filter(phone_number__icontains=search)
+            name_qs = qs.filter(full_name__icontains=search)
+            # Only super admins may search by phone number
+            if self.request.user.is_super_admin:
+                qs = name_qs | qs.filter(phone_number__icontains=search)
+            else:
+                qs = name_qs
         if s := params.get('status'):
             qs = qs.filter(status=s)
         if t := params.get('ticket_type'):

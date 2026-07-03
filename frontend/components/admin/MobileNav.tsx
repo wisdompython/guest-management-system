@@ -23,23 +23,23 @@ const Ic = {
 
 const NAV_GROUPS = [
   { label: 'LIVE', items: [
-    { href: '/admin/dashboard',  label: 'Dashboard',     icon: Ic.grid },
+    { href: '/admin/dashboard',  label: 'Dashboard',     icon: Ic.grid,    minRole: 'check_in_staff' as const },
     { href: '/admin/check-in',   label: 'Scanner',       icon: Ic.scanner },
   ]},
   { label: 'PLAN', items: [
-    { href: '/admin/events',             label: 'Events',        icon: Ic.events },
-    { href: '/admin/guests',             label: 'Guests',        icon: Ic.guests },
+    { href: '/admin/events',             label: 'Events',        icon: Ic.events, minRole: 'check_in_staff' as const },
+    { href: '/admin/guests',             label: 'Guests',        icon: Ic.guests, minRole: 'check_in_staff' as const },
     { href: '/admin/guests/bulk-upload', label: 'Bulk Upload',   icon: Ic.upload,  minRole: 'event_manager' as const },
     { href: '/admin/fonts',              label: 'Pass Designer', icon: Ic.design,  minRole: 'event_manager' as const },
   ]},
   { label: 'COMMS', items: [
-    { href: '/admin/whatsapp',  label: 'WhatsApp',  icon: Ic.whatsapp },
-    { href: '/admin/reminders', label: 'Reminders', icon: Ic.reminders },
+    { href: '/admin/whatsapp',  label: 'WhatsApp',  icon: Ic.whatsapp,  minRole: 'check_in_staff' as const },
+    { href: '/admin/reminders', label: 'Reminders', icon: Ic.reminders, minRole: 'check_in_staff' as const },
   ]},
   { label: 'ADMIN', items: [
     { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const },
     { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const },
-    { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs },
+    { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs,      minRole: 'check_in_staff' as const },
   ]},
 ]
 

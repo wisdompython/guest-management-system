@@ -3,6 +3,7 @@
 import EventConfigPanel from '@/components/EventConfigPanel'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import type { WhatsAppTemplate } from '@/lib/api'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 interface Props {
   ticketTypes: TicketTypeDef[]
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, whatsappTemplate, templates, onChange }: Props) {
+  const selectedTemplate = templates.find((t) => t.id === whatsappTemplate)
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
@@ -43,25 +45,26 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
               Choose which approved Meta template to use when sending passes for this event.
               Defaults to the global template if none is selected.
             </p>
-            <select
+            <SearchableSelect
               data-tour="event-whatsapp-template"
-              value={whatsappTemplate ?? ''}
-              onChange={(e) => onChange({ whatsappTemplate: e.target.value ? Number(e.target.value) : null })}
-              className="w-full rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}
-            >
-              <option value="">— Use global default —</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.display_name || t.name}
-                  {t.description ? ` — ${t.description}` : ''}
-                </option>
-              ))}
-            </select>
-            {whatsappTemplate && templates.find((t) => t.id === whatsappTemplate) && (
+              options={[
+                { value: '', label: '— Use global default —' },
+                ...templates.map((t) => ({
+                  value: String(t.id),
+                  label: t.display_name || t.name,
+                  sublabel: t.description || undefined,
+                })),
+              ]}
+              value={whatsappTemplate ? String(whatsappTemplate) : ''}
+              onChange={(val) => onChange({ whatsappTemplate: val ? Number(val) : null })}
+              placeholder="— Use global default —"
+              searchPlaceholder="Search templates…"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+            />
+            {whatsappTemplate && selectedTemplate && (
               <div className="mt-2 rounded-[8px] px-3 py-2 text-xs" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--ink)' }}>Params: </span>
-                {(templates.find((t) => t.id === whatsappTemplate)!.body_params || []).join(', ') || 'none'}
+                {(selectedTemplate.body_params || []).join(', ') || 'none'}
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { Event } from '@/lib/api'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.06)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
 const select = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
@@ -43,12 +44,18 @@ export function GuestForm({
 
         <div className="sm:col-span-2">
           <label className={labelCls}>Event *</label>
-          <select data-tour="guest-event-select" name="event" required className={select} onChange={(e) => onEventChange(e.target.value)}>
-            <option value="">Select an event…</option>
-            {events.map(ev => (
-              <option key={ev.id} value={ev.id}>{ev.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            data-tour="guest-event-select"
+            options={events.map((ev) => ({
+              value: String(ev.id),
+              label: ev.name,
+              sublabel: ev.date ? new Date(ev.date).toLocaleDateString() : undefined,
+            }))}
+            value={selectedEvent ? String(selectedEvent.id) : ''}
+            onChange={onEventChange}
+            placeholder="Select an event…"
+            searchPlaceholder="Search events…"
+          />
         </div>
 
         <div className="sm:col-span-2">
