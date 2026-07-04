@@ -41,6 +41,8 @@ export default function GuestsPage() {
   const [selected, setSelected]         = useState<Set<string>>(new Set())
   const [deleting, setDeleting]         = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState('')
+  const [regeneratingAll, setRegeneratingAll] = useState(false)
+  const [regenToast, setRegenToast]     = useState('')
   const [undoToast, setUndoToast]       = useState<{ id: string; name: string; guest: Guest } | null>(null)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -179,6 +181,19 @@ export default function GuestsPage() {
     } finally { setDeleting(null) }
   }
 
+  async function handleRegenerateAll() {
+    if (!selectedEvent) return
+    if (!confirm(`Regenerate passes for all ${count} guests in "${selectedEvent.name}"? This may take a few minutes.`)) return
+    setRegeneratingAll(true)
+    try {
+      const { queued } = await api.bulkRegenerateAssets(selectedEvent.id)
+      setRegenToast(`Queued ${queued} pass${queued !== 1 ? 'es' : ''} for regeneration.`)
+      setTimeout(() => setRegenToast(''), 5000)
+    } catch {
+      setDeleteError('Failed to queue regeneration.')
+    } finally { setRegeneratingAll(false) }
+  }
+
   const checkedIn = stats?.checked_in ?? 0
   const pending   = stats?.pending ?? 0
 
@@ -256,6 +271,12 @@ export default function GuestsPage() {
           </button>
         </div>
       )}
+      {regenToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 shadow-xl text-sm"
+          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--brand)' }}>
+          ✓ {regenToast}
+        </div>
+      )}
       <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4"
         style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-3">
@@ -294,6 +315,15 @@ export default function GuestsPage() {
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                 </svg>
                 {deleting === 'all' ? 'Clearing…' : 'Clear all'}
+              </button>
+              <button onClick={handleRegenerateAll} disabled={regeneratingAll || count === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition hover:opacity-90 disabled:opacity-40"
+                style={{ border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--panel-2)' }}
+                title="Regenerate QR codes and pass images for all guests">
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0 1 7.5-7.5 7.5 7.5 0 0 1 5.196 2.087M19.5 12a7.5 7.5 0 0 1-7.5 7.5 7.5 7.5 0 0 1-5.196-2.087M4.5 12H2m17.5 0H22M4.5 8l-2-2m19 6 2 2" />
+                </svg>
+                {regeneratingAll ? 'Queuing…' : 'Regen passes'}
               </button>
               <DownloadAssetsButton eventId={selectedEvent.id} eventName={selectedEvent.name} />
               <ExportDropdown events={[selectedEvent]} />

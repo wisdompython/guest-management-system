@@ -149,6 +149,21 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         deleted, _ = qs.delete()
         return Response({'deleted': deleted})
 
+    @action(detail=False, methods=['post'], url_path='bulk_regenerate_assets')
+    def bulk_regenerate_assets(self, request):
+        event_id = request.data.get('event_id')
+        if not event_id:
+            return Response({'detail': 'event_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        guest_ids = list(
+            Guest.objects.filter(event_id=event_id).values_list('id', flat=True)
+        )
+        if not guest_ids:
+            return Response({'queued': 0})
+        for guest_id in guest_ids:
+            generate_guest_assets.delay(str(guest_id), send_whatsapp=False)
+        logger.info("bulk_regenerate_assets: queued %s guests for event %s", len(guest_ids), event_id)
+        return Response({'queued': len(guest_ids), 'event_id': event_id})
+
     @action(detail=False, methods=['post'], url_path='bulk_send_whatsapp')
     def bulk_send_whatsapp(self, request):
         event_id = request.data.get('event_id')
