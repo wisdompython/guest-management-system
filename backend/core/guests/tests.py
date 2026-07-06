@@ -273,6 +273,45 @@ class DownloadAssetsTests(TestCase):
             self.fail('download-assets response is not a valid ZIP file')
 
 
+@patch('guests.tasks.send_whatsapp_pass')
+class PastEventWhatsAppGuardTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user('mgr4', password='pass', role='event_manager')
+        self.client.force_authenticate(self.manager)
+        self.past_event   = make_event(name='Past Event',   date=timezone.now() - timezone.timedelta(days=1))
+        self.future_event = make_event(name='Future Event', date=timezone.now() + timezone.timedelta(days=7))
+        self.past_guest   = make_guest(self.past_event,   full_name='Past Guest')
+        self.future_guest = make_guest(self.future_event, full_name='Future Guest')
+        # Give both guests a pass_image name so the no-image guard doesn't fire first
+        Guest.objects.filter(pk=self.past_guest.pk).update(pass_image='passes/fake.png')
+        Guest.objects.filter(pk=self.future_guest.pk).update(pass_image='passes/fake.png')
+        self.past_guest.refresh_from_db()
+        self.future_guest.refresh_from_db()
+
+    def test_send_whatsapp_blocked_for_past_event(self, mock_task):
+        r = self.client.post(f'/api/guests/{self.past_guest.id}/send_whatsapp/')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ended', r.data['detail'].lower())
+        mock_task.delay.assert_not_called()
+
+    def test_send_whatsapp_allowed_for_future_event(self, mock_task):
+        r = self.client.post(f'/api/guests/{self.future_guest.id}/send_whatsapp/')
+        self.assertEqual(r.status_code, 200)
+        mock_task.delay.assert_called_once_with(str(self.future_guest.id))
+
+    def test_bulk_send_whatsapp_blocked_for_past_event(self, mock_task):
+        r = self.client.post('/api/guests/bulk_send_whatsapp/', {'event_id': self.past_event.id}, format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ended', r.data['detail'].lower())
+        mock_task.delay.assert_not_called()
+
+    def test_bulk_send_whatsapp_allowed_for_future_event(self, mock_task):
+        r = self.client.post('/api/guests/bulk_send_whatsapp/', {'event_id': self.future_event.id}, format='json')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.data['queued'])
+
+
 class CheckInTests(TestCase):
     def setUp(self):
         self.client = APIClient()

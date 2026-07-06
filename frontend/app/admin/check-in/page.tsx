@@ -93,18 +93,30 @@ export default function CheckInPage() {
           return
         }
       } else {
-        // jsQR fallback — scale canvas to 640px wide max to keep decode fast
+        // jsQR fallback — crop the scan-box region at full camera resolution
+        // instead of downscaling the whole frame, which blurs the QR modules.
         const canvas = canvasRef.current
         if (!canvas) { requestAnimationFrame(scanFrame); return }
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) { requestAnimationFrame(scanFrame); return }
-        const scale = Math.min(1, 640 / video.videoWidth)
-        canvas.width  = Math.round(video.videoWidth  * scale)
-        canvas.height = Math.round(video.videoHeight * scale)
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+        // The scan box is 240×240 CSS px centered in the video element.
+        // Map that to actual video pixels using the video's intrinsic dimensions.
+        const vw = video.videoWidth
+        const vh = video.videoHeight
+        const cropSize = Math.round(Math.min(vw, vh) * 0.55) // ~55% of shorter edge
+        const cropX = Math.round((vw - cropSize) / 2)
+        const cropY = Math.round((vh - cropSize) / 2)
+
+        // Render crop at full resolution — no downscale, no blur
+        canvas.width  = cropSize
+        canvas.height = cropSize
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize)
+
+        const imageData = ctx.getImageData(0, 0, cropSize, cropSize)
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert', // skip inversion pass — faster
+          inversionAttempts: 'attemptBoth',
         })
         if (code && scanningRef.current) {
           scanningRef.current = false

@@ -7,7 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
 from django.db.models import Count, Q
 
-from ..models import Guest
+from ..models import Event, Guest
 from ..serializers import GuestSerializer, GuestListSerializer
 from ..tasks import generate_guest_assets, send_whatsapp_pass, bulk_send_whatsapp_passes
 from accounts.permissions import (
@@ -118,10 +118,17 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='send_whatsapp')
     def send_whatsapp(self, request, pk=None):
+        from django.utils import timezone as tz
         guest = self.get_object()
         if not guest.pass_image:
             return Response(
                 {'detail': 'No pass image — regenerate assets first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event = guest.event
+        if event and event.date and event.date < tz.now():
+            return Response(
+                {'detail': f'"{event.name}" has already ended — passes are not sent for past events.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
@@ -170,10 +177,20 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='bulk_send_whatsapp')
     def bulk_send_whatsapp(self, request):
+        from django.utils import timezone as tz
         event_id = request.data.get('event_id')
         resend   = request.data.get('resend', False)
         if not event_id:
             return Response({'detail': 'event_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            event = Event.objects.get(pk=event_id)
+        except Event.DoesNotExist:
+            return Response({'detail': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if event.date and event.date < tz.now():
+            return Response(
+                {'detail': f'"{event.name}" has already ended — passes are not sent for past events.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             result = bulk_send_whatsapp_passes.delay(int(event_id), resend)
             return Response({'queued': True, 'event_id': event_id, 'task_id': result.id})

@@ -45,6 +45,16 @@ def send_pass(guest) -> bool:
         logger.warning("Guest %s has no pass image — skipping WhatsApp send", guest.id)
         return False
 
+    # Don't send passes for events that have already ended
+    from django.utils import timezone as tz
+    event = guest.event
+    if event and event.date and event.date < tz.now():
+        logger.warning(
+            "Event '%s' has passed — skipping WhatsApp pass for guest %s",
+            event.name, guest.id,
+        )
+        return False
+
     try:
         from pywa.types.templates import HeaderImage, BodyText, TemplateLanguage
 
