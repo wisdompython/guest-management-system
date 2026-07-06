@@ -159,8 +159,12 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         )
         if not guest_ids:
             return Response({'queued': 0})
-        for guest_id in guest_ids:
-            generate_guest_assets.delay(str(guest_id), send_whatsapp=False)
+        from celery import group
+        job = group(
+            generate_guest_assets.s(str(gid), send_whatsapp=False)
+            for gid in guest_ids
+        )
+        job.delay()
         logger.info("bulk_regenerate_assets: queued %s guests for event %s", len(guest_ids), event_id)
         return Response({'queued': len(guest_ids), 'event_id': event_id})
 

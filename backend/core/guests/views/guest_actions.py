@@ -39,28 +39,35 @@ class GuestBulkExportMixin:
 
         valid_rows, error_report = serializer.parse()
 
+        # Build Guest objects without hitting the DB yet
+        guest_objects = [Guest(**row) for row in valid_rows]
+
+        # Insert in chunks of 500 to keep each statement fast and memory bounded
+        CHUNK = 500
         created_guests = []
-        asset_failures = []
-        for row in valid_rows:
+        for i in range(0, len(guest_objects), CHUNK):
+            chunk = guest_objects[i:i + CHUNK]
             try:
-                guest = Guest.objects.create(**row)
+                inserted = Guest.objects.bulk_create(chunk, batch_size=CHUNK)
+                created_guests.extend(inserted)
             except Exception as exc:
-                logger.error("Failed to create guest from row %s: %s", row, exc, exc_info=True)
-                error_report.append({'row': row, 'error': str(exc)})
-                continue
+                logger.error("bulk_create chunk %s failed: %s", i // CHUNK, exc, exc_info=True)
+                # Fall back to individual creates so we don't lose the whole batch
+                for obj in chunk:
+                    try:
+                        obj.save()
+                        created_guests.append(obj)
+                    except Exception as row_exc:
+                        error_report.append({'row': '?', 'error': str(row_exc)})
 
+        # Queue asset generation outside the insert loop — one .delay() call per guest,
+        # but only after all rows are committed so workers never race a missing row.
+        for guest in created_guests:
             generate_guest_assets.delay(str(guest.id), send_whatsapp=True)
-            created_guests.append(str(guest.id))
-            if False:  # asset results now come from background worker
-                asset_failures.append({
-                    'guest_id': str(guest.id),
-                    'name': guest.full_name,
-                    'qr': False,
-                    'pass': False,
-                })
 
+        guest_ids = [str(g.id) for g in created_guests]
         upload_record.total_rows = len(valid_rows) + len(error_report)
-        upload_record.successful_rows = len(created_guests)
+        upload_record.successful_rows = len(guest_ids)
         upload_record.failed_rows = len(error_report)
         upload_record.error_report = error_report
         upload_record.status = BulkUpload.UploadStatus.DONE
@@ -71,8 +78,8 @@ class GuestBulkExportMixin:
             'successful': upload_record.successful_rows,
             'failed': upload_record.failed_rows,
             'errors': error_report,
-            'asset_warnings': asset_failures,
-            'guest_ids': created_guests,
+            'asset_warnings': [],
+            'guest_ids': guest_ids,
         }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], url_path='export')
@@ -140,31 +147,48 @@ class GuestBulkExportMixin:
         def safe_name(name):
             return re.sub(r'[^\w\s-]', '', name).strip().replace(' ', '_')
 
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            missing = 0
-            for guest in guests:
-                name = safe_name(guest.full_name) or str(guest.id)
-
-                if mode in ('passes', 'both') and guest.pass_image:
-                    try:
-                        path = guest.pass_image.path
-                        ext = os.path.splitext(path)[1] or '.png'
-                        zf.write(path, f'passes/{name}{ext}')
-                    except (FileNotFoundError, ValueError):
-                        missing += 1
-
-                if mode in ('qr', 'both') and guest.qr_code:
-                    try:
-                        path = guest.qr_code.path
-                        ext = os.path.splitext(path)[1] or '.png'
-                        zf.write(path, f'qr_codes/{name}{ext}')
-                    except (FileNotFoundError, ValueError):
-                        missing += 1
-
-        buf.seek(0)
         event_slug = re.sub(r'[^\w-]', '_', event.name)
         filename = f"{event_slug}_{mode}.zip"
-        response = HttpResponse(buf.read(), content_type='application/zip')
+
+        # Stream the zip so we never hold all files in memory at once.
+        # zipstream-ng writes each file as it is yielded; the browser receives
+        # chunks immediately rather than waiting for the full archive.
+        try:
+            import zipstream
+            zs = zipstream.ZipFile(mode='w', compression=zipstream.ZIP_DEFLATED)
+            for guest in guests.iterator():
+                name = safe_name(guest.full_name) or str(guest.id)
+                if mode in ('passes', 'both') and guest.pass_image:
+                    try:
+                        zs.write(guest.pass_image.path, f'passes/{name}.png')
+                    except (FileNotFoundError, ValueError):
+                        pass
+                if mode in ('qr', 'both') and guest.qr_code:
+                    try:
+                        zs.write(guest.qr_code.path, f'qr_codes/{name}.png')
+                    except (FileNotFoundError, ValueError):
+                        pass
+            response = StreamingHttpResponse(zs, content_type='application/zip')
+        except ImportError:
+            # zipstream-ng not installed — fall back to in-memory zip
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for guest in guests.iterator():
+                    name = safe_name(guest.full_name) or str(guest.id)
+                    if mode in ('passes', 'both') and guest.pass_image:
+                        try:
+                            zs_path = guest.pass_image.path
+                            zf.write(zs_path, f'passes/{name}.png')
+                        except (FileNotFoundError, ValueError):
+                            pass
+                    if mode in ('qr', 'both') and guest.qr_code:
+                        try:
+                            zs_path = guest.qr_code.path
+                            zf.write(zs_path, f'qr_codes/{name}.png')
+                        except (FileNotFoundError, ValueError):
+                            pass
+            buf.seek(0)
+            response = HttpResponse(buf.read(), content_type='application/zip')
+
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
