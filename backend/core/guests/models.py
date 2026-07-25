@@ -99,6 +99,9 @@ class Guest(models.Model):
     checked_in_at = models.DateTimeField(null=True, blank=True)
     whatsapp_sent = models.BooleanField(default=False)
     whatsapp_sent_at = models.DateTimeField(null=True, blank=True)
+    # If set, the WhatsApp pass is held back and sent by dispatch_scheduled_sends
+    # once this time arrives, instead of immediately on registration.
+    scheduled_send_at = models.DateTimeField(null=True, blank=True)
     registered_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

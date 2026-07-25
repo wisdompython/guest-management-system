@@ -138,6 +138,41 @@ def send_reminder(reminder_id: int, guest_id: str):
 
 
 @shared_task
+def dispatch_scheduled_sends():
+    """
+    Periodic task — runs every 30 minutes.
+    Finds guests whose scheduled_send_at has arrived (or passed) and whose
+    pass hasn't been sent yet, then queues send_whatsapp_pass for each,
+    staggered to respect the WhatsApp rate limit.
+    """
+    from .models import Guest
+
+    now = timezone.now()
+
+    guest_ids = list(
+        Guest.objects.filter(
+            scheduled_send_at__isnull=False,
+            scheduled_send_at__lte=now,
+            whatsapp_sent=False,
+        )
+        .exclude(pass_image='')
+        .filter(pass_image__isnull=False)
+        .exclude(phone_number='')
+        .filter(event__whatsapp_enabled=True, event__date__gte=now)
+        .values_list('id', flat=True)
+    )
+
+    for i, guest_id in enumerate(guest_ids):
+        send_whatsapp_pass.apply_async(
+            args=[str(guest_id)],
+            countdown=i * WHATSAPP_BATCH_COUNTDOWN,
+        )
+
+    logger.info("dispatch_scheduled_sends: queued %s scheduled sends", len(guest_ids))
+    return {'queued': len(guest_ids)}
+
+
+@shared_task
 def dispatch_due_reminders():
     """
     Periodic task — runs every 30 minutes.

@@ -40,6 +40,7 @@ export default function AddGuestPage() {
     const form = e.currentTarget
     const getValue = (name: string) =>
       (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null)?.value ?? ''
+    const scheduledSendAt = getValue('scheduled_send_at')
     const payload: CreateGuestPayload = {
       full_name:    getValue('full_name'),
       phone_number: getValue('phone_number'),
@@ -48,6 +49,7 @@ export default function AddGuestPage() {
       table_number: getValue('table_number'),
       seat_number:  getValue('seat_number'),
       event:        selectedEvent ? selectedEvent.id : null,
+      scheduled_send_at: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : null,
     }
     try {
       await api.createGuest(payload)

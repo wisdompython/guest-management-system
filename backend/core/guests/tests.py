@@ -312,6 +312,144 @@ class PastEventWhatsAppGuardTests(TestCase):
         self.assertTrue(r.data['queued'])
 
 
+@patch('guests.views.guests.generate_guest_assets')
+class ScheduledSendCreateTests(TestCase):
+    """perform_create should hold back the WhatsApp send when scheduled_send_at is in the future."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user('mgr5', password='pass', role='event_manager')
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(name='Scheduled Event', date=timezone.now() + timezone.timedelta(days=7))
+
+    def _create(self, **extra):
+        payload = dict(
+            full_name='Scheduled Guest',
+            phone_number='2348000000009',
+            event=self.event.id,
+        )
+        payload.update(extra)
+        return self.client.post('/api/guests/', payload, format='json')
+
+    def test_no_scheduled_send_at_sends_immediately(self, mock_task):
+        r = self._create()
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        guest_id, kwargs = mock_task.delay.call_args
+        self.assertTrue(kwargs.get('send_whatsapp', True))
+
+    def test_future_scheduled_send_at_defers_send(self, mock_task):
+        future = (timezone.now() + timezone.timedelta(hours=2)).isoformat()
+        r = self._create(scheduled_send_at=future)
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        _, kwargs = mock_task.delay.call_args
+        self.assertFalse(kwargs.get('send_whatsapp'))
+        guest = Guest.objects.get(pk=r.data['id'])
+        self.assertIsNotNone(guest.scheduled_send_at)
+
+    def test_past_scheduled_send_at_sends_immediately(self, mock_task):
+        """A scheduled time already in the past behaves like 'send now'."""
+        past = (timezone.now() - timezone.timedelta(hours=1)).isoformat()
+        r = self._create(scheduled_send_at=past)
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_scheduled_send_at_after_event_date_rejected(self, mock_task):
+        after_event = (self.event.date + timezone.timedelta(days=1)).isoformat()
+        r = self._create(scheduled_send_at=after_event)
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('scheduled_send_at', r.data)
+        mock_task.delay.assert_not_called()
+
+
+class DispatchScheduledSendsTaskTests(TestCase):
+    """guests.tasks.dispatch_scheduled_sends — the Celery Beat poll for deferred passes."""
+
+    def setUp(self):
+        self.event = make_event(name='Beat Event', date=timezone.now() + timezone.timedelta(days=7))
+
+    def _due_guest(self, **kwargs):
+        defaults = dict(
+            phone_number='2348000000001',
+            pass_image='passes/fake.png',
+            scheduled_send_at=timezone.now() - timezone.timedelta(minutes=1),
+        )
+        defaults.update(kwargs)
+        return make_guest(self.event, **defaults)
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_due_guest_is_queued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        guest = self._due_guest()
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 1)
+        mock_send.apply_async.assert_called_once()
+        args, kwargs = mock_send.apply_async.call_args
+        self.assertEqual(kwargs['args'], [str(guest.id)])
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_future_scheduled_guest_not_queued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(scheduled_send_at=timezone.now() + timezone.timedelta(hours=1))
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_already_sent_guest_not_requeued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(whatsapp_sent=True)
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_guest_without_pass_image_not_queued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(pass_image='')
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_guest_without_phone_not_queued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(phone_number='')
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_past_event_not_queued(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        past_event = make_event(name='Past Beat Event', date=timezone.now() - timezone.timedelta(days=1))
+        make_guest(
+            past_event,
+            phone_number='2348000000002',
+            pass_image='passes/fake.png',
+            scheduled_send_at=timezone.now() - timezone.timedelta(minutes=1),
+        )
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_guests_without_scheduled_send_at_ignored(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        make_guest(self.event, phone_number='2348000000003', pass_image='passes/fake.png')
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_multiple_due_guests_staggered_by_countdown(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(full_name='G1', phone_number='2348000000004')
+        self._due_guest(full_name='G2', phone_number='2348000000005')
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 2)
+        countdowns = sorted(c.kwargs['countdown'] for c in mock_send.apply_async.call_args_list)
+        self.assertEqual(countdowns, [0, 3])
+
+
 class CheckInTests(TestCase):
     def setUp(self):
         self.client = APIClient()

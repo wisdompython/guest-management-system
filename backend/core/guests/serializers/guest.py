@@ -18,7 +18,7 @@ class GuestSerializer(serializers.ModelSerializer):
             'ticket_type', 'table_number', 'seat_number',
             'qr_code', 'pass_image',
             'status', 'checked_in_at',
-            'whatsapp_sent', 'whatsapp_sent_at',
+            'whatsapp_sent', 'whatsapp_sent_at', 'scheduled_send_at',
             'registered_at',
         )
         read_only_fields = (
@@ -32,6 +32,12 @@ class GuestSerializer(serializers.ModelSerializer):
         if not _can_see_phone(self.context.get('request')):
             data['phone_number'] = None
         return data
+
+    def validate_scheduled_send_at(self, value):
+        from django.utils import timezone as tz
+        if value and value < tz.now():
+            raise serializers.ValidationError('scheduled_send_at must be in the future.')
+        return value
 
     def validate(self, data):
         # On update, merge with existing instance values so partial updates work
@@ -59,6 +65,12 @@ class GuestSerializer(serializers.ModelSerializer):
         if not ticket_type and valid_types:
             data['ticket_type'] = valid_types[0]
 
+        scheduled_send_at = data.get('scheduled_send_at')
+        if scheduled_send_at and event.date and scheduled_send_at > event.date:
+            raise serializers.ValidationError(
+                {'scheduled_send_at': 'Scheduled send time must be before the event date.'}
+            )
+
         return data
 
 
@@ -70,7 +82,7 @@ class GuestListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'event_name', 'full_name', 'phone_number',
             'email', 'ticket_type', 'table_number',
-            'status', 'whatsapp_sent', 'registered_at',
+            'status', 'whatsapp_sent', 'scheduled_send_at', 'registered_at',
         )
 
     def to_representation(self, instance):

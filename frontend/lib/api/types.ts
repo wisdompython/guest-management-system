@@ -41,6 +41,7 @@ export interface Guest {
   checked_in_at: string | null;
   whatsapp_sent: boolean;
   whatsapp_sent_at: string | null;
+  scheduled_send_at: string | null;
   registered_at: string;
 }
 
@@ -62,7 +63,9 @@ export interface GuestList {
 export type CreateGuestPayload = Pick<
   Guest,
   'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'event'
->;
+> & {
+  scheduled_send_at?: string | null;
+};
 
 export interface TicketTypeDef {
   value: string;

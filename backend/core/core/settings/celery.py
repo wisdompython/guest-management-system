@@ -24,4 +24,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'guests.tasks.dispatch_due_reminders',
         'schedule': crontab(minute='*/30'),  # every 30 minutes
     },
+    'dispatch-scheduled-sends': {
+        'task': 'guests.tasks.dispatch_scheduled_sends',
+        'schedule': crontab(minute='*/30'),  # every 30 minutes
+    },
 }

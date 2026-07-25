@@ -103,8 +103,10 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         guest = serializer.save()
-        # Dispatch asset generation + WhatsApp send to background worker
-        generate_guest_assets.delay(str(guest.id), send_whatsapp=True)
+        # If a future send time was requested, generate assets now but hold off
+        # on the WhatsApp send — dispatch_scheduled_sends will pick it up later.
+        send_now = not (guest.scheduled_send_at and guest.scheduled_send_at > timezone.now())
+        generate_guest_assets.delay(str(guest.id), send_whatsapp=send_now)
 
     @action(detail=True, methods=['post'], url_path='regenerate_assets')
     def regenerate_assets(self, request, pk=None):

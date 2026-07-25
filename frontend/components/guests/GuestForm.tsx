@@ -80,6 +80,15 @@ export function GuestForm({
             </div>
           )
         })}
+
+        {selectedEvent?.whatsapp_enabled && (
+          <div className="sm:col-span-2">
+            <label className={labelCls}>
+              Schedule pass send <span className="normal-case font-normal tracking-normal" style={{ color: 'var(--muted-2)' }}>(optional — leave blank to send immediately)</span>
+            </label>
+            <input name="scheduled_send_at" type="datetime-local" className={field} />
+          </div>
+        )}
       </div>
 
       {selectedEvent && (
