@@ -29,6 +29,8 @@ node_modules/
 frontend/.next/
 frontend/out/
 frontend/build/
+output/
+tmp/
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 docker-compose.override.yml

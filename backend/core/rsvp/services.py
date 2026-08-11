@@ -14,6 +14,38 @@ CALLBACK_PATTERN = re.compile(
 )
 
 
+def sync_guest_to_workflow(guest):
+    """Attach a newly-added eligible guest to this event's open RSVP workflow."""
+    if not guest.phone_number:
+        return None
+    workflow = RsvpWorkflow.objects.filter(
+        event_id=guest.event_id,
+        status__in=[
+            RsvpWorkflow.Status.DRAFT,
+            RsvpWorkflow.Status.ACTIVE,
+            RsvpWorkflow.Status.PAUSED,
+        ],
+    ).first()
+    if not workflow:
+        return None
+
+    invitation_due = not workflow.invitation_send_at or workflow.invitation_send_at <= timezone.now()
+    initial_status = (
+        RsvpRecipient.InvitationStatus.QUEUED
+        if workflow.status == RsvpWorkflow.Status.ACTIVE and invitation_due
+        else RsvpRecipient.InvitationStatus.NOT_SENT
+    )
+    recipient, created = RsvpRecipient.objects.get_or_create(
+        workflow=workflow,
+        guest=guest,
+        defaults={'invitation_status': initial_status},
+    )
+    if created and initial_status == RsvpRecipient.InvitationStatus.QUEUED:
+        from .tasks import send_rsvp_invitation
+        transaction.on_commit(lambda: send_rsvp_invitation.delay(recipient.id))
+    return recipient
+
+
 def pass_delivery_allowed(guest_id, event_id) -> bool:
     """Preserve normal delivery unless an RSVP workflow is holding this guest's pass."""
     workflow = RsvpWorkflow.objects.filter(
@@ -99,9 +131,13 @@ def record_response(
             return {'accepted': False, 'reason': 'duplicate'}
 
         now = timezone.now()
+        pass_due = (
+            not recipient.workflow.pass_send_at
+            or recipient.workflow.pass_send_at <= now
+        )
         if answer == RsvpResponse.Answer.YES:
             recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
-            if recipient.workflow.auto_send_pass:
+            if recipient.workflow.auto_send_pass and pass_due:
                 recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
                 recipient.pass_queued_at = now
         else:
@@ -116,14 +152,26 @@ def record_response(
             'updated_at',
         ])
 
-        if answer == RsvpResponse.Answer.YES and recipient.workflow.auto_send_pass:
+        should_queue_pass = (
+            answer == RsvpResponse.Answer.YES
+            and recipient.workflow.auto_send_pass
+            and pass_due
+        )
+        if should_queue_pass:
             from .tasks import send_confirmed_pass
             transaction.on_commit(lambda: send_confirmed_pass.delay(recipient.id))
 
         return {
             'accepted': True,
             'response_status': recipient.response_status,
-            'pass_queued': answer == RsvpResponse.Answer.YES and recipient.workflow.auto_send_pass,
+            'pass_queued': should_queue_pass,
+            'pass_scheduled_for': (
+                recipient.workflow.pass_send_at
+                if answer == RsvpResponse.Answer.YES
+                and recipient.workflow.auto_send_pass
+                and not pass_due
+                else None
+            ),
         }
 
 

@@ -72,7 +72,9 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             'pass_template_name',
             'status',
             'response_deadline',
+            'invitation_send_at',
             'auto_send_pass',
+            'pass_send_at',
             'launched_at',
             'completed_at',
             'created_at',
@@ -107,6 +109,14 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             'response_deadline',
             instance.response_deadline if instance else None,
         )
+        invitation_send_at = attrs.get(
+            'invitation_send_at',
+            instance.invitation_send_at if instance else None,
+        )
+        pass_send_at = attrs.get(
+            'pass_send_at',
+            instance.pass_send_at if instance else None,
+        )
 
         if event and deadline and deadline >= event.date:
             raise serializers.ValidationError({
@@ -115,6 +125,26 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
         if deadline and deadline <= timezone.now():
             raise serializers.ValidationError({
                 'response_deadline': 'The response deadline must be in the future.',
+            })
+        if invitation_send_at and invitation_send_at <= timezone.now():
+            raise serializers.ValidationError({
+                'invitation_send_at': 'The invitation send time must be in the future.',
+            })
+        if invitation_send_at and deadline and invitation_send_at >= deadline:
+            raise serializers.ValidationError({
+                'invitation_send_at': 'Invitations must be sent before the response deadline.',
+            })
+        if invitation_send_at and event and invitation_send_at >= event.date:
+            raise serializers.ValidationError({
+                'invitation_send_at': 'Invitations must be sent before the event date.',
+            })
+        if pass_send_at and pass_send_at <= timezone.now():
+            raise serializers.ValidationError({
+                'pass_send_at': 'The pass send time must be in the future.',
+            })
+        if pass_send_at and event and pass_send_at >= event.date:
+            raise serializers.ValidationError({
+                'pass_send_at': 'Passes must be sent before the event date.',
             })
         if invitation_template and not invitation_template.is_active:
             raise serializers.ValidationError({

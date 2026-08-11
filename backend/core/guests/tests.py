@@ -23,6 +23,41 @@ def make_guest(event, **kwargs):
     return Guest.objects.create(event=event, **defaults)
 
 
+class EventDeliveryWorkflowTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user('event-flow-manager', password='pass', role='event_manager')
+        self.client.force_authenticate(self.manager)
+
+    def test_event_creation_can_reserve_an_rsvp_workflow(self):
+        from rsvp.models import RsvpWorkflow
+
+        response = self.client.post('/api/events/', {
+            'name': 'RSVP Event',
+            'date': (timezone.now() + timezone.timedelta(days=10)).isoformat(),
+            'create_rsvp_workflow': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        workflow = RsvpWorkflow.objects.get(event_id=response.data['id'])
+        self.assertEqual(workflow.status, RsvpWorkflow.Status.DRAFT)
+        self.assertEqual(workflow.created_by, self.manager)
+        self.assertEqual(response.data['rsvp_workflow_id'], workflow.id)
+
+    def test_direct_event_does_not_create_an_rsvp_workflow(self):
+        from rsvp.models import RsvpWorkflow
+
+        response = self.client.post('/api/events/', {
+            'name': 'Direct Event',
+            'date': (timezone.now() + timezone.timedelta(days=10)).isoformat(),
+            'create_rsvp_workflow': False,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertFalse(RsvpWorkflow.objects.filter(event_id=response.data['id']).exists())
+        self.assertIsNone(response.data['rsvp_workflow_id'])
+
+
 class GuestListFilterTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -348,6 +383,16 @@ class ScheduledSendCreateTests(TestCase):
         guest = Guest.objects.get(pk=r.data['id'])
         self.assertIsNotNone(guest.scheduled_send_at)
 
+    def test_event_default_send_time_is_inherited(self, mock_task):
+        self.event.pass_send_at = timezone.now() + timezone.timedelta(hours=3)
+        self.event.save(update_fields=['pass_send_at'])
+        r = self._create()
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        guest = Guest.objects.get(pk=r.data['id'])
+        self.assertEqual(guest.scheduled_send_at, self.event.pass_send_at)
+        _, kwargs = mock_task.delay.call_args
+        self.assertFalse(kwargs.get('send_whatsapp'))
+
     def test_past_scheduled_send_at_sends_immediately(self, mock_task):
         """A scheduled time already in the past behaves like 'send now'."""
         past = (timezone.now() - timezone.timedelta(hours=1)).isoformat()
@@ -605,7 +650,10 @@ class DispatchDueRemindersTimingTests(TestCase):
 
         dispatch_due_reminders()
         # Only the overdue one from setUp should have been queued
-        queued_reminder_ids = {c.args[0] for c in mock_send_reminder.apply_async.call_args_list}
+        queued_reminder_ids = {
+            c.kwargs['args'][0]
+            for c in mock_send_reminder.apply_async.call_args_list
+        }
         self.assertEqual(queued_reminder_ids, {self.reminder.id})
 
 

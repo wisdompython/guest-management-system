@@ -164,13 +164,25 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             workflow.status = RsvpWorkflow.Status.ACTIVE
             workflow.launched_at = timezone.now()
             workflow.save(update_fields=['status', 'launched_at', 'updated_at'])
-            workflow.recipients.filter(
-                invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
-            ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
+            invitations_due = (
+                not workflow.invitation_send_at
+                or workflow.invitation_send_at <= timezone.now()
+            )
+            if invitations_due:
+                workflow.recipients.filter(
+                    invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
+                ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
 
-        from .tasks import queue_workflow_invitations
-        result = queue_workflow_invitations.delay(workflow.id)
-        return Response({'launched': True, 'task_id': result.id})
+        if invitations_due:
+            from .tasks import queue_workflow_invitations
+            result = queue_workflow_invitations.delay(workflow.id)
+            return Response({'launched': True, 'scheduled': False, 'task_id': result.id})
+        return Response({
+            'launched': True,
+            'scheduled': True,
+            'invitation_send_at': workflow.invitation_send_at,
+            'task_id': None,
+        })
 
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):

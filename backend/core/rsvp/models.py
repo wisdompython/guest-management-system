@@ -37,7 +37,9 @@ class RsvpWorkflow(models.Model):
         db_index=True,
     )
     response_deadline = models.DateTimeField(null=True, blank=True)
+    invitation_send_at = models.DateTimeField(null=True, blank=True)
     auto_send_pass = models.BooleanField(default=True)
+    pass_send_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

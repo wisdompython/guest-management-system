@@ -5,6 +5,8 @@ import os
 import re
 import zipfile
 
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -62,8 +64,13 @@ class GuestBulkExportMixin:
 
         # Queue asset generation outside the insert loop — one .delay() call per guest,
         # but only after all rows are committed so workers never race a missing row.
+        from rsvp.services import sync_guest_to_workflow
         for guest in created_guests:
-            generate_guest_assets.delay(str(guest.id), send_whatsapp=True)
+            sync_guest_to_workflow(guest)
+            send_now = not (
+                guest.scheduled_send_at and guest.scheduled_send_at > timezone.now()
+            )
+            generate_guest_assets.delay(str(guest.id), send_whatsapp=send_now)
 
         guest_ids = [str(g.id) for g in created_guests]
         upload_record.total_rows = len(valid_rows) + len(error_report)

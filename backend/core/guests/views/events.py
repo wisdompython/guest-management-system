@@ -16,7 +16,7 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return (
             Event.objects
-            .select_related('name_font', 'whatsapp_template')
+            .select_related('name_font', 'whatsapp_template', 'rsvp_workflow')
             .annotate(
                 guest_count_ann=Count('guests', distinct=True),
                 checked_in_count_ann=Count(

@@ -161,3 +161,80 @@ def send_confirmed_pass(self, recipient_id: int):
             whatsapp_sent_at=now,
         )
     return {'sent': True, 'message_id': sent_update.id}
+
+
+@shared_task
+def dispatch_scheduled_rsvp_messages():
+    """Queue due RSVP invitations and confirmed passes exactly once."""
+    from .models import RsvpRecipient, RsvpWorkflow
+
+    now = timezone.now()
+    workflows = RsvpWorkflow.objects.filter(
+        status=RsvpWorkflow.Status.ACTIVE,
+        event__date__gt=now,
+    )
+
+    invitation_workflow_ids = list(
+        workflows.filter(
+            invitation_send_at__isnull=False,
+            invitation_send_at__lte=now,
+        ).values_list('id', flat=True)
+    )
+    invitation_ids = list(
+        RsvpRecipient.objects.filter(
+            workflow_id__in=invitation_workflow_ids,
+            response_status=RsvpRecipient.ResponseStatus.AWAITING,
+            invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
+        ).values_list('id', flat=True)
+    )
+    claimed_invitation_ids = []
+    for recipient_id in invitation_ids:
+        claimed = RsvpRecipient.objects.filter(
+            id=recipient_id,
+            invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
+        ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
+        if claimed:
+            claimed_invitation_ids.append(recipient_id)
+    if claimed_invitation_ids:
+        for index, recipient_id in enumerate(claimed_invitation_ids):
+            send_rsvp_invitation.apply_async(
+                args=[recipient_id],
+                countdown=index * RSVP_BATCH_COUNTDOWN,
+            )
+
+    pass_workflow_ids = list(
+        workflows.filter(
+            auto_send_pass=True,
+            pass_send_at__isnull=False,
+            pass_send_at__lte=now,
+        ).values_list('id', flat=True)
+    )
+    pass_ids = list(
+        RsvpRecipient.objects.filter(
+            workflow_id__in=pass_workflow_ids,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.HELD,
+        ).values_list('id', flat=True)
+    )
+    claimed_pass_ids = []
+    for recipient_id in pass_ids:
+        claimed = RsvpRecipient.objects.filter(
+            id=recipient_id,
+            pass_status=RsvpRecipient.PassStatus.HELD,
+        ).update(
+            pass_status=RsvpRecipient.PassStatus.QUEUED,
+            pass_queued_at=now,
+        )
+        if claimed:
+            claimed_pass_ids.append(recipient_id)
+    if claimed_pass_ids:
+        for index, recipient_id in enumerate(claimed_pass_ids):
+            send_confirmed_pass.apply_async(
+                args=[recipient_id],
+                countdown=index * RSVP_BATCH_COUNTDOWN,
+            )
+
+    return {
+        'invitations_queued': len(claimed_invitation_ids),
+        'passes_queued': len(claimed_pass_ids),
+    }

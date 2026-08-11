@@ -1,3 +1,6 @@
+from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 from rest_framework import serializers
 from ..models import Event, Font
 
@@ -36,6 +39,8 @@ class EventSerializer(serializers.ModelSerializer):
     checked_in_count = serializers.SerializerMethodField()
     name_font_name = serializers.CharField(source='name_font.name', read_only=True)
     whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
+    create_rsvp_workflow = serializers.BooleanField(write_only=True, required=False, default=False)
+    rsvp_workflow_id = serializers.SerializerMethodField()
 
     def get_guest_count(self, obj):
         # Use annotation when available (list view), fall back for single-object endpoints.
@@ -45,6 +50,12 @@ class EventSerializer(serializers.ModelSerializer):
     def get_checked_in_count(self, obj):
         ann = getattr(obj, 'checked_in_count_ann', None)
         return ann if ann is not None else obj.guests.filter(status='checked_in').count()
+
+    def get_rsvp_workflow_id(self, obj):
+        try:
+            return obj.rsvp_workflow.id
+        except ObjectDoesNotExist:
+            return None
 
     class Meta:
         model = Event
@@ -57,9 +68,39 @@ class EventSerializer(serializers.ModelSerializer):
             'qr_bg_color',
             'ticket_types', 'required_fields', 'whatsapp_enabled',
             'whatsapp_template', 'whatsapp_template_name',
+            'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
             'is_ended', 'guest_count', 'checked_in_count', 'created_at',
         )
         read_only_fields = ('id', 'created_at', 'name_font_name', 'whatsapp_template_name')
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        event_date = attrs.get('date') or (self.instance.date if self.instance else None)
+        pass_send_at = attrs.get(
+            'pass_send_at',
+            self.instance.pass_send_at if self.instance else None,
+        )
+        if pass_send_at and pass_send_at <= timezone.now():
+            raise serializers.ValidationError({
+                'pass_send_at': 'The scheduled pass time must be in the future.',
+            })
+        if pass_send_at and event_date and pass_send_at >= event_date:
+            raise serializers.ValidationError({
+                'pass_send_at': 'The scheduled pass time must be before the event date.',
+            })
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        create_rsvp_workflow = validated_data.pop('create_rsvp_workflow', False)
+        event = super().create(validated_data)
+        if create_rsvp_workflow:
+            from rsvp.models import RsvpWorkflow
+
+            request = self.context.get('request')
+            created_by = request.user if request and request.user.is_authenticated else None
+            RsvpWorkflow.objects.create(event=event, created_by=created_by)
+        return event
 
     def validate_ticket_types(self, value):
         if not isinstance(value, list):

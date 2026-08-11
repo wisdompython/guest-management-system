@@ -73,6 +73,12 @@ class GuestSerializer(serializers.ModelSerializer):
 
         return data
 
+    def create(self, validated_data):
+        event = validated_data.get('event')
+        if event and 'scheduled_send_at' not in validated_data and event.pass_send_at:
+            validated_data['scheduled_send_at'] = event.pass_send_at
+        return super().create(validated_data)
+
 
 class GuestListSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='event.name', read_only=True)

@@ -64,6 +64,9 @@ class Event(models.Model):
         related_name='events',
         help_text='WhatsApp template to use for this event. Falls back to the global default if not set.',
     )
+    # Default delivery time for the original (non-RSVP) workflow. New guests
+    # inherit this value, while a per-guest scheduled_send_at can still override it.
+    pass_send_at = models.DateTimeField(null=True, blank=True)
     is_ended = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

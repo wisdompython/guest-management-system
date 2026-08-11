@@ -20,7 +20,9 @@ export interface CreateRsvpWorkflowPayload {
   invitation_template: number | null
   pass_template: number | null
   response_deadline: string | null
+  invitation_send_at: string | null
   auto_send_pass: boolean
+  pass_send_at: string | null
 }
 
 export interface RsvpRecipientFilters {
@@ -53,7 +55,7 @@ export const rsvpApi = {
       body: JSON.stringify(guestIds ? { guest_ids: guestIds } : {}),
     }),
   launchRsvpWorkflow: (id: number) =>
-    request<{ launched: boolean; task_id: string }>(`/rsvp/workflows/${id}/launch/`, { method: 'POST' }),
+    request<{ launched: boolean; scheduled: boolean; task_id: string | null; invitation_send_at?: string }>(`/rsvp/workflows/${id}/launch/`, { method: 'POST' }),
   pauseRsvpWorkflow: (id: number) =>
     request<RsvpWorkflow>(`/rsvp/workflows/${id}/pause/`, { method: 'POST' }),
   resumeRsvpWorkflow: (id: number) =>

@@ -131,6 +131,21 @@ class RsvpWorkflowApiTests(TestCase):
         )
         mock_queue.assert_called_once_with(workflow.id)
 
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_launch_holds_invitations_until_the_scheduled_time(self, mock_queue):
+        workflow = self.create_workflow()
+        workflow.invitation_send_at = timezone.now() + timezone.timedelta(hours=2)
+        workflow.save(update_fields=['invitation_send_at'])
+        recipient = RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_a)
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/launch/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data['scheduled'])
+        recipient.refresh_from_db()
+        self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.NOT_SENT)
+        mock_queue.assert_not_called()
+
     def test_stats_keep_response_and_delivery_counts_separate(self):
         workflow = self.create_workflow()
         RsvpRecipient.objects.create(
@@ -241,6 +256,20 @@ class RsvpResponseTests(TestCase):
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.response_status, RsvpRecipient.ResponseStatus.DECLINED)
         self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.NOT_ISSUED)
+        mock_send.assert_not_called()
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_scheduled_pass_stays_held_after_confirmation(self, mock_send):
+        self.workflow.pass_send_at = timezone.now() + timezone.timedelta(hours=4)
+        self.workflow.save(update_fields=['pass_send_at'])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            handled = process_incoming_message(self.message(message_id='wamid.scheduled-pass'))
+
+        self.assertTrue(handled)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.response_status, RsvpRecipient.ResponseStatus.CONFIRMED)
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.HELD)
         mock_send.assert_not_called()
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
@@ -463,3 +492,70 @@ class RsvpTaskClaimTests(TestCase):
         self.assertTrue(first['sent'])
         self.assertFalse(second['sent'])
         mock_send.assert_called_once()
+
+
+class RsvpScheduledDispatchTests(TestCase):
+    def setUp(self):
+        self.event = make_event(name='Scheduled RSVP Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+            auto_send_pass=True,
+            invitation_send_at=timezone.now() - timezone.timedelta(minutes=1),
+            pass_send_at=timezone.now() - timezone.timedelta(minutes=1),
+        )
+        self.invited_guest = Guest.objects.create(
+            event=self.event,
+            full_name='Awaiting Guest',
+            phone_number='2348000000021',
+        )
+        self.confirmed_guest = Guest.objects.create(
+            event=self.event,
+            full_name='Confirmed Guest',
+            phone_number='2348000000022',
+        )
+        self.invited_recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.invited_guest,
+        )
+        self.confirmed_recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.confirmed_guest,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_due_messages_are_claimed_and_queued_once(self, mock_invitation, mock_pass):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        first = dispatch_scheduled_rsvp_messages()
+        second = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(first, {'invitations_queued': 1, 'passes_queued': 1})
+        self.assertEqual(second, {'invitations_queued': 0, 'passes_queued': 0})
+        mock_invitation.apply_async.assert_called_once()
+        mock_pass.apply_async.assert_called_once()
+        self.invited_recipient.refresh_from_db()
+        self.confirmed_recipient.refresh_from_db()
+        self.assertEqual(self.invited_recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
+        self.assertEqual(self.confirmed_recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+
+
+class RsvpGuestSyncTests(TestCase):
+    @patch('guests.views.guests.generate_guest_assets')
+    def test_guest_added_after_event_setup_joins_the_draft_workflow(self, mock_assets):
+        client = APIClient()
+        manager = User.objects.create_user('sync-manager', password='pass', role='event_manager')
+        client.force_authenticate(manager)
+        event = make_event(name='Draft Sync Event')
+        workflow = RsvpWorkflow.objects.create(event=event, created_by=manager)
+
+        response = client.post('/api/guests/', {
+            'event': event.id,
+            'full_name': 'Later Guest',
+            'phone_number': '2348000000031',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(workflow.recipients.filter(guest_id=response.data['id']).exists())

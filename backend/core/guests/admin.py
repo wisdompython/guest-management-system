@@ -4,7 +4,7 @@ from .models import Event, Guest, BulkUpload
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('name', 'date', 'venue', 'guest_count', 'created_at')
+    list_display = ('name', 'date', 'venue', 'pass_send_at', 'guest_count', 'created_at')
     search_fields = ('name', 'venue')
 
     def guest_count(self, obj):

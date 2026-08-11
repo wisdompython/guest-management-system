@@ -103,6 +103,8 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         guest = serializer.save()
+        from rsvp.services import sync_guest_to_workflow
+        sync_guest_to_workflow(guest)
         # If a future send time was requested, generate assets now but hold off
         # on the WhatsApp send — dispatch_scheduled_sends will pick it up later.
         send_now = not (guest.scheduled_send_at and guest.scheduled_send_at > timezone.now())

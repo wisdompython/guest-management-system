@@ -26,6 +26,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     'dispatch-scheduled-sends': {
         'task': 'guests.tasks.dispatch_scheduled_sends',
-        'schedule': crontab(minute='*/30'),  # every 30 minutes
+        'schedule': crontab(minute='*/5'),  # every 5 minutes
+    },
+    'dispatch-scheduled-rsvp-messages': {
+        'task': 'rsvp.tasks.dispatch_scheduled_rsvp_messages',
+        'schedule': crontab(minute='*/5'),
     },
 }

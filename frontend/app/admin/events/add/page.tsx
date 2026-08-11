@@ -36,6 +36,8 @@ export default function AddEventPage() {
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
+  const [deliveryFlow, setDeliveryFlow] = useState<'direct' | 'rsvp'>('direct')
+  const [passSendAt, setPassSendAt] = useState('')
 
   useEffect(() => {
     Promise.all([api.getFonts(), api.getWhatsAppTemplates()])
@@ -70,11 +72,15 @@ export default function AddEventPage() {
     fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
     if (whatsappTemplate) fd.append('whatsapp_template', String(whatsappTemplate))
+    const usesRsvp = whatsappEnabled && deliveryFlow === 'rsvp'
+    fd.append('create_rsvp_workflow', String(usesRsvp))
+    if (!usesRsvp && whatsappEnabled && passSendAt) fd.append('pass_send_at', new Date(passSendAt).toISOString())
     try {
       const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
       const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
-      router.push('/admin/events')
+      const created = await res.json() as { id: number }
+      router.push(usesRsvp ? `/admin/rsvp/add?event=${created.id}` : '/admin/events')
     } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to create event.'); setSubmitting(false) }
   }
 
@@ -103,6 +109,24 @@ export default function AddEventPage() {
             if (wa !== undefined) setWhatsappEnabled(wa)
             if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
+        {whatsappEnabled && <div className="rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)] p-6">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">Guest delivery workflow</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">Choose this now so guest passes are never sent before the intended RSVP step.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {([
+              ['rsvp', 'Confirm RSVP first', 'Send an RSVP request, then release passes only to confirmed guests.'],
+              ['direct', 'Send passes directly', 'Use the original workflow without collecting an RSVP response.'],
+            ] as const).map(([value, title, description]) => <label key={value} className="cursor-pointer rounded-xl p-4" style={{ border: `1px solid ${deliveryFlow === value ? 'var(--brand)' : 'var(--line)'}`, background: deliveryFlow === value ? 'var(--brand-soft)' : 'var(--bg)' }}>
+              <span className="flex items-start gap-3"><input type="radio" name="delivery_flow" value={value} checked={deliveryFlow === value} onChange={() => setDeliveryFlow(value)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{description}</span></span></span>
+            </label>)}
+          </div>
+          {deliveryFlow === 'direct' && <div className="mt-5 border-t border-[var(--line)] pt-4">
+            <label className="block text-xs font-semibold text-[var(--ink)]">When should guest passes be sent?</label>
+            <input type="datetime-local" value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+            <p className="mt-2 text-xs text-[var(--muted)]">Leave blank to send each pass as soon as its guest is added. A scheduled time becomes the default for every guest in this event.</p>
+          </div>}
+          {deliveryFlow === 'rsvp' && <p className="mt-4 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>After creating the event, you’ll choose when to send RSVP requests and confirmed guest passes.</p>}
+        </div>}
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
         <div className="flex gap-3 pt-1">

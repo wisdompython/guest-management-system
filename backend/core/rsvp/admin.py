@@ -5,7 +5,10 @@ from .models import RsvpRecipient, RsvpResponse, RsvpWorkflow
 
 @admin.register(RsvpWorkflow)
 class RsvpWorkflowAdmin(admin.ModelAdmin):
-    list_display = ('event', 'status', 'auto_send_pass', 'response_deadline', 'launched_at')
+    list_display = (
+        'event', 'status', 'invitation_send_at', 'auto_send_pass',
+        'pass_send_at', 'response_deadline', 'launched_at',
+    )
     list_filter = ('status', 'auto_send_pass')
     search_fields = ('event__name',)
     readonly_fields = ('created_at', 'updated_at', 'launched_at', 'completed_at')
@@ -32,4 +35,3 @@ class RsvpResponseAdmin(admin.ModelAdmin):
     list_filter = ('answer',)
     search_fields = ('recipient__guest__full_name', 'message_id', 'sender_phone')
     readonly_fields = ('received_at',)
-

@@ -27,6 +27,8 @@ This checklist tracks the implementation of the isolated RSVP feature.
 - [x] Return confirmed, declined, awaiting, invitation, and pass statistics.
 - [x] Add recipient search and status filters.
 - [x] Add workflow launch, pause, resume, and complete actions.
+- [x] Allow RSVP invitations to be scheduled for a later date and time.
+- [x] Allow confirmed guest passes to be scheduled independently of RSVP responses.
 - [x] Add reminder action for awaiting recipients.
 - [x] Enforce event-manager permissions for mutations.
 
@@ -48,6 +50,7 @@ This checklist tracks the implementation of the isolated RSVP feature.
 - [x] Hold normal automatic pass delivery when an event has an active RSVP workflow.
 - [x] Continue generating QR codes and pass images while delivery is held.
 - [x] Preserve the existing automatic send for every event without an active workflow.
+- [x] Add an event-level default pass schedule to the original direct-delivery workflow.
 - [x] Allow manual recovery for failed confirmed-pass deliveries.
 
 ## Phase 5 — Admin interface
@@ -55,6 +58,7 @@ This checklist tracks the implementation of the isolated RSVP feature.
 - [x] Add a separate **RSVP Workflows** navigation entry.
 - [x] Build the workflow list with draft/active/paused/completed states.
 - [x] Build the three-step setup wizard.
+- [x] Ask for RSVP-first or direct delivery during event creation and reserve RSVP safely.
 - [x] Preview the selected RSVP template and guest-specific link.
 - [x] Build the public guest RSVP page with Yes/No response states.
 - [x] Show the recipient count before launch.

@@ -97,6 +97,8 @@ export interface Event {
   whatsapp_enabled: boolean;
   whatsapp_template: number | null;
   whatsapp_template_name: string | null;
+  pass_send_at: string | null;
+  rsvp_workflow_id: number | null;
   is_ended: boolean;
   guest_count: number;
   checked_in_count: number;
@@ -169,7 +171,9 @@ export interface RsvpWorkflow {
   pass_template_name: string | null;
   status: RsvpWorkflowStatus;
   response_deadline: string | null;
+  invitation_send_at: string | null;
   auto_send_pass: boolean;
+  pass_send_at: string | null;
   launched_at: string | null;
   completed_at: string | null;
   created_at: string;

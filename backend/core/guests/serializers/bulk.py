@@ -94,6 +94,7 @@ class BulkGuestUploadSerializer(serializers.Serializer):
                 'ticket_type':  ticket_type,
                 'table_number': row.get('table_number', ''),
                 'seat_number':  row.get('seat_number', ''),
+                'scheduled_send_at': event.pass_send_at,
             })
 
         return valid_rows, error_report

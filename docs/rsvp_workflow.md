@@ -1,6 +1,6 @@
 # RSVP Workflow Operations
 
-The RSVP module is optional. Creating a normal event does not enable RSVP or change pass delivery. A pass is held only after an RSVP workflow is created for that event, and normal delivery resumes when the workflow is completed.
+The RSVP module is optional. Event creation now asks whether guests should confirm RSVP first or receive passes through the original direct-delivery workflow. Choosing RSVP creates a protected draft workflow immediately, so adding guests cannot accidentally send their passes before RSVP is configured. Normal delivery resumes when the workflow is completed.
 
 ## Meta templates
 
@@ -22,16 +22,20 @@ Create two approved WhatsApp templates before configuring a workflow.
 
 ## Admin flow
 
-1. Create the event and add or import its guests.
-2. Open **RSVP Workflows** and create a workflow for the event.
-3. Choose the invitation and pass templates, response deadline, and automatic-pass preference.
+1. Create the event and choose **Confirm RSVP first**. The RSVP setup screen opens automatically.
+2. Choose the invitation and pass templates, response deadline, and automatic-pass preference.
+3. Optionally schedule the RSVP invitations and confirmed guest passes. A blank invitation time means send on launch; a blank pass time means send immediately after each Yes response.
 4. Review the eligible recipient count. Guests without phone numbers are excluded.
 5. Launch the workflow.
 6. Monitor confirmed, declined, awaiting, invitation delivery, and pass delivery counts.
 7. Remind awaiting guests, retry failed deliveries, or pause the workflow as required.
 8. Complete the workflow after RSVP closes. Completion releases the event from the RSVP pass hold.
 
-The first valid Yes/No response submitted from the RSVP page is authoritative. Repeated submissions never queue another pass.
+Guests added or imported while the workflow is a draft are attached to it automatically. The first valid Yes/No response submitted from the RSVP page is authoritative. Repeated submissions never queue another pass.
+
+## Original direct-delivery flow
+
+Choose **Send passes directly** during event creation to keep the original workflow. You may set one default pass delivery date and time for the event; every newly added or imported guest inherits it. Leave the time blank for immediate delivery. A per-guest delivery time can still override the event default.
 
 ## Webhook configuration
 
@@ -39,7 +43,7 @@ The first valid Yes/No response submitted from the RSVP page is authoritative. R
 - Subscribe the Meta application to WhatsApp message-status updates for invitation and pass delivery tracking.
 - Set `WHATSAPP_VERIFY_TOKEN` to the token used during callback verification.
 - Set `WHATSAPP_APP_SECRET` in production. When present, POST requests are verified using `X-Hub-Signature-256`.
-- Ensure Celery workers are running; invitations, reminders, and passes are dispatched as background jobs.
+- Ensure Celery workers and Celery Beat are running; scheduled invitations and passes are checked every five minutes and dispatched as background jobs.
 
 ## Deployment order
 
