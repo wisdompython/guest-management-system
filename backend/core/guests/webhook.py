@@ -1,5 +1,7 @@
 import json
 import logging
+import hashlib
+import hmac
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -35,6 +37,10 @@ def _verify(request):
 
 
 def _handle(request):
+    if not _valid_signature(request):
+        logger.warning("WhatsApp webhook rejected — invalid POST signature")
+        return HttpResponseForbidden("Forbidden")
+
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
@@ -52,9 +58,30 @@ def _handle(request):
     return HttpResponse(status=200)
 
 
+def _valid_signature(request):
+    """Validate Meta's X-Hub-Signature-256 when an app secret is configured."""
+    app_secret = getattr(settings, 'WHATSAPP_APP_SECRET', '')
+    if not app_secret:
+        logger.warning("WHATSAPP_APP_SECRET is empty — webhook signature validation is disabled")
+        return True
+
+    received = request.headers.get('X-Hub-Signature-256', '')
+    expected = 'sha256=' + hmac.new(
+        app_secret.encode('utf-8'),
+        request.body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(received, expected)
+
+
 def _process_messages(messages: list):
     """Log incoming messages from guests."""
     for msg in messages:
+        from rsvp.services import process_incoming_message
+        if process_incoming_message(msg):
+            logger.info("Processed RSVP WhatsApp response %s", msg.get('id'))
+            continue
+
         from_number = msg.get('from')
         msg_type    = msg.get('type')
         body        = msg.get('text', {}).get('body', '') if msg_type == 'text' else f'[{msg_type}]'
@@ -65,12 +92,19 @@ def _process_statuses(statuses: list):
     from .models import Guest
 
     for s in statuses:
+        from rsvp.services import process_status_update
+        if process_status_update(s):
+            continue
+
         wa_status = s.get('status')
         recipient = s.get('recipient_id')
 
         logger.info("WhatsApp status update: %s for %s", wa_status, recipient)
 
         if wa_status not in ('delivered', 'read', 'failed'):
+            continue
+
+        if not recipient:
             continue
 
         try:

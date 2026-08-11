@@ -273,7 +273,8 @@ class DownloadAssetsTests(TestCase):
             self.fail('download-assets response is not a valid ZIP file')
 
 
-@patch('guests.tasks.send_whatsapp_pass')
+@patch('guests.views.guests.bulk_send_whatsapp_passes')
+@patch('guests.views.guests.send_whatsapp_pass')
 class PastEventWhatsAppGuardTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -289,27 +290,28 @@ class PastEventWhatsAppGuardTests(TestCase):
         self.past_guest.refresh_from_db()
         self.future_guest.refresh_from_db()
 
-    def test_send_whatsapp_blocked_for_past_event(self, mock_task):
+    def test_send_whatsapp_blocked_for_past_event(self, mock_task, mock_bulk_task):
         r = self.client.post(f'/api/guests/{self.past_guest.id}/send_whatsapp/')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('ended', r.data['detail'].lower())
         mock_task.delay.assert_not_called()
 
-    def test_send_whatsapp_allowed_for_future_event(self, mock_task):
+    def test_send_whatsapp_allowed_for_future_event(self, mock_task, mock_bulk_task):
         r = self.client.post(f'/api/guests/{self.future_guest.id}/send_whatsapp/')
         self.assertEqual(r.status_code, 200)
         mock_task.delay.assert_called_once_with(str(self.future_guest.id))
 
-    def test_bulk_send_whatsapp_blocked_for_past_event(self, mock_task):
+    def test_bulk_send_whatsapp_blocked_for_past_event(self, mock_task, mock_bulk_task):
         r = self.client.post('/api/guests/bulk_send_whatsapp/', {'event_id': self.past_event.id}, format='json')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('ended', r.data['detail'].lower())
-        mock_task.delay.assert_not_called()
+        mock_bulk_task.delay.assert_not_called()
 
-    def test_bulk_send_whatsapp_allowed_for_future_event(self, mock_task):
+    def test_bulk_send_whatsapp_allowed_for_future_event(self, mock_task, mock_bulk_task):
         r = self.client.post('/api/guests/bulk_send_whatsapp/', {'event_id': self.future_event.id}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data['queued'])
+        mock_bulk_task.delay.assert_called_once_with(self.future_event.id, False)
 
 
 @patch('guests.views.guests.generate_guest_assets')
@@ -448,6 +450,163 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self.assertEqual(result['queued'], 2)
         countdowns = sorted(c.kwargs['countdown'] for c in mock_send.apply_async.call_args_list)
         self.assertEqual(countdowns, [0, 3])
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_repeated_run_does_not_requeue_claimed_guest(self, mock_send):
+        """A second Beat tick before the first send completes must not re-queue the guest (P1 dup fix)."""
+        from .tasks import dispatch_scheduled_sends
+        guest = self._due_guest()
+        first = dispatch_scheduled_sends()
+        self.assertEqual(first['queued'], 1)
+        second = dispatch_scheduled_sends()
+        self.assertEqual(second['queued'], 0)
+        self.assertEqual(mock_send.apply_async.call_count, 1)
+        guest.refresh_from_db()
+        self.assertIsNotNone(guest.scheduled_send_claimed_at)
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_stale_claim_is_retried(self, mock_send):
+        """If a claim is old enough that the send clearly never went out, it's eligible again."""
+        from .tasks import dispatch_scheduled_sends, SCHEDULED_SEND_CLAIM_TIMEOUT
+        guest = self._due_guest(
+            scheduled_send_claimed_at=timezone.now() - SCHEDULED_SEND_CLAIM_TIMEOUT - timezone.timedelta(minutes=1),
+        )
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 1)
+        mock_send.apply_async.assert_called_once()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_recent_claim_not_retried(self, mock_send):
+        """A claim made moments ago (send likely still in flight) must not be re-queued."""
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(scheduled_send_claimed_at=timezone.now() - timezone.timedelta(minutes=5))
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+
+class SendPassRetryTests(TestCase):
+    """whatsapp.send_pass must let transient WhatsAppError propagate so send_whatsapp_pass can retry (P1 fix)."""
+
+    def setUp(self):
+        self.event = make_event(date=timezone.now() + timezone.timedelta(days=7))
+        self.guest = make_guest(self.event, phone_number='2348000000001')
+        Guest.objects.filter(pk=self.guest.pk).update(pass_image='passes/fake.png')
+        self.guest.refresh_from_db()
+
+    def test_transient_whatsapp_error_propagates_from_send_pass(self):
+        from pywa.errors import WhatsAppError
+        from .whatsapp import send_pass
+
+        class FakeTransientError(WhatsAppError):
+            is_transient = True
+
+            def __init__(self):
+                pass
+
+        with patch('guests.whatsapp._get_client') as mock_client, \
+             self.settings(WHATSAPP_PHONE_ID='id', WHATSAPP_TOKEN='tok', WHATSAPP_MEDIA_BASE_URL='https://example.com'):
+            mock_client.return_value.send_template.side_effect = FakeTransientError()
+            with self.assertRaises(WhatsAppError):
+                send_pass(self.guest)
+
+    def test_unexpected_exception_is_swallowed_and_returns_false(self):
+        from .whatsapp import send_pass
+
+        with patch('guests.whatsapp._get_client') as mock_client, \
+             self.settings(WHATSAPP_PHONE_ID='id', WHATSAPP_TOKEN='tok', WHATSAPP_MEDIA_BASE_URL='https://example.com'):
+            mock_client.return_value.send_template.side_effect = RuntimeError('boom')
+            self.assertFalse(send_pass(self.guest))
+
+    def test_send_whatsapp_pass_task_retries_on_transient_error(self):
+        from pywa.errors import WhatsAppError
+        from .tasks import send_whatsapp_pass
+
+        class FakeTransientError(WhatsAppError):
+            is_transient = True
+
+            def __init__(self):
+                pass
+
+        with patch('guests.whatsapp.send_pass', side_effect=FakeTransientError()), \
+             patch.object(send_whatsapp_pass, 'retry', side_effect=Exception('retried')) as mock_retry, \
+             self.settings(WHATSAPP_PHONE_ID='id', WHATSAPP_TOKEN='tok'):
+            with self.assertRaises(Exception):
+                send_whatsapp_pass.apply(args=[str(self.guest.id)]).get()
+            mock_retry.assert_called_once()
+
+
+class ReminderRetryTests(TestCase):
+    """A failed reminder attempt must not permanently suppress future retries (P1 fix)."""
+
+    def setUp(self):
+        from .models import EventReminder
+        self.event = make_event(date=timezone.now() + timezone.timedelta(days=1))
+        self.guest = make_guest(self.event, phone_number='2348000000001')
+        self.reminder = EventReminder.objects.create(
+            event=self.event, hours_before=24, template_name='reminder_tmpl',
+        )
+
+    def test_failed_send_leaves_no_log_and_is_retried(self):
+        from .models import ReminderLog
+        from .tasks import send_reminder
+        with patch('guests.whatsapp.send_reminder', return_value=False):
+            result = send_reminder(self.reminder.id, str(self.guest.id))
+        self.assertFalse(result['sent'])
+        self.assertFalse(ReminderLog.objects.filter(reminder=self.reminder, guest=self.guest).exists())
+
+        # Next attempt is not blocked by a "already sent" log from the failure above
+        with patch('guests.whatsapp.send_reminder', return_value=True):
+            result2 = send_reminder(self.reminder.id, str(self.guest.id))
+        self.assertTrue(result2['sent'])
+        self.assertTrue(ReminderLog.objects.filter(reminder=self.reminder, guest=self.guest, success=True).exists())
+
+    def test_successful_send_blocks_duplicate(self):
+        from .models import ReminderLog
+        from .tasks import send_reminder
+        with patch('guests.whatsapp.send_reminder', return_value=True):
+            send_reminder(self.reminder.id, str(self.guest.id))
+        with patch('guests.whatsapp.send_reminder', return_value=True) as mock_send:
+            result = send_reminder(self.reminder.id, str(self.guest.id))
+        self.assertFalse(result['sent'])
+        mock_send.assert_not_called()
+        self.assertEqual(
+            ReminderLog.objects.filter(reminder=self.reminder, guest=self.guest).count(), 1,
+        )
+
+
+class DispatchDueRemindersTimingTests(TestCase):
+    """A Beat tick that lands after fire_at (delay/downtime) must still catch the reminder (P1 fix)."""
+
+    def setUp(self):
+        from .models import EventReminder
+        # Event date - hours_before = fire_at already 10 minutes in the past,
+        # simulating a Beat run that was delayed past the old forward-looking window.
+        self.event = make_event(date=timezone.now() - timezone.timedelta(hours=24) + timezone.timedelta(minutes=10))
+        self.guest = make_guest(self.event, phone_number='2348000000001')
+        self.reminder = EventReminder.objects.create(
+            event=self.event, hours_before=24, template_name='reminder_tmpl',
+        )
+
+    @patch('guests.tasks.send_reminder')
+    def test_overdue_reminder_still_dispatched(self, mock_send_reminder):
+        from .tasks import dispatch_due_reminders
+        result = dispatch_due_reminders()
+        self.assertEqual(result['queued'], 1)
+        mock_send_reminder.apply_async.assert_called_once()
+
+    @patch('guests.tasks.send_reminder')
+    def test_reminder_not_yet_due_is_skipped(self, mock_send_reminder):
+        from .tasks import dispatch_due_reminders
+        from .models import EventReminder
+        future_event = make_event(date=timezone.now() + timezone.timedelta(days=30))
+        make_guest(future_event, phone_number='2348000000002')
+        EventReminder.objects.create(event=future_event, hours_before=24, template_name='reminder_tmpl')
+
+        dispatch_due_reminders()
+        # Only the overdue one from setUp should have been queued
+        queued_reminder_ids = {c.args[0] for c in mock_send_reminder.apply_async.call_args_list}
+        self.assertEqual(queued_reminder_ids, {self.reminder.id})
 
 
 class CheckInTests(TestCase):

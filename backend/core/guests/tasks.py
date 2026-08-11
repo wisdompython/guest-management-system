@@ -1,5 +1,6 @@
 import logging
 from celery import shared_task
+from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 
@@ -24,6 +25,13 @@ def send_whatsapp_pass(self, guest_id: str):
     except Guest.DoesNotExist:
         logger.warning("send_whatsapp_pass: guest %s not found", guest_id)
         return {'sent': False, 'reason': 'guest not found'}
+
+    # Optional RSVP workflows hold passes until this specific guest confirms.
+    # Events without an RSVP workflow always pass this guard.
+    from rsvp.services import pass_delivery_allowed
+    if not pass_delivery_allowed(guest.id, guest.event_id):
+        logger.info("RSVP workflow is holding the pass for guest %s", guest_id)
+        return {'sent': False, 'reason': 'awaiting RSVP confirmation'}
 
     from django.conf import settings as django_settings
     if not django_settings.WHATSAPP_PHONE_ID or not django_settings.WHATSAPP_TOKEN:
@@ -109,7 +117,12 @@ def generate_guest_assets(guest_id: str, send_whatsapp: bool = True):
 
     from django.conf import settings as django_settings
     wa_configured = bool(django_settings.WHATSAPP_PHONE_ID and django_settings.WHATSAPP_TOKEN)
-    if send_whatsapp and pass_ok and wa_configured and guest.event and guest.event.whatsapp_enabled:
+    from rsvp.services import pass_delivery_allowed
+    delivery_allowed = pass_delivery_allowed(guest.id, guest.event_id) if guest.event_id else True
+    if (
+        send_whatsapp and pass_ok and wa_configured and guest.event
+        and guest.event.whatsapp_enabled and delivery_allowed
+    ):
         guest.refresh_from_db(fields=['pass_image'])
         send_whatsapp_pass.delay(guest_id)
 
@@ -128,13 +141,20 @@ def send_reminder(reminder_id: int, guest_id: str):
     except (EventReminder.DoesNotExist, Guest.DoesNotExist):
         return {'sent': False, 'reason': 'not found'}
 
-    # Avoid duplicate sends
-    if ReminderLog.objects.filter(reminder=reminder, guest=guest).exists():
+    # Avoid duplicate sends — only a successful prior send blocks a retry, so a
+    # transient failure doesn't permanently suppress this reminder for the guest.
+    if ReminderLog.objects.filter(reminder=reminder, guest=guest, success=True).exists():
         return {'sent': False, 'reason': 'already sent'}
 
     success = wa_send_reminder(guest, reminder.template_name)
-    ReminderLog.objects.create(reminder=reminder, guest=guest, success=success)
+    if success:
+        ReminderLog.objects.create(reminder=reminder, guest=guest, success=True)
     return {'sent': success}
+
+
+# If a claimed scheduled send still hasn't gone out after this long, treat the
+# claim as stale (worker likely died mid-flight) and let it be re-claimed.
+SCHEDULED_SEND_CLAIM_TIMEOUT = timedelta(hours=1)
 
 
 @shared_task
@@ -144,21 +164,49 @@ def dispatch_scheduled_sends():
     Finds guests whose scheduled_send_at has arrived (or passed) and whose
     pass hasn't been sent yet, then queues send_whatsapp_pass for each,
     staggered to respect the WhatsApp rate limit.
+
+    Guests are atomically claimed (scheduled_send_claimed_at set) before being
+    queued so a run that takes longer than the 30-minute Beat interval can't
+    have the next run queue the same guest again. A claim older than
+    SCHEDULED_SEND_CLAIM_TIMEOUT is considered stale and eligible for re-claim.
     """
     from .models import Guest
 
     now = timezone.now()
+    stale_before = now - SCHEDULED_SEND_CLAIM_TIMEOUT
 
-    guest_ids = list(
+    eligible_ids = list(
         Guest.objects.filter(
             scheduled_send_at__isnull=False,
             scheduled_send_at__lte=now,
             whatsapp_sent=False,
         )
+        .filter(
+            Q(scheduled_send_claimed_at__isnull=True) |
+            Q(scheduled_send_claimed_at__lt=stale_before)
+        )
         .exclude(pass_image='')
         .filter(pass_image__isnull=False)
         .exclude(phone_number='')
         .filter(event__whatsapp_enabled=True, event__date__gte=now)
+        .values_list('id', flat=True)
+    )
+
+    if not eligible_ids:
+        return {'queued': 0}
+
+    # Atomically claim only the rows still matching (guards against a
+    # concurrent Beat run claiming the same guests between select and update).
+    Guest.objects.filter(
+        id__in=eligible_ids,
+        whatsapp_sent=False,
+    ).filter(
+        Q(scheduled_send_claimed_at__isnull=True) |
+        Q(scheduled_send_claimed_at__lt=stale_before)
+    ).update(scheduled_send_claimed_at=now)
+
+    guest_ids = list(
+        Guest.objects.filter(id__in=eligible_ids, scheduled_send_claimed_at=now)
         .values_list('id', flat=True)
     )
 
@@ -183,9 +231,11 @@ def dispatch_due_reminders():
     from .models import EventReminder, ReminderLog
 
     now = timezone.now()
-    window_end = now + timedelta(minutes=30)
 
-    # Find reminders whose scheduled fire time falls in the next 30-minute window
+    # Find reminders whose scheduled fire time has arrived (or passed). Using
+    # "now >= fire_at" rather than a forward-looking window means a delayed or
+    # missed Beat tick still catches up on the next run instead of permanently
+    # skipping the reminder — dedup against ReminderLog prevents re-sends.
     due_reminders = (
         EventReminder.objects
         .filter(is_active=True, event__date__isnull=False)
@@ -195,12 +245,13 @@ def dispatch_due_reminders():
     queued = 0
     for reminder in due_reminders:
         fire_at = reminder.event.date - timedelta(hours=reminder.hours_before)
-        if not (now <= fire_at < window_end):
+        if now < fire_at:
             continue
 
-        # Get guests for this event who have a phone number and haven't received this reminder
+        # Get guests for this event who have a phone number and haven't successfully
+        # received this reminder yet (a prior failed attempt is retried, not skipped)
         already_sent = ReminderLog.objects.filter(
-            reminder=reminder
+            reminder=reminder, success=True,
         ).values_list('guest_id', flat=True)
 
         guests = (

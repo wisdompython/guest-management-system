@@ -94,6 +94,11 @@ def send_pass(guest) -> bool:
         return True
 
     except Exception as exc:
+        # Let WhatsAppError propagate so callers (e.g. send_whatsapp_pass) can
+        # tell transient failures (worth retrying) from permanent ones.
+        from pywa.errors import WhatsAppError
+        if isinstance(exc, WhatsAppError):
+            raise
         logger.error("WhatsApp send failed for guest %s: %s", guest.id, exc, exc_info=True)
         return False
 

@@ -139,3 +139,81 @@ export interface WhatsAppTemplate {
   is_active: boolean;
   created_at: string;
 }
+
+export type RsvpWorkflowStatus = 'draft' | 'active' | 'paused' | 'completed';
+export type RsvpResponseStatus = 'awaiting' | 'confirmed' | 'declined';
+export type RsvpInvitationStatus = 'not_sent' | 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+export type RsvpPassStatus = 'held' | 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'not_issued';
+
+export interface RsvpStats {
+  invited: number;
+  awaiting: number;
+  confirmed: number;
+  declined: number;
+  invitation_delivered: number;
+  invitation_failed: number;
+  passes_sent: number;
+  passes_failed: number;
+  response_rate: number;
+  confirmation_rate: number;
+}
+
+export interface RsvpWorkflow {
+  id: number;
+  event: number;
+  event_name: string;
+  event_date: string;
+  invitation_template: number | null;
+  invitation_template_name: string | null;
+  pass_template: number | null;
+  pass_template_name: string | null;
+  status: RsvpWorkflowStatus;
+  response_deadline: string | null;
+  auto_send_pass: boolean;
+  launched_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  stats: RsvpStats;
+}
+
+export interface RsvpRecipient {
+  id: number;
+  workflow: number;
+  guest: string;
+  guest_name: string;
+  event_name: string;
+  ticket_type: string;
+  table_number: string;
+  has_phone: boolean;
+  response_status: RsvpResponseStatus;
+  invitation_status: RsvpInvitationStatus;
+  pass_status: RsvpPassStatus;
+  invitation_sent_at: string | null;
+  responded_at: string | null;
+  pass_queued_at: string | null;
+  reminder_count: number;
+  last_reminded_at: string | null;
+  last_error: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedRsvpRecipients {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: RsvpRecipient[];
+}
+
+export interface PublicRsvpDetails {
+  guest_name: string;
+  event_name: string;
+  event_date: string;
+  venue: string;
+  response_deadline: string | null;
+  response_status: RsvpResponseStatus;
+  responded_at: string | null;
+  can_respond: boolean;
+  closed_reason: 'deadline_passed' | 'workflow_inactive' | 'already_responded' | null;
+}

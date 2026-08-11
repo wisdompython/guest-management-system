@@ -102,6 +102,9 @@ class Guest(models.Model):
     # If set, the WhatsApp pass is held back and sent by dispatch_scheduled_sends
     # once this time arrives, instead of immediately on registration.
     scheduled_send_at = models.DateTimeField(null=True, blank=True)
+    # Set the moment dispatch_scheduled_sends claims this guest for sending, so a
+    # slow queue (task not yet run) doesn't get re-claimed by the next Beat tick.
+    scheduled_send_claimed_at = models.DateTimeField(null=True, blank=True)
     registered_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -194,6 +197,7 @@ class WhatsAppTemplate(models.Model):
         ('ticket_type', 'Guest ticket type'),
         ('table_number','Guest table number'),
         ('seat_number', 'Guest seat number'),
+        ('rsvp_link',   'Guest-specific RSVP link'),
     ]
 
     name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")

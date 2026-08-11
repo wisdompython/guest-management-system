@@ -1,0 +1,180 @@
+import re
+import uuid
+
+from django.db import transaction
+from django.utils import timezone
+
+from guests.whatsapp import _normalise_phone
+
+from .models import RsvpRecipient, RsvpResponse, RsvpWorkflow
+
+
+CALLBACK_PATTERN = re.compile(
+    r'^rsvp:(?P<token>[0-9a-fA-F-]{36}):(?P<answer>yes|no)$'
+)
+
+
+def pass_delivery_allowed(guest_id, event_id) -> bool:
+    """Preserve normal delivery unless an RSVP workflow is holding this guest's pass."""
+    workflow = RsvpWorkflow.objects.filter(
+        event_id=event_id,
+        status__in=[
+            RsvpWorkflow.Status.DRAFT,
+            RsvpWorkflow.Status.ACTIVE,
+            RsvpWorkflow.Status.PAUSED,
+        ],
+    ).first()
+    if not workflow:
+        return True
+    return RsvpRecipient.objects.filter(
+        workflow=workflow,
+        guest_id=guest_id,
+        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+    ).exists()
+
+
+def extract_button_payload(message: dict):
+    message_type = message.get('type')
+    if message_type == 'button':
+        return message.get('button', {}).get('payload', '')
+    if message_type == 'interactive':
+        interactive = message.get('interactive', {})
+        return interactive.get('button_reply', {}).get('id', '')
+    return ''
+
+
+def record_response(
+    *,
+    callback_token,
+    answer: str,
+    response_id: str,
+    source: str,
+    sender_phone: str = '',
+    raw_payload: dict | None = None,
+    require_phone_match: bool = False,
+) -> dict:
+    """Record the first valid response and queue a pass when appropriate."""
+    if answer not in {RsvpResponse.Answer.YES, RsvpResponse.Answer.NO}:
+        return {'accepted': False, 'reason': 'invalid_answer'}
+
+    with transaction.atomic():
+        try:
+            recipient = (
+                RsvpRecipient.objects
+                .select_for_update()
+                .select_related('workflow', 'guest')
+                .get(callback_token=callback_token)
+            )
+        except RsvpRecipient.DoesNotExist:
+            return {'accepted': False, 'reason': 'not_found'}
+
+        normalised_sender = _normalise_phone(sender_phone) if sender_phone else ''
+        if require_phone_match and _normalise_phone(recipient.guest.phone_number) != normalised_sender:
+            return {'accepted': False, 'reason': 'phone_mismatch'}
+        if recipient.workflow.status != RsvpWorkflow.Status.ACTIVE:
+            return {'accepted': False, 'reason': 'workflow_inactive'}
+        if (
+            recipient.workflow.response_deadline
+            and recipient.workflow.response_deadline <= timezone.now()
+        ):
+            return {'accepted': False, 'reason': 'deadline_passed'}
+        if recipient.response_status != RsvpRecipient.ResponseStatus.AWAITING:
+            return {
+                'accepted': False,
+                'reason': 'already_responded',
+                'response_status': recipient.response_status,
+            }
+
+        _, created = RsvpResponse.objects.get_or_create(
+            message_id=response_id,
+            defaults={
+                'recipient': recipient,
+                'answer': answer,
+                'source': source,
+                'sender_phone': normalised_sender,
+                'raw_payload': raw_payload or {},
+            },
+        )
+        if not created:
+            return {'accepted': False, 'reason': 'duplicate'}
+
+        now = timezone.now()
+        if answer == RsvpResponse.Answer.YES:
+            recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
+            if recipient.workflow.auto_send_pass:
+                recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
+                recipient.pass_queued_at = now
+        else:
+            recipient.response_status = RsvpRecipient.ResponseStatus.DECLINED
+            recipient.pass_status = RsvpRecipient.PassStatus.NOT_ISSUED
+        recipient.responded_at = now
+        recipient.save(update_fields=[
+            'response_status',
+            'pass_status',
+            'pass_queued_at',
+            'responded_at',
+            'updated_at',
+        ])
+
+        if answer == RsvpResponse.Answer.YES and recipient.workflow.auto_send_pass:
+            from .tasks import send_confirmed_pass
+            transaction.on_commit(lambda: send_confirmed_pass.delay(recipient.id))
+
+        return {
+            'accepted': True,
+            'response_status': recipient.response_status,
+            'pass_queued': answer == RsvpResponse.Answer.YES and recipient.workflow.auto_send_pass,
+        }
+
+
+def process_incoming_message(message: dict) -> bool:
+    """Keep compatibility with RSVP quick replies sent by an older workflow version."""
+    callback_data = extract_button_payload(message)
+    match = CALLBACK_PATTERN.fullmatch(callback_data or '')
+    if not match:
+        return False
+
+    try:
+        callback_token = uuid.UUID(match.group('token'))
+    except ValueError:
+        return True
+
+    message_id = message.get('id', '')
+    sender_phone = message.get('from', '')
+    if not message_id or not sender_phone:
+        return True
+
+    record_response(
+        callback_token=callback_token,
+        answer=match.group('answer'),
+        response_id=message_id,
+        source=RsvpResponse.Source.WHATSAPP,
+        sender_phone=sender_phone,
+        raw_payload=message,
+        require_phone_match=True,
+    )
+
+    return True
+
+
+def process_status_update(status_payload: dict) -> bool:
+    """Apply a Meta status update to an RSVP invitation or pass by message ID."""
+    message_id = status_payload.get('id', '')
+    wa_status = status_payload.get('status', '')
+    if not message_id or wa_status not in {'sent', 'delivered', 'read', 'failed'}:
+        return False
+
+    recipient = RsvpRecipient.objects.filter(invitation_message_id=message_id).first()
+    field = 'invitation_status'
+    if not recipient:
+        recipient = RsvpRecipient.objects.filter(pass_message_id=message_id).first()
+        field = 'pass_status'
+    if not recipient:
+        return False
+
+    updates = {field: wa_status, 'last_error': ''}
+    if wa_status == 'failed':
+        errors = status_payload.get('errors') or []
+        updates['last_error'] = str(errors[0].get('title', 'WhatsApp delivery failed')) if errors else 'WhatsApp delivery failed'
+    RsvpRecipient.objects.filter(pk=recipient.pk).update(**updates)
+    return True

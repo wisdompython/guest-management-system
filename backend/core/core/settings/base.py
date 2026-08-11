@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     # Local
     'accounts',
     'guests',
+    'rsvp',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
