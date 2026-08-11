@@ -37,6 +37,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(true)
+  const [passTiming, setPassTiming] = useState<'immediate' | 'scheduled'>('immediate')
   const [passSendAt, setPassSendAt] = useState('')
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setWhatsappEnabled(ev.whatsapp_enabled ?? true)
         setWhatsappTemplate(ev.whatsapp_template ?? null)
         if (ev.pass_send_at) {
+          setPassTiming('scheduled')
           const sendDate = new Date(ev.pass_send_at)
           const offset = sendDate.getTimezoneOffset() * 60_000
           setPassSendAt(new Date(sendDate.getTime() - offset).toISOString().slice(0, 16))
@@ -79,6 +81,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!dateValid) { setError('Please set a future date and time for the event.'); return }
+    if (!event?.rsvp_workflow_id && whatsappEnabled && passTiming === 'scheduled' && !passSendAt) {
+      setError('Choose a date and time for scheduled guest-pass delivery.'); return
+    }
     setError(''); setSubmitting(true)
     const form = e.currentTarget; const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
@@ -91,7 +96,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled))
     fd.append('whatsapp_template', whatsappTemplate ? String(whatsappTemplate) : '')
-    if (!event?.rsvp_workflow_id) fd.append('pass_send_at', passSendAt ? new Date(passSendAt).toISOString() : '')
+    if (!event?.rsvp_workflow_id) fd.append('pass_send_at', passTiming === 'scheduled' && passSendAt ? new Date(passSendAt).toISOString() : '')
     try {
       const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include' })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
@@ -129,9 +134,12 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           }} />
         {whatsappEnabled && !event.rsvp_workflow_id && <div className="rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)] p-6">
           <h2 className="text-sm font-semibold text-[var(--ink)]">Direct pass delivery</h2>
-          <label className="mt-4 block text-xs font-semibold text-[var(--ink)]">Default send time for new guests</label>
-          <input type="datetime-local" value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}/>
-          <p className="mt-2 text-xs text-[var(--muted)]">Leave blank for immediate delivery. This default is applied when a guest is added.</p>
+          <label className="mt-4 block text-xs font-semibold text-[var(--ink)]">Default delivery timing for new guests</label>
+          <select value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}><option value="immediate">Send immediately</option><option value="scheduled">Schedule for later</option></select>
+          {passTiming === 'scheduled' && (
+            <input type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-3 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}/>
+          )}
+          <p className="mt-2 text-xs text-[var(--muted)]">Immediate delivery sends the pass when a guest is added. Scheduled delivery applies the selected time to new guests.</p>
         </div>}
         <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />

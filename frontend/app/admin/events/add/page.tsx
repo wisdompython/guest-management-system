@@ -37,6 +37,7 @@ export default function AddEventPage() {
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
   const [deliveryFlow, setDeliveryFlow] = useState<'direct' | 'rsvp'>('direct')
+  const [passTiming, setPassTiming] = useState<'immediate' | 'scheduled'>('immediate')
   const [passSendAt, setPassSendAt] = useState('')
 
   useEffect(() => {
@@ -59,6 +60,9 @@ export default function AddEventPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!dateValid) { setError('Please set a future date and time for the event.'); return }
+    if (whatsappEnabled && deliveryFlow === 'direct' && passTiming === 'scheduled' && !passSendAt) {
+      setError('Choose a date and time for scheduled guest-pass delivery.'); return
+    }
     setError(''); setSubmitting(true)
     const form = e.currentTarget; const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
@@ -74,7 +78,7 @@ export default function AddEventPage() {
     if (whatsappTemplate) fd.append('whatsapp_template', String(whatsappTemplate))
     const usesRsvp = whatsappEnabled && deliveryFlow === 'rsvp'
     fd.append('create_rsvp_workflow', String(usesRsvp))
-    if (!usesRsvp && whatsappEnabled && passSendAt) fd.append('pass_send_at', new Date(passSendAt).toISOString())
+    if (!usesRsvp && whatsappEnabled && passTiming === 'scheduled' && passSendAt) fd.append('pass_send_at', new Date(passSendAt).toISOString())
     try {
       const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrftoken='))?.split('=')[1] ?? ''
       const res = await fetch(`${BASE_URL}/events/`, { method: 'POST', body: fd, credentials: 'include', headers: { 'X-CSRFToken': csrf } })
@@ -122,8 +126,12 @@ export default function AddEventPage() {
           </div>
           {deliveryFlow === 'direct' && <div className="mt-5 border-t border-[var(--line)] pt-4">
             <label className="block text-xs font-semibold text-[var(--ink)]">When should guest passes be sent?</label>
-            <input type="datetime-local" value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
-            <p className="mt-2 text-xs text-[var(--muted)]">Leave blank to send each pass as soon as its guest is added. A scheduled time becomes the default for every guest in this event.</p>
+            <select value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+              <option value="immediate">Send immediately</option>
+              <option value="scheduled">Schedule for later</option>
+            </select>
+            {passTiming === 'scheduled' && <input type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-3 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} />}
+            <p className="mt-2 text-xs text-[var(--muted)]">Immediate delivery sends each pass as soon as its guest is added. A scheduled time becomes the default for every guest in this event.</p>
           </div>}
           {deliveryFlow === 'rsvp' && <p className="mt-4 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>After creating the event, you’ll choose when to send RSVP requests and confirmed guest passes.</p>}
         </div>}

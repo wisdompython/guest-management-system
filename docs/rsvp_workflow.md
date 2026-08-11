@@ -24,7 +24,7 @@ Create two approved WhatsApp templates before configuring a workflow.
 
 1. Create the event and choose **Confirm RSVP first**. The RSVP setup screen opens automatically.
 2. Choose the invitation and pass templates, response deadline, and automatic-pass preference.
-3. Optionally schedule the RSVP invitations and confirmed guest passes. A blank invitation time means send on launch; a blank pass time means send immediately after each Yes response.
+3. Choose **Send immediately** or **Schedule for later** independently for RSVP invitations and confirmed guest passes.
 4. Review the eligible recipient count. Guests without phone numbers are excluded.
 5. Launch the workflow.
 6. Monitor confirmed, declined, awaiting, invitation delivery, and pass delivery counts.
@@ -35,7 +35,7 @@ Guests added or imported while the workflow is a draft are attached to it automa
 
 ## Original direct-delivery flow
 
-Choose **Send passes directly** during event creation to keep the original workflow. You may set one default pass delivery date and time for the event; every newly added or imported guest inherits it. Leave the time blank for immediate delivery. A per-guest delivery time can still override the event default.
+Choose **Send passes directly** during event creation to keep the original workflow. Select **Send immediately** or set one default scheduled delivery date and time for the event; every newly added or imported guest inherits it. A per-guest delivery time can still override the event default.
 
 ## Webhook configuration
 
