@@ -5,9 +5,9 @@ import { DualZoneCanvas, ZoneLegendItem, ZoneWarning } from '@/components/PassDe
 import type { Zone } from '@/components/PassDesignPanel'
 import { Event } from '@/lib/api'
 import { QrBgColorPicker } from './QrBgColorPicker'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
-const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.06)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
+const label = 'form-label'
 
 interface Props {
   event?: Event | null
@@ -26,6 +26,7 @@ interface Props {
   onNameChange: (z: Zone | null) => void
   onQrBgColorChange: (color: string) => void
   isEdit?: boolean
+  step?: number
 }
 
 export function PassDesignSection({
@@ -33,18 +34,11 @@ export function PassDesignSection({
   qrZone, nameZone, qrBgColor,
   fontColor, fontSizeFrac, fontName, fontFileUrl,
   onFileChange, onQrChange, onNameChange, onQrBgColorChange,
-  isEdit = false,
+  isEdit = false, step,
 }: Props) {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
-      <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 data-tour="event-pass-design-section" className="text-sm font-semibold text-[var(--ink)]">Pass Design & Zones</h2>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">
-          {isEdit
-            ? 'Leave the file picker empty to keep the existing design.'
-            : 'Upload your design, then drag to mark the QR code area and the guest name area.'}
-        </p>
-      </div>
+    <div className="form-card">
+      <FormSectionHeader step={step} optional={!isEdit} tourId="event-pass-design-section" title="Pass design" description={isEdit ? 'Upload a replacement only if the design has changed.' : 'Upload a design now, or skip this and add one before sending passes.'} />
       <div className="space-y-5 p-6">
         {isEdit && event?.design_template && !newFileChosen && (
           <div className="flex items-center gap-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-4 py-2.5">
@@ -60,7 +54,8 @@ export function PassDesignSection({
             {isEdit ? (newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)') : 'Design Template (PNG / JPG)'}
           </label>
           <input data-tour="event-design-upload" ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={onFileChange}
-            className="w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--brand)] file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--brand-strong)]" />
+            className="w-full rounded-xl border border-dashed border-[rgba(255,255,255,0.16)] bg-[var(--bg)] p-3 text-sm text-[var(--muted)] file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-[rgba(184,150,62,0.55)] hover:file:bg-[var(--brand-strong)]" />
+          <p className="form-hint">PNG or JPG, up to 5 MB. A landscape design works best.</p>
         </div>
         {previewUrl && (
           <>

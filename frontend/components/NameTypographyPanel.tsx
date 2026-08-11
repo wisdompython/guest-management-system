@@ -1,9 +1,10 @@
 'use client'
 
 import { Font } from '@/lib/api'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
-const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
+const field = 'form-control'
+const label = 'form-label'
 
 // Reference height used to give a real px estimate (A4 landscape at 150dpi ≈ 1240px tall)
 const REF_HEIGHT_PX = 1240
@@ -16,11 +17,12 @@ interface Props {
   onFontChange: (v: string) => void
   onColorChange: (v: string) => void
   onSizeChange: (v: number) => void
+  step?: number
 }
 
 export default function NameTypographyPanel({
   fonts, selectedFont, fontColor, fontSizeFrac,
-  onFontChange, onColorChange, onSizeChange,
+  onFontChange, onColorChange, onSizeChange, step,
 }: Props) {
   const approxPx = Math.round(fontSizeFrac * REF_HEIGHT_PX)
 
@@ -33,14 +35,8 @@ export default function NameTypographyPanel({
   }
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
-      <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 data-tour="event-typography-section" className="text-sm font-semibold text-[var(--ink)]">Name Typography</h2>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">
-          Controls how the guest name is rendered inside the name zone.
-          <a href="/admin/fonts" className="ml-1 font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Manage fonts →</a>
-        </p>
-      </div>
+    <div className="form-card">
+      <FormSectionHeader step={step} optional title="Guest-name style" description="Choose how guest names appear on the pass. The defaults work well for most designs." tourId="event-typography-section" />
       <div className="grid gap-4 p-6 sm:grid-cols-3">
         <div>
           <label className={label}>Font</label>
@@ -48,6 +44,7 @@ export default function NameTypographyPanel({
             <option value="">Default (system)</option>
             {fonts.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
+          <p className="form-hint"><a href="/admin/fonts" className="font-semibold text-[var(--brand)] hover:underline">Manage uploaded fonts →</a></p>
         </div>
         <div>
           <label className={label}>Color</label>
@@ -78,7 +75,7 @@ export default function NameTypographyPanel({
               max={Math.round(0.15 * REF_HEIGHT_PX)}
               value={approxPx}
               onChange={(e) => handlePxInput(e.target.value)}
-              className="w-20 rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              className="form-control w-20"
             />
             <span className="text-xs" style={{ color: 'var(--muted)' }}>px &nbsp;·&nbsp; {(fontSizeFrac * 100).toFixed(1)}% of height</span>
           </div>

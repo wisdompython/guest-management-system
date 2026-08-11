@@ -9,18 +9,17 @@ interface Props {
 }
 
 export function TicketTypesSection({ ticketTypes, onChange }: Props) {
-  const [newValue, setNewValue] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [addError, setAddError] = useState('')
 
   function addTicketType() {
-    const v = newValue.trim().toLowerCase().replace(/\s+/g, '_')
     const l = newLabel.trim()
-    if (!v || !l) { setAddError('Both a value and a label are required.'); return }
-    if (ticketTypes.some((t) => t.value === v)) { setAddError(`"${v}" already exists.`); return }
+    const v = l.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    if (!l || !v) { setAddError('Enter a ticket category name.'); return }
+    if (ticketTypes.some((t) => t.value === v)) { setAddError(`"${l}" already exists.`); return }
     setAddError('')
     onChange([...ticketTypes, { value: v, label: l }])
-    setNewValue(''); setNewLabel('')
+    setNewLabel('')
   }
 
   function removeTicketType(value: string) {
@@ -31,9 +30,9 @@ export function TicketTypesSection({ ticketTypes, onChange }: Props) {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Ticket Categories</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Ticket categories</p>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
-            Define the ticket tiers for this event. Guests will be assigned one of these.
+            Add the guest groups your team will recognise, such as General, VIP or Family.
           </p>
         </div>
         {ticketTypes.length === 0 && (
@@ -52,6 +51,7 @@ export function TicketTypesSection({ ticketTypes, onChange }: Props) {
               <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>{t.label}</span>
               <span className="text-[10px] font-mono" style={{ color: 'var(--muted-2)' }}>{t.value}</span>
               <button type="button" onClick={() => removeTicketType(t.value)}
+                aria-label={`Remove ${t.label}`}
                 className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition hover:bg-red-100"
                 style={{ color: 'var(--muted-2)' }}>
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor">
@@ -63,17 +63,12 @@ export function TicketTypesSection({ ticketTypes, onChange }: Props) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <input type="text" placeholder="Label  e.g. VVVIP" value={newLabel}
+      <div className="flex gap-2">
+        <input type="text" placeholder="e.g. Sponsors" value={newLabel}
           onChange={(e) => { setNewLabel(e.target.value); setAddError('') }}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTicketType())}
-          className="rounded-[10px] border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          style={{ borderColor: 'var(--line)', color: 'var(--ink)', minWidth: '150px' }} />
-        <input type="text" placeholder="Value  e.g. vvvip" value={newValue}
-          onChange={(e) => { setNewValue(e.target.value); setAddError('') }}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTicketType())}
-          className="rounded-[10px] border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          style={{ borderColor: 'var(--line)', color: 'var(--ink)', minWidth: '140px' }} />
+          aria-label="New ticket category"
+          className="form-control min-w-0 flex-1" />
         <button type="button" onClick={addTicketType}
           className="rounded-[10px] border px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
           style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}>
@@ -82,7 +77,7 @@ export function TicketTypesSection({ ticketTypes, onChange }: Props) {
       </div>
       {addError && <p className="mt-1.5 text-xs text-red-500">{addError}</p>}
       <p className="mt-1.5 text-xs" style={{ color: 'var(--muted-2)' }}>
-        The <span className="font-mono">value</span> is stored internally (lowercase, underscored). The <span className="font-mono">label</span> is shown to the user.
+        We create the internal value automatically, so you only need to enter the name guests and staff will see.
       </p>
     </div>
   )

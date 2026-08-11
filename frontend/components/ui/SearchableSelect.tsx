@@ -69,6 +69,8 @@ export function SearchableSelect({
       <button
         type="button"
         onClick={handleOpen}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="w-full flex items-center justify-between gap-2 rounded-[12px] px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         style={{
           border: '1px solid rgba(255,255,255,0.1)',
@@ -113,11 +115,11 @@ export function SearchableSelect({
             )}
           </div>
 
-          <div className="max-h-56 overflow-y-auto">
+          <div className="max-h-56 overflow-y-auto" role="listbox">
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-xs text-center" style={{ color: 'var(--muted)' }}>No results</p>
             ) : filtered.map((opt) => (
-              <button key={opt.value} type="button" onClick={() => select(opt.value)}
+              <button key={opt.value} type="button" role="option" aria-selected={opt.value === value} onClick={() => select(opt.value)}
                 className="w-full px-4 py-2.5 text-left text-sm transition"
                 style={{
                   background: opt.value === value ? 'rgba(255,255,255,0.06)' : undefined,

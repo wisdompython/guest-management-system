@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { Event } from '@/lib/api'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
-const field = 'w-full border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]'
-const fieldStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }
-const label = 'block text-xs font-semibold uppercase tracking-[0.18em] mb-1.5'
-const labelStyle = { color: 'var(--muted)' }
+const field = 'form-control'
+const label = 'form-label'
 
 function toLocalDateTimeValue(iso: string) {
   const d = new Date(iso)
@@ -24,11 +23,12 @@ interface Props {
   event?: Event
   localDateValue?: string
   subtitle?: string
+  step?: number
   onDateChange?: (val: string) => void
   onValidationChange?: (valid: boolean) => void
 }
 
-export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange, onValidationChange }: Props) {
+export function EventDetailsForm({ event, localDateValue, subtitle, step, onDateChange, onValidationChange }: Props) {
   const [minVal] = useState(nowMin)
   const [dateVal, setDateVal] = useState(
     localDateValue ?? (event?.date ? toLocalDateTimeValue(event.date) : '')
@@ -61,21 +61,19 @@ export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange
   }
 
   return (
-    <div className="overflow-hidden" style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
-      <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
-        <h2 data-tour="event-details-section" className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Event Details</h2>
-        {subtitle && <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
-      </div>
+    <div className="form-card">
+      <FormSectionHeader step={step} tourId="event-details-section" title="Event details" description={subtitle || 'Start with the essentials guests and staff will recognise.'} />
       <div className="grid gap-5 p-6 sm:grid-cols-2">
 
         <div className="sm:col-span-2">
-          <label className={label} style={labelStyle}>Event Name *</label>
+          <label className={label}>Event name <span className="text-[var(--brand)]">*</span></label>
           <input data-tour="event-name-field" name="name" type="text" required defaultValue={event?.name}
-            placeholder="e.g. Annual Gala 2026" className={field} style={fieldStyle} />
+            placeholder="e.g. Annual Gala 2026" className={field} />
+          <p className="form-hint">Use the name guests will see on invitations and passes.</p>
         </div>
 
         <div>
-          <label className={label} style={labelStyle}>Date & Time *</label>
+          <label className={label}>Date and time <span className="text-[var(--brand)]">*</span></label>
           <input
             data-tour="event-date-field"
             name="date"
@@ -85,30 +83,25 @@ export function EventDetailsForm({ event, localDateValue, subtitle, onDateChange
             min={minVal}
             onChange={handleDateChange}
             className={field}
-            style={{
-              ...fieldStyle,
-              colorScheme: 'dark',
-              ...(dateError ? { border: '1px solid var(--danger)' } : {}),
-            }}
+            style={dateError ? { borderColor: 'var(--danger)' } : undefined}
           />
           {dateError && (
             <p className="mt-1 text-[11px]" style={{ color: 'var(--danger)' }}>{dateError}</p>
           )}
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
-            Must be a future date and time.
-          </p>
+          {!dateError && <p className="form-hint">Scheduling and reminders use this date and time.</p>}
         </div>
 
         <div>
-          <label className={label} style={labelStyle}>Venue</label>
+          <label className={label}>Venue <span className="font-normal text-[var(--muted)]">(optional)</span></label>
           <input name="venue" type="text" defaultValue={event?.venue}
-            placeholder="optional" className={field} style={fieldStyle} />
+            placeholder="e.g. Eko Hotel, Lagos" className={field} />
+          <p className="form-hint">You can leave this blank and add it when confirmed.</p>
         </div>
 
         <div className="sm:col-span-2">
-          <label className={label} style={labelStyle}>Description</label>
+          <label className={label}>Description <span className="font-normal text-[var(--muted)]">(optional)</span></label>
           <textarea name="description" rows={3} defaultValue={event?.description}
-            placeholder="optional" className={`${field} resize-none`} style={fieldStyle} />
+            placeholder="Add a short internal note about this event" className={field} />
         </div>
 
       </div>

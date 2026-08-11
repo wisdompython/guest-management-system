@@ -17,8 +17,8 @@ function FieldToggle({
       className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-sm transition select-none"
       style={{
         borderColor: checked ? 'var(--brand)' : 'var(--line)',
-        background:  checked ? 'var(--brand-soft)' : '#fff',
-        opacity:     disabled ? 0.7 : 1,
+        background:  checked ? 'var(--brand-soft)' : 'var(--bg)',
+        opacity:     disabled ? 0.78 : 1,
         cursor:      disabled ? 'not-allowed' : 'pointer',
       }}
     >
@@ -29,8 +29,9 @@ function FieldToggle({
         onChange={onChange}
         className="h-3.5 w-3.5 accent-[var(--brand)]"
       />
-      <span className="text-xs font-medium" style={{ color: checked ? 'var(--brand)' : 'var(--ink)' }}>
-        {label}
+      <span className="min-w-0 text-xs font-medium" style={{ color: checked ? 'var(--brand)' : 'var(--ink)' }}>
+        <span className="block">{label}</span>
+        {disabledReason && <span className="mt-0.5 block text-[10px] font-normal text-[var(--muted)]">Required by WhatsApp</span>}
       </span>
     </label>
   )
@@ -45,9 +46,9 @@ interface Props {
 export function RequiredFieldsSection({ requiredFields, whatsappEnabled, onToggle }: Props) {
   return (
     <div>
-      <p className="mb-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>Required Guest Fields</p>
+      <p className="mb-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>Required guest information</p>
       <p className="mb-3 text-xs" style={{ color: 'var(--muted)' }}>
-        <span className="font-semibold">Full Name</span> is always required. Toggle the others on or off.
+        Select only what your team needs. Full name is always required.
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <FieldToggle label="Full Name" checked disabled />

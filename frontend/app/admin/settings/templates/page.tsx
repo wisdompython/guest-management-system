@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { api, WhatsAppTemplate, TemplateCategory } from '@/lib/api'
 import { useRequireAuth } from '@/lib/auth'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
 const PAGE_SIZE = 20
 
@@ -14,6 +15,7 @@ const VAR_EXAMPLES: Record<string, string> = {
   ticket_type:  'VIP',
   table_number: 'Table 12',
   seat_number:  'Seat 4A',
+  rsvp_link:    'https://guestpass.example/rsvp/your-secure-link',
 }
 
 type FormState = {
@@ -86,7 +88,7 @@ function PreviewBubble({ bodyText, bodyParams, hasHeaderImage }: {
 }
 
 function TemplateForm({
-  form, setForm, categories, availableVars, error, submitting, submitLabel, onSubmit, onCancel,
+  form, setForm, categories, availableVars, error, submitting, submitLabel, onSubmit, onCancel, isNew,
 }: {
   form: FormState
   setForm: React.Dispatch<React.SetStateAction<FormState>>
@@ -97,6 +99,7 @@ function TemplateForm({
   submitLabel: string
   onSubmit: (e: React.FormEvent) => void
   onCancel: () => void
+  isNew: boolean
 }) {
   const varLabel = (key: string) => availableVars.find((v) => v.key === key)?.label ?? key
   const unusedVars = availableVars.filter((v) => !form.body_params.includes(v.key))
@@ -117,73 +120,107 @@ function TemplateForm({
     })
   }
 
+  function useRsvpStarter() {
+    setForm((f) => ({
+      ...f,
+      name: 'event_rsvp_invitation',
+      display_name: 'Event RSVP Invitation',
+      description: 'Invites a guest to confirm attendance using their secure RSVP link.',
+      body_text: 'Hello {{1}},\n\nYou are invited to {{2}} on {{3}}.\n\nPlease confirm whether you can attend:\n{{4}}\n\nThis link is unique to you.',
+      body_params: ['guest_name', 'event_name', 'event_date', 'rsvp_link'],
+      has_header_image: false,
+    }))
+  }
+
   const placeholderCount = countPlaceholders(form.body_text)
-  const mismatch = form.body_text.trim() && placeholderCount !== form.body_params.length
+  const mismatch = Boolean(form.body_text.trim()) && placeholderCount !== form.body_params.length
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-5 pb-2">
       {error && (
         <p className="rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
           {error}
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {isNew && (
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--brand)]/30 bg-[var(--brand-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[var(--ink)]">Creating an RSVP invitation?</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Start with recommended copy and variable order, then match it to the approved Meta template.</p>
+          </div>
+          <button type="button" onClick={useRsvpStarter} className="shrink-0 rounded-full border border-[var(--brand)] px-4 py-2 text-xs font-semibold text-[var(--brand)]">Use RSVP starter</button>
+        </div>
+      )}
+
+      <section className="form-card">
+      <FormSectionHeader step={1} title="Template identity" description="Use the exact Meta name, plus a friendly name your team will recognise." />
+
+      <div className="p-5">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
+          <label className="form-label">
             Template name *
           </label>
           <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             placeholder="e.g. birthday_invite_v1"
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>Exact name from Meta Business Manager</p>
+            className="form-control mt-2" />
+          <p className="form-hint">Copy this exactly from Meta Business Manager.</p>
         </div>
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
-            Display name
+          <label className="form-label">
+            Display name <span className="font-normal text-[var(--muted-2)]">(optional)</span>
           </label>
           <input value={form.display_name} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
             placeholder="e.g. Birthday Invite"
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+            className="form-control mt-2" />
+          <p className="form-hint">Shown only to your team.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="form-label">Description <span className="font-normal text-[var(--muted-2)]">(optional)</span></label>
+          <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="What is this template used for?" className="form-control mt-2" />
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
-          Category
+      <div className="mt-4">
+        <label className="form-label">
+          Category <span className="font-normal text-[var(--muted-2)]">(optional)</span>
         </label>
         <select
           value={form.category ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, category: e.target.value ? Number(e.target.value) : null }))}
-          className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
+          className="form-control mt-2">
           <option value="">— No category —</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
       </div>
+      </div>
+      </section>
 
-      <div>
-        <label className="block text-xs font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--muted)' }}>
-          Body text
+      <section className="form-card">
+        <FormSectionHeader step={2} title="Approved message" description="Paste the body exactly as approved by Meta. Number variables in the order they appear." />
+        <div className="p-5">
+        <label className="form-label">
+          Message body
         </label>
         <textarea
           value={form.body_text}
           onChange={(e) => setForm((f) => ({ ...f, body_text: e.target.value }))}
           rows={6}
           placeholder={"Hello {{1}}, you're invited to {{2}} on {{3}}.\n\nPlease find your guest pass attached."}
-          className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] resize-none"
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${mismatch ? 'rgba(239,68,68,0.5)' : 'var(--line)'}`, color: 'var(--ink)' }}
+          className={`form-control mt-2 min-h-40 ${mismatch ? 'border-red-500/60' : ''}`}
         />
-        <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
-          Paste exactly as approved in Meta. Use {'{{1}}'}, {'{{2}}'} for variables.
+        <p className="form-hint">
+          Use {'{{1}}'}, {'{{2}}'}, and so on. Each number is connected to guest or event data next.
         </p>
-      </div>
+        </div>
+      </section>
 
-      <div className="flex items-center gap-3">
+      <section className="form-card">
+      <FormSectionHeader step={3} title="Delivery media" description="RSVP invitations are normally text-only. Pass messages can include the generated pass image." />
+      <div className="m-5 flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] p-4">
         <button type="button"
           onClick={() => setForm((f) => ({ ...f, has_header_image: !f.has_header_image }))}
           className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
@@ -196,11 +233,11 @@ function TemplateForm({
           <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Template has an image header — guest pass will be sent</p>
         </div>
       </div>
+      </section>
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--muted)' }}>
-          Body parameters <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--muted-2)' }}>(in order)</span>
-        </p>
+      <section className="form-card">
+        <FormSectionHeader step={4} title="Map placeholders" description="Add one variable for every numbered placeholder, in the same order as the message." />
+        <div className="m-5">
         {form.body_params.length === 0 && (
           <p className="text-xs mb-2" style={{ color: 'var(--muted-2)' }}>No parameters yet.</p>
         )}
@@ -235,11 +272,12 @@ function TemplateForm({
             </div>
           </div>
         )}
-      </div>
+        </div>
 
-      <PreviewBubble bodyText={form.body_text} bodyParams={form.body_params} hasHeaderImage={form.has_header_image} />
+      <div className="mx-5 mb-5"><PreviewBubble bodyText={form.body_text} bodyParams={form.body_params} hasHeaderImage={form.has_header_image} /></div>
+      </section>
 
-      <div className="flex gap-3 pt-1">
+      <div className="sticky bottom-0 z-10 -mx-2 flex gap-3 border-t border-[var(--line)] bg-[var(--panel)]/95 px-2 py-4 backdrop-blur">
         <button type="submit" disabled={submitting || !!mismatch}
           className="rounded-full px-5 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           style={{ background: 'var(--brand)' }}>
@@ -578,6 +616,7 @@ export default function TemplatesPage() {
                 form={form} setForm={setForm} categories={categories}
                 availableVars={availableVars} error={formError} submitting={submitting}
                 submitLabel={selectedId === 'new' ? 'Add Template' : 'Save Changes'}
+                isNew={selectedId === 'new'}
                 onSubmit={handleSubmit} onCancel={closePanel}
               />
             </div>

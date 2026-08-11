@@ -4,6 +4,7 @@ import EventConfigPanel from '@/components/EventConfigPanel'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import type { WhatsAppTemplate } from '@/lib/api'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
 interface Props {
   ticketTypes: TicketTypeDef[]
@@ -11,6 +12,7 @@ interface Props {
   whatsappEnabled: boolean
   whatsappTemplate: number | null
   templates: WhatsAppTemplate[]
+  step?: number
   onChange: (patch: {
     ticketTypes?: TicketTypeDef[]
     requiredFields?: string[]
@@ -19,15 +21,12 @@ interface Props {
   }) => void
 }
 
-export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, whatsappTemplate, templates, onChange }: Props) {
+export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, whatsappTemplate, templates, step, onChange }: Props) {
   const selectedTemplate = templates.find((t) => t.id === whatsappTemplate)
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
-      <div className="border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
-        <h2 data-tour="event-guest-config-section" className="text-sm font-semibold text-[var(--ink)]">Guest Configuration</h2>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">Set ticket categories, required fields, and delivery options for this event.</p>
-      </div>
+    <div className="form-card">
+      <FormSectionHeader step={step} tourId="event-guest-config-section" title="Guest setup" description="Choose ticket categories and the information to collect for each guest." />
       <div className="p-6 space-y-6">
         <EventConfigPanel
           ticketTypes={ticketTypes}
@@ -38,12 +37,11 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
 
         {whatsappEnabled && (
           <div className="space-y-1.5 pt-2 border-t border-[rgba(255,255,255,0.07)]">
-            <label className="block text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-              WhatsApp Invite Template
+            <label className="form-label">
+              Guest-pass message template <span className="font-normal text-[var(--muted)]">(optional)</span>
             </label>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Choose which approved Meta template to use when sending passes for this event.
-              Defaults to the global template if none is selected.
+            <p className="mb-2 text-xs leading-5" style={{ color: 'var(--muted)' }}>
+              This approved Meta template accompanies the guest pass. Keep the global default unless this event needs different wording.
             </p>
             <SearchableSelect
               data-tour="event-whatsapp-template"

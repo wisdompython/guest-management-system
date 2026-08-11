@@ -9,6 +9,7 @@ import type { Zone } from '@/components/PassDesignPanel'
 import { EventDetailsForm } from '@/components/events/EventDetailsForm'
 import { PassDesignSection } from '@/components/events/PassDesignSection'
 import { GuestConfigSection } from '@/components/events/GuestConfigSection'
+import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
@@ -108,23 +109,23 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   if (!event) return <div className="px-6 py-8 lg:px-8 lg:py-10"><p className="text-sm" style={{ color: 'var(--danger)' }}>{error || 'Event not found.'}</p></div>
 
   return (
-    <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
+    <div className="max-w-4xl px-6 py-8 lg:px-8 lg:py-10">
       <div className="mb-8 border-b border-[var(--line)] pb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Event setup</p>
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Edit Event</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">{event.name}</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">{event.name}</p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-5">
+          {['Details', 'Guests', 'Delivery', 'Pass design', 'Name style'].map((label, index) => (
+            <div key={label} className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-xs text-[var(--muted)]">
+              <span className="font-semibold text-[var(--brand)]">{index + 1}</span><span>{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
       {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <EventDetailsForm event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} onValidationChange={setDateValid} />
-        <PassDesignSection event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}
-          previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
-          fontColor={fontColor} fontSizeFrac={fontSizeFrac}
-          fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
-          fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
-          onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
-          onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
-        <GuestConfigSection ticketTypes={ticketTypes} requiredFields={requiredFields}
+        <EventDetailsForm step={1} event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} onValidationChange={setDateValid} />
+        <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields}
           whatsappEnabled={whatsappEnabled} whatsappTemplate={whatsappTemplate} templates={waTemplates}
           onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, whatsappTemplate: wt }) => {
             if (tt !== undefined) setTicketTypes(tt)
@@ -132,18 +133,29 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             if (wa !== undefined) setWhatsappEnabled(wa)
             if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
-        {whatsappEnabled && !event.rsvp_workflow_id && <div className="rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)] p-6">
-          <h2 className="text-sm font-semibold text-[var(--ink)]">Direct pass delivery</h2>
-          <label className="mt-4 block text-xs font-semibold text-[var(--ink)]">Default delivery timing for new guests</label>
-          <select value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}><option value="immediate">Send immediately</option><option value="scheduled">Schedule for later</option></select>
+        {whatsappEnabled && !event.rsvp_workflow_id && <div className="form-card">
+          <FormSectionHeader step={3} title="Direct pass delivery" description="Choose the default send time for guests added to this event." />
+          <div className="p-6">
+          <label className="form-label" htmlFor="edit-pass-timing">Default delivery timing for new guests</label>
+          <select id="edit-pass-timing" value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="form-control mt-2"><option value="immediate">Send immediately</option><option value="scheduled">Schedule for later</option></select>
           {passTiming === 'scheduled' && (
-            <input type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="mt-3 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}/>
+            <div className="mt-3"><label className="form-label" htmlFor="edit-pass-send-at">Delivery date and time</label><input id="edit-pass-send-at" type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="form-control mt-2"/></div>
           )}
-          <p className="mt-2 text-xs text-[var(--muted)]">Immediate delivery sends the pass when a guest is added. Scheduled delivery applies the selected time to new guests.</p>
+          <p className="form-hint">Immediate delivery sends the pass when a guest is added. Scheduled delivery applies the selected time to new guests.</p>
+          </div>
         </div>}
-        <NameTypographyPanel fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+        {whatsappEnabled && event.rsvp_workflow_id && <div className="form-card"><FormSectionHeader step={3} title="RSVP delivery" description="Invitation and confirmed-pass timing are managed in this event's RSVP workflow." /><div className="p-6"><button type="button" onClick={() => router.push(`/admin/rsvp/${event.rsvp_workflow_id}`)} className="text-sm font-semibold text-[var(--brand)]">Open RSVP workflow &rarr;</button></div></div>}
+        {!whatsappEnabled && <div className="form-card"><FormSectionHeader step={3} title="Delivery flow" description="WhatsApp delivery is off. Enable it above whenever you are ready to send passes." /></div>}
+        <PassDesignSection step={4} event={event} newFileChosen={newFileChosen} fileInputRef={fileInputRef}
+          previewUrl={previewUrl} qrZone={qrZone} nameZone={nameZone} qrBgColor={qrBgColor}
+          fontColor={fontColor} fontSizeFrac={fontSizeFrac}
+          fontName={fonts.find((f) => String(f.id) === selectedFont)?.name ?? ''}
+          fontFileUrl={fonts.find((f) => String(f.id) === selectedFont)?.file}
+          onFileChange={handleFileChange} onQrChange={(z) => { setQrZone(z); setQrTouched(true) }}
+          onNameChange={(z) => { setNameZone(z); setNameTouched(true) }} onQrBgColorChange={setQrBgColor} isEdit />
+        <NameTypographyPanel step={5} fonts={fonts} selectedFont={selectedFont} fontColor={fontColor} fontSizeFrac={fontSizeFrac}
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
-        <div className="flex gap-3 pt-1">
+        <div className="sticky bottom-0 z-10 -mx-2 flex gap-3 border-t border-[var(--line)] bg-[var(--bg)]/95 px-2 py-4 backdrop-blur">
           <button type="submit" disabled={submitting} className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">{submitting ? 'Saving…' : 'Save Changes'}</button>
           <button type="button" onClick={() => router.push('/admin/events')} className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Cancel</button>
         </div>

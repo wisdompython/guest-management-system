@@ -12,8 +12,8 @@ function toLocalInput(value: string | null) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
-const fieldClass = 'mt-2 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none'
-const fieldStyle = { background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }
+const fieldClass = 'form-control mt-2'
+const fieldStyle = undefined
 
 export default function AddRsvpWorkflowPage() {
   const router = useRouter()
