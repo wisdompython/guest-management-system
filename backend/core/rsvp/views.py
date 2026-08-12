@@ -138,8 +138,12 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
     def launch(self, request, pk=None):
         requested_workflow = self.get_object()
         with transaction.atomic():
+            # Do not reuse get_queryset() here. It select_related()s nullable
+            # template/user relations, which makes PostgreSQL try to apply FOR
+            # UPDATE to the nullable side of an outer join. Lock only the
+            # workflow row; related objects can be loaded normally afterward.
             workflow = (
-                self.get_queryset()
+                RsvpWorkflow.objects
                 .select_for_update()
                 .get(pk=requested_workflow.pk)
             )

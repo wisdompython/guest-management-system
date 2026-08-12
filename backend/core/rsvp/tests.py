@@ -151,6 +151,20 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(duplicate.status_code, 409)
         mock_queue.assert_called_once_with(workflow.id)
 
+    @patch('rsvp.views.RsvpWorkflow.objects.select_for_update')
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_launch_locks_only_the_workflow_table(self, mock_queue, mock_select_for_update):
+        mock_queue.return_value.id = 'task-locked'
+        workflow = self.create_workflow()
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_a)
+        mock_select_for_update.return_value.get.return_value = workflow
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/launch/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_select_for_update.assert_called_once_with()
+        mock_select_for_update.return_value.get.assert_called_once_with(pk=workflow.pk)
+
     @patch('rsvp.tasks.queue_workflow_invitations.delay')
     def test_launch_holds_invitations_until_the_scheduled_time(self, mock_queue):
         workflow = self.create_workflow()
