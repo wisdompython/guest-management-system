@@ -1,7 +1,10 @@
 import csv
 import uuid
+from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -9,9 +12,11 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.permissions import ReadOnlyOrEventManager
+from guests.csv_utils import safe_csv_row
 from guests.models import Guest
 
 from .models import RsvpRecipient, RsvpWorkflow
@@ -107,7 +112,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
             ])
             for recipient in recipients.iterator():
-                yield writer.writerow([
+                yield writer.writerow(safe_csv_row([
                     recipient.guest.full_name,
                     recipient.guest.ticket_type,
                     recipient.guest.table_number,
@@ -116,7 +121,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     recipient.invitation_status,
                     recipient.pass_status,
                     recipient.reminder_count,
-                ])
+                ]))
 
         safe_name = ''.join(
             character if character.isalnum() else '_'
@@ -128,39 +133,44 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def launch(self, request, pk=None):
-        workflow = self.get_object()
-        if workflow.status != RsvpWorkflow.Status.DRAFT:
-            return Response(
-                {'detail': 'Only a draft workflow can be launched.'},
-                status=status.HTTP_409_CONFLICT,
-            )
-        if not workflow.invitation_template_id:
-            return Response(
-                {'detail': 'Select an RSVP invitation template before launch.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if 'rsvp_link' not in (workflow.invitation_template.body_params or []):
-            return Response(
-                {'detail': 'The RSVP invitation template must include the rsvp_link variable.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if workflow.auto_send_pass and not workflow.pass_template_id:
-            return Response(
-                {'detail': 'Select a pass template before launch.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if workflow.response_deadline and workflow.response_deadline <= timezone.now():
-            return Response(
-                {'detail': 'The response deadline has passed.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not workflow.recipients.exists():
-            return Response(
-                {'detail': 'Add at least one eligible recipient before launch.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        requested_workflow = self.get_object()
         with transaction.atomic():
+            workflow = (
+                self.get_queryset()
+                .select_for_update()
+                .get(pk=requested_workflow.pk)
+            )
+            if workflow.status != RsvpWorkflow.Status.DRAFT:
+                return Response(
+                    {'detail': 'Only a draft workflow can be launched.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if not workflow.invitation_template_id:
+                return Response(
+                    {'detail': 'Select an RSVP invitation template before launch.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if 'rsvp_link' not in (workflow.invitation_template.body_params or []):
+                return Response(
+                    {'detail': 'The RSVP invitation template must include the rsvp_link variable.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if workflow.auto_send_pass and not workflow.pass_template_id:
+                return Response(
+                    {'detail': 'Select a pass template before launch.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if workflow.response_deadline and workflow.response_deadline <= timezone.now():
+                return Response(
+                    {'detail': 'The response deadline has passed.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not workflow.recipients.exists():
+                return Response(
+                    {'detail': 'Add at least one eligible recipient before launch.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             workflow.status = RsvpWorkflow.Status.ACTIVE
             workflow.launched_at = timezone.now()
             workflow.save(update_fields=['status', 'launched_at', 'updated_at'])
@@ -228,23 +238,32 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        cooldown_minutes = settings.RSVP_REMINDER_COOLDOWN_MINUTES
+        reminder_cutoff = timezone.now() - timedelta(minutes=cooldown_minutes)
         eligible = workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
             invitation_status__in=[
                 RsvpRecipient.InvitationStatus.SENT,
                 RsvpRecipient.InvitationStatus.DELIVERED,
                 RsvpRecipient.InvitationStatus.READ,
-                RsvpRecipient.InvitationStatus.FAILED,
             ],
+            reminder_count__lt=settings.RSVP_MAX_REMINDERS,
+        ).filter(
+            Q(last_reminded_at__lte=reminder_cutoff)
+            | Q(last_reminded_at__isnull=True, invitation_sent_at__lte=reminder_cutoff)
         )
-        queued = eligible.count()
-        eligible.update(
+        queued = eligible.update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
             last_error='',
         )
-        from .tasks import queue_workflow_invitations
-        queue_workflow_invitations.delay(workflow.id)
-        return Response({'queued': queued})
+        if queued:
+            from .tasks import queue_workflow_invitations
+            queue_workflow_invitations.delay(workflow.id)
+        return Response({
+            'queued': queued,
+            'cooldown_minutes': cooldown_minutes,
+            'max_reminders': settings.RSVP_MAX_REMINDERS,
+        })
 
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
@@ -335,6 +354,8 @@ class PublicRsvpResponseView(APIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'public_rsvp'
 
     def get_recipient(self, token):
         return get_object_or_404(

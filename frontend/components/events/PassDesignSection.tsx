@@ -37,7 +37,7 @@ export function PassDesignSection({
   isEdit = false, step,
 }: Props) {
   return (
-    <div className="form-card">
+    <div id="pass-design" className="form-card scroll-mt-6">
       <FormSectionHeader step={step} optional={!isEdit} tourId="event-pass-design-section" title="Pass design" description={isEdit ? 'Upload a replacement only if the design has changed.' : 'Upload a design now, or skip this and add one before sending passes.'} />
       <div className="space-y-5 p-6">
         {isEdit && event?.design_template && !newFileChosen && (

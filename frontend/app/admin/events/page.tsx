@@ -202,7 +202,7 @@ export default function EventsPage() {
             <div className="md:hidden divide-y" style={{ borderColor: 'var(--line)' }}>
               {filteredEvents.map((ev) => (
                 <div key={ev.id} className="px-4 py-4 cursor-pointer transition-colors hover:bg-[var(--panel)]"
-                  onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
+                  onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}` }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
                       <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</p>
@@ -226,7 +226,7 @@ export default function EventsPage() {
                     </div>
                   )}
                   <div className="flex items-center gap-3">
-                    <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>Edit</Link>
+                    <Link href={`/admin/events/${ev.id}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>Open</Link>
                     <button onClick={() => exportEvent(ev.id)} className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Export</button>
                     <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
                       className="text-xs font-semibold disabled:opacity-40"
@@ -257,7 +257,7 @@ export default function EventsPage() {
                 <tbody>
                   {filteredEvents.map((ev) => (
                     <tr key={ev.id} className="group cursor-pointer transition-colors hover:bg-[var(--panel)]" style={{ borderTop: '1px solid var(--line)' }}
-                      onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}/edit` }}>
+                      onClick={(e) => { if ((e.target as HTMLElement).closest('button,a')) return; window.location.href = `/admin/events/${ev.id}` }}>
                       <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--ink)' }}>
                         <div className="flex items-center gap-2">
                           {ev.name}
@@ -291,7 +291,7 @@ export default function EventsPage() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <Link href={`/admin/events/${ev.id}/edit`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Edit</Link>
+                          <Link href={`/admin/events/${ev.id}`} className="text-xs font-semibold hover:underline" style={{ color: 'var(--brand)' }}>Open</Link>
                           <button onClick={() => exportEvent(ev.id)} className="text-xs font-semibold hover:underline" style={{ color: 'var(--muted)' }}>Export</button>
                           <button onClick={() => handleToggleEnded(ev)} disabled={togglingId === ev.id}
                             className="text-xs font-semibold transition hover:opacity-70 disabled:opacity-40"

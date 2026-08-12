@@ -60,7 +60,11 @@ export default function GuestsPage() {
   const waToken     = tokens.find((t) => t.key === 'wa')?.value ?? ''
 
   useEffect(() => {
-    api.getEvents().then(setEvents).catch(console.error).finally(() => setEventsLoading(false))
+    api.getEvents().then((items) => {
+      setEvents(items)
+      const requestedEventId = Number(new URLSearchParams(window.location.search).get('event'))
+      if (requestedEventId) setSelectedEvent(items.find((item) => item.id === requestedEventId) ?? null)
+    }).catch(console.error).finally(() => setEventsLoading(false))
   }, [])
 
   // reset to page 1 when filters or event changes

@@ -95,6 +95,14 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         instance = self.instance
+        if (
+            instance
+            and 'event' in attrs
+            and attrs['event'].pk != instance.event_id
+        ):
+            raise serializers.ValidationError({
+                'event': 'The event cannot be changed after a workflow is created.',
+            })
         event = attrs.get('event') or (instance.event if instance else None)
         invitation_template = attrs.get(
             'invitation_template',

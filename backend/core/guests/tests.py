@@ -110,6 +110,15 @@ class GuestListFilterTests(TestCase):
         names = {g['full_name'] for g in r.data['results']}
         self.assertEqual(names, {'Bob'})
 
+    def test_csv_export_escapes_spreadsheet_formulas(self):
+        self.g1.full_name = '=HYPERLINK("https://example.com")'
+        self.g1.save(update_fields=['full_name'])
+
+        response = self.client.get('/api/guests/export/', {'event': self.event_a.id})
+        body = b''.join(response.streaming_content).decode('utf-8')
+
+        self.assertIn("'=HYPERLINK", body)
+
 
 class BulkDeleteTests(TestCase):
     def setUp(self):

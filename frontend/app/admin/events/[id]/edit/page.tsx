@@ -101,7 +101,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     try {
       const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include' })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
-      router.push('/admin/events')
+      router.push(`/admin/events/${id}`)
     } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to save changes.'); setSubmitting(false) }
   }
 
@@ -111,6 +111,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   return (
     <div className="max-w-4xl px-6 py-8 lg:px-8 lg:py-10">
       <div className="mb-8 border-b border-[var(--line)] pb-6">
+        <button type="button" onClick={() => router.push(`/admin/events/${id}`)} className="mb-3 text-xs font-semibold text-[var(--brand)] hover:underline">&larr; Event workspace</button>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--brand)]">Event setup</p>
         <h1 className="mt-2 font-display text-4xl text-[var(--ink)]">Edit Event</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">{event.name}</p>
@@ -157,7 +158,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           onFontChange={setSelectedFont} onColorChange={setFontColor} onSizeChange={setFontSizeFrac} />
         <div className="sticky bottom-0 z-10 -mx-2 flex gap-3 border-t border-[var(--line)] bg-[var(--bg)]/95 px-2 py-4 backdrop-blur">
           <button type="submit" disabled={submitting} className="flex-1 rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">{submitting ? 'Saving…' : 'Save Changes'}</button>
-          <button type="button" onClick={() => router.push('/admin/events')} className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Cancel</button>
+          <button type="button" onClick={() => router.push(`/admin/events/${id}`)} className="flex-1 rounded-full border border-[var(--line)] py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Cancel</button>
         </div>
       </form>
     </div>

@@ -58,11 +58,13 @@ def pass_delivery_allowed(guest_id, event_id) -> bool:
     ).first()
     if not workflow:
         return True
-    return RsvpRecipient.objects.filter(
+    recipient = RsvpRecipient.objects.filter(
         workflow=workflow,
         guest_id=guest_id,
-        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
-    ).exists()
+    ).only('response_status').first()
+    if not recipient:
+        return True
+    return recipient.response_status == RsvpRecipient.ResponseStatus.CONFIRMED
 
 
 def extract_button_payload(message: dict):
@@ -224,5 +226,10 @@ def process_status_update(status_payload: dict) -> bool:
     if wa_status == 'failed':
         errors = status_payload.get('errors') or []
         updates['last_error'] = str(errors[0].get('title', 'WhatsApp delivery failed')) if errors else 'WhatsApp delivery failed'
-    RsvpRecipient.objects.filter(pk=recipient.pk).update(**updates)
+    recipients = RsvpRecipient.objects.filter(pk=recipient.pk)
+    if wa_status == 'sent':
+        recipients = recipients.exclude(**{f'{field}__in': ['delivered', 'read']})
+    elif wa_status == 'delivered':
+        recipients = recipients.exclude(**{field: 'read'})
+    recipients.update(**updates)
     return True

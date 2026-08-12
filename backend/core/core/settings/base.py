@@ -110,4 +110,10 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 50,
     'PAGE_SIZE_QUERY_PARAM': 'page_size',
     'MAX_PAGE_SIZE': 200,
+    'DEFAULT_THROTTLE_RATES': {
+        'public_rsvp': os.environ.get('PUBLIC_RSVP_THROTTLE_RATE', '30/min'),
+    },
 }
+
+RSVP_REMINDER_COOLDOWN_MINUTES = int(os.environ.get('RSVP_REMINDER_COOLDOWN_MINUTES', '360'))
+RSVP_MAX_REMINDERS = int(os.environ.get('RSVP_MAX_REMINDERS', '3'))

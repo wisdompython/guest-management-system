@@ -3,7 +3,8 @@ import hmac
 import json
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -91,6 +92,21 @@ class RsvpWorkflowApiTests(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 400)
 
+    def test_event_cannot_be_changed_after_workflow_creation(self):
+        workflow = self.create_workflow()
+        other_event = make_event(name='Other Event')
+
+        response = self.client.patch(
+            f'/api/rsvp/workflows/{workflow.id}/',
+            {'event': other_event.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('cannot be changed', str(response.data))
+        workflow.refresh_from_db()
+        self.assertEqual(workflow.event, self.event)
+
     def test_invitation_template_must_contain_rsvp_link(self):
         template_without_link = make_template('rsvp_without_link')
         response = self.client.post('/api/rsvp/workflows/', {
@@ -129,6 +145,10 @@ class RsvpWorkflowApiTests(TestCase):
             workflow.recipients.get().invitation_status,
             RsvpRecipient.InvitationStatus.QUEUED,
         )
+        mock_queue.assert_called_once_with(workflow.id)
+
+        duplicate = self.client.post(f'/api/rsvp/workflows/{workflow.id}/launch/')
+        self.assertEqual(duplicate.status_code, 409)
         mock_queue.assert_called_once_with(workflow.id)
 
     @patch('rsvp.tasks.queue_workflow_invitations.delay')
@@ -173,6 +193,48 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertIn('invitation_status', body)
         self.assertIn('Ada Guest', body)
 
+    def test_export_escapes_spreadsheet_formulas(self):
+        workflow = self.create_workflow()
+        self.guest_a.full_name = '=HYPERLINK("https://example.com")'
+        self.guest_a.save(update_fields=['full_name'])
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_a)
+
+        response = self.client.get(f'/api/rsvp/workflows/{workflow.id}/export/')
+        body = b''.join(response.streaming_content).decode('utf-8')
+
+        self.assertIn("'=HYPERLINK", body)
+
+    @override_settings(RSVP_REMINDER_COOLDOWN_MINUTES=60, RSVP_MAX_REMINDERS=2)
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_reminders_respect_cooldown_and_cap(self, mock_queue):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+        old = timezone.now() - timezone.timedelta(hours=2)
+        recent = timezone.now() - timezone.timedelta(minutes=10)
+        eligible_guest = Guest.objects.create(event=self.event, full_name='Eligible', phone_number='2348000000002')
+        recent_guest = Guest.objects.create(event=self.event, full_name='Recent', phone_number='2348000000003')
+        capped_guest = Guest.objects.create(event=self.event, full_name='Capped', phone_number='2348000000004')
+        eligible = RsvpRecipient.objects.create(workflow=workflow, guest=eligible_guest, invitation_status=RsvpRecipient.InvitationStatus.SENT, invitation_sent_at=old)
+        recent_recipient = RsvpRecipient.objects.create(workflow=workflow, guest=recent_guest, invitation_status=RsvpRecipient.InvitationStatus.SENT, invitation_sent_at=recent)
+        capped = RsvpRecipient.objects.create(workflow=workflow, guest=capped_guest, invitation_status=RsvpRecipient.InvitationStatus.READ, invitation_sent_at=old, reminder_count=2)
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/remind-awaiting/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['queued'], 1)
+        eligible.refresh_from_db()
+        recent_recipient.refresh_from_db()
+        capped.refresh_from_db()
+        self.assertEqual(eligible.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
+        self.assertEqual(recent_recipient.invitation_status, RsvpRecipient.InvitationStatus.SENT)
+        self.assertEqual(capped.invitation_status, RsvpRecipient.InvitationStatus.READ)
+        mock_queue.assert_called_once_with(workflow.id)
+
+        duplicate = self.client.post(f'/api/rsvp/workflows/{workflow.id}/remind-awaiting/')
+        self.assertEqual(duplicate.data['queued'], 0)
+        mock_queue.assert_called_once_with(workflow.id)
+
 
 class RsvpIsolationTests(TestCase):
     def setUp(self):
@@ -193,6 +255,10 @@ class RsvpIsolationTests(TestCase):
 
         recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
         recipient.save(update_fields=['response_status'])
+        self.assertTrue(pass_delivery_allowed(self.guest.id, self.event.id))
+
+    def test_guest_excluded_from_workflow_keeps_normal_pass_delivery(self):
+        RsvpWorkflow.objects.create(event=self.event)
         self.assertTrue(pass_delivery_allowed(self.guest.id, self.event.id))
 
     def test_completed_workflow_restores_normal_delivery(self):
@@ -292,6 +358,20 @@ class RsvpResponseTests(TestCase):
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.invitation_status, RsvpRecipient.InvitationStatus.READ)
 
+    def test_delivery_status_does_not_regress_when_webhooks_arrive_out_of_order(self):
+        self.recipient.invitation_message_id = 'wamid.out-of-order'
+        self.recipient.invitation_status = RsvpRecipient.InvitationStatus.READ
+        self.recipient.save(update_fields=['invitation_message_id', 'invitation_status'])
+
+        handled = process_status_update({
+            'id': 'wamid.out-of-order',
+            'status': 'delivered',
+        })
+
+        self.assertTrue(handled)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.invitation_status, RsvpRecipient.InvitationStatus.READ)
+
     def test_non_rsvp_message_is_left_for_existing_webhook_processing(self):
         handled = process_incoming_message({
             'id': 'wamid.text-1',
@@ -329,6 +409,15 @@ class PublicRsvpPageApiTests(TestCase):
         self.assertEqual(response.data['guest_name'], 'Public Guest')
         self.assertEqual(response.data['event_name'], 'Public RSVP Event')
         self.assertTrue(response.data['can_respond'])
+
+    def test_public_endpoint_is_throttled(self):
+        cache.clear()
+        try:
+            for _ in range(30):
+                self.assertEqual(self.client.get(self.url).status_code, 200)
+            self.assertEqual(self.client.get(self.url).status_code, 429)
+        finally:
+            cache.clear()
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
     def test_yes_response_confirms_and_queues_one_pass(self, mock_send):

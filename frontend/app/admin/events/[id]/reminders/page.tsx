@@ -17,7 +17,7 @@ export default function EventRemindersPage({ params }: { params: Promise<{ id: s
   return (
     <div className="px-6 py-8 lg:px-8 lg:py-10 max-w-3xl">
       <div className="mb-8 border-b border-[var(--line)] pb-6">
-        <button onClick={() => router.push('/admin/events')}
+        <button onClick={() => router.push(`/admin/events/${id}`)}
           className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] transition hover:opacity-70"
           style={{ color: 'var(--brand)' }}>
           ← Events

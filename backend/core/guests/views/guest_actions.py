@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import StreamingHttpResponse, HttpResponse
 
+from ..csv_utils import safe_csv_row
 from ..models import Event, Guest, BulkUpload
 from ..serializers import BulkGuestUploadSerializer
 from ..tasks import generate_guest_assets
@@ -118,15 +119,15 @@ class GuestBulkExportMixin:
         def row_iter():
             yield columns
             for g in qs.select_related('event').iterator():
-                yield [
+                yield safe_csv_row([
                     g.full_name, g.email, g.phone_number,
-                    g.get_ticket_type_display(), g.table_number, g.seat_number,
+                    g.ticket_type, g.table_number, g.seat_number,
                     g.get_status_display(),
                     g.registered_at.strftime('%Y-%m-%d %H:%M') if g.registered_at else '',
                     g.checked_in_at.strftime('%Y-%m-%d %H:%M') if g.checked_in_at else '',
                     'Yes' if g.whatsapp_sent else 'No',
                     g.event.name if g.event else '',
-                ]
+                ])
 
         class EchoBuffer:
             def write(self, value): return value
