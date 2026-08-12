@@ -66,7 +66,7 @@ class EventSerializer(serializers.ModelSerializer):
             'name_zone_x', 'name_zone_y', 'name_zone_w', 'name_zone_h',
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
-            'ticket_types', 'required_fields', 'whatsapp_enabled',
+            'ticket_types', 'required_fields', 'collect_aso_ebi', 'whatsapp_enabled',
             'whatsapp_template', 'whatsapp_template_name',
             'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
             'is_ended', 'guest_count', 'checked_in_count', 'created_at',

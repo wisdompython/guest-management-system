@@ -35,6 +35,8 @@ export interface Guest {
   ticket_type: TicketType;
   table_number: string;
   seat_number: string;
+  aso_ebi_requested: boolean;
+  aso_ebi_quantity: number;
   qr_code: string | null;
   pass_image: string | null;
   status: GuestStatus;
@@ -62,7 +64,7 @@ export interface GuestList {
 
 export type CreateGuestPayload = Pick<
   Guest,
-  'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'event'
+  'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'aso_ebi_requested' | 'aso_ebi_quantity' | 'event'
 > & {
   scheduled_send_at?: string | null;
 };
@@ -94,6 +96,7 @@ export interface Event {
   qr_bg_color: string;
   ticket_types: TicketTypeDef[];
   required_fields: string[];
+  collect_aso_ebi: boolean;
   whatsapp_enabled: boolean;
   whatsapp_template: number | null;
   whatsapp_template_name: string | null;
@@ -189,6 +192,8 @@ export interface RsvpRecipient {
   event_name: string;
   ticket_type: string;
   table_number: string;
+  aso_ebi_requested: boolean;
+  aso_ebi_quantity: number;
   has_phone: boolean;
   response_status: RsvpResponseStatus;
   invitation_status: RsvpInvitationStatus;
@@ -215,6 +220,9 @@ export interface PublicRsvpDetails {
   event_name: string;
   event_date: string;
   venue: string;
+  collect_aso_ebi: boolean;
+  aso_ebi_requested: boolean;
+  aso_ebi_quantity: number;
   response_deadline: string | null;
   response_status: RsvpResponseStatus;
   responded_at: string | null;

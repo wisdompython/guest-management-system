@@ -16,6 +16,7 @@ class GuestSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'event_name', 'full_name', 'phone_number', 'email',
             'ticket_type', 'table_number', 'seat_number',
+            'aso_ebi_requested', 'aso_ebi_quantity',
             'qr_code', 'pass_image',
             'status', 'checked_in_at',
             'whatsapp_sent', 'whatsapp_sent_at', 'scheduled_send_at',
@@ -71,6 +72,25 @@ class GuestSerializer(serializers.ModelSerializer):
                 {'scheduled_send_at': 'Scheduled send time must be before the event date.'}
             )
 
+        aso_ebi_requested = data.get(
+            'aso_ebi_requested',
+            self.instance.aso_ebi_requested if self.instance else False,
+        )
+        aso_ebi_quantity = data.get(
+            'aso_ebi_quantity',
+            self.instance.aso_ebi_quantity if self.instance else 0,
+        )
+        if aso_ebi_requested and not event.collect_aso_ebi:
+            raise serializers.ValidationError({
+                'aso_ebi_requested': 'Aso Ebi requests are not enabled for this event.',
+            })
+        if aso_ebi_requested and aso_ebi_quantity < 1:
+            raise serializers.ValidationError({
+                'aso_ebi_quantity': 'Enter a quantity of at least 1 for an Aso Ebi request.',
+            })
+        if not aso_ebi_requested:
+            data['aso_ebi_quantity'] = 0
+
         return data
 
     def create(self, validated_data):
@@ -88,6 +108,7 @@ class GuestListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'event_name', 'full_name', 'phone_number',
             'email', 'ticket_type', 'table_number',
+            'aso_ebi_requested', 'aso_ebi_quantity',
             'status', 'whatsapp_sent', 'scheduled_send_at', 'registered_at',
         )
 

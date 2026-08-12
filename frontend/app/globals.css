@@ -142,7 +142,6 @@ textarea.form-control {
 }
 
 .form-card {
-  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--panel);

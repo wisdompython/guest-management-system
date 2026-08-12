@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -14,6 +14,8 @@ class RsvpStatsSerializer(serializers.Serializer):
     invitation_failed = serializers.IntegerField()
     passes_sent = serializers.IntegerField()
     passes_failed = serializers.IntegerField()
+    aso_ebi_requests = serializers.IntegerField()
+    aso_ebi_quantity = serializers.IntegerField()
     response_rate = serializers.FloatField()
     confirmation_rate = serializers.FloatField()
 
@@ -41,6 +43,21 @@ def build_workflow_stats(workflow):
             ]),
         ),
         passes_failed=Count('id', filter=Q(pass_status=RsvpRecipient.PassStatus.FAILED)),
+        aso_ebi_requests=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                guest__aso_ebi_requested=True,
+            ),
+        ),
+        aso_ebi_quantity=Sum(
+            'guest__aso_ebi_quantity',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                guest__aso_ebi_requested=True,
+            ),
+            default=0,
+        ),
     )
     invited = counts['invited']
     responded = counts['confirmed'] + counts['declined']
@@ -178,6 +195,8 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='workflow.event.name', read_only=True)
     ticket_type = serializers.CharField(source='guest.ticket_type', read_only=True)
     table_number = serializers.CharField(source='guest.table_number', read_only=True)
+    aso_ebi_requested = serializers.BooleanField(source='guest.aso_ebi_requested', read_only=True)
+    aso_ebi_quantity = serializers.IntegerField(source='guest.aso_ebi_quantity', read_only=True)
     has_phone = serializers.SerializerMethodField()
 
     class Meta:
@@ -190,6 +209,8 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'event_name',
             'ticket_type',
             'table_number',
+            'aso_ebi_requested',
+            'aso_ebi_quantity',
             'has_phone',
             'response_status',
             'invitation_status',

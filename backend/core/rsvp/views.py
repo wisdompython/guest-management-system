@@ -109,6 +109,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         def rows():
             yield writer.writerow([
                 'guest_name', 'ticket_type', 'table_number', 'response_status',
+                'aso_ebi_requested', 'aso_ebi_quantity',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
             ])
             for recipient in recipients.iterator():
@@ -117,6 +118,8 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     recipient.guest.ticket_type,
                     recipient.guest.table_number,
                     recipient.response_status,
+                    'Yes' if recipient.guest.aso_ebi_requested else 'No',
+                    recipient.guest.aso_ebi_quantity if recipient.guest.aso_ebi_requested else 0,
                     recipient.responded_at.isoformat() if recipient.responded_at else '',
                     recipient.invitation_status,
                     recipient.pass_status,
@@ -375,6 +378,9 @@ class PublicRsvpResponseView(APIView):
             'event_name': workflow.event.name,
             'event_date': workflow.event.date,
             'venue': workflow.event.venue,
+            'collect_aso_ebi': workflow.event.collect_aso_ebi,
+            'aso_ebi_requested': recipient.guest.aso_ebi_requested,
+            'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,
             'response_deadline': workflow.response_deadline,
             'response_status': recipient.response_status,
             'responded_at': recipient.responded_at,
@@ -399,6 +405,30 @@ class PublicRsvpResponseView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        recipient = self.get_recipient(token)
+        aso_ebi_requested = request.data.get('aso_ebi_requested', False)
+        if not isinstance(aso_ebi_requested, bool):
+            return Response(
+                {'detail': 'aso_ebi_requested must be true or false.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if answer == 'no':
+            aso_ebi_requested = False
+        if aso_ebi_requested and not recipient.workflow.event.collect_aso_ebi:
+            return Response(
+                {'detail': 'Aso Ebi requests are not enabled for this event.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            aso_ebi_quantity = int(request.data.get('aso_ebi_quantity', 0))
+        except (TypeError, ValueError):
+            aso_ebi_quantity = 0
+        if aso_ebi_requested and aso_ebi_quantity < 1:
+            return Response(
+                {'detail': 'Enter an Aso Ebi quantity of at least 1.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         from .models import RsvpResponse
         from .services import record_response
         result = record_response(
@@ -406,7 +436,13 @@ class PublicRsvpResponseView(APIView):
             answer=answer,
             response_id=f'web:{uuid.uuid4()}',
             source=RsvpResponse.Source.WEB,
-            raw_payload={'answer': answer},
+            raw_payload={
+                'answer': answer,
+                'aso_ebi_requested': aso_ebi_requested,
+                'aso_ebi_quantity': aso_ebi_quantity if aso_ebi_requested else 0,
+            },
+            aso_ebi_requested=aso_ebi_requested,
+            aso_ebi_quantity=aso_ebi_quantity if aso_ebi_requested else 0,
         )
         reason = result.get('reason')
         if reason == 'not_found':

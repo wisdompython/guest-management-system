@@ -25,6 +25,9 @@ export default function PublicRsvpPage() {
   const [details, setDetails] = useState<PublicRsvpDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<'yes' | 'no' | null>(null)
+  const [answer, setAnswer] = useState<'yes' | 'no' | null>(null)
+  const [asoEbiRequested, setAsoEbiRequested] = useState(false)
+  const [asoEbiQuantity, setAsoEbiQuantity] = useState(1)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -35,15 +38,21 @@ export default function PublicRsvpPage() {
   }, [token])
 
   async function respond(answer: 'yes' | 'no') {
+    if (answer === 'yes' && asoEbiRequested && asoEbiQuantity < 1) {
+      setError('Enter the number of Aso Ebi pieces you need.')
+      return
+    }
     setSubmitting(answer); setError('')
     try {
-      const result = await api.submitPublicRsvp(token, answer)
+      const result = await api.submitPublicRsvp(token, answer, asoEbiRequested, asoEbiQuantity)
       setDetails((current) => current ? {
         ...current,
         response_status: result.response_status,
         can_respond: false,
         closed_reason: 'already_responded',
         responded_at: new Date().toISOString(),
+        aso_ebi_requested: answer === 'yes' && asoEbiRequested,
+        aso_ebi_quantity: answer === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
       } : current)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Your response could not be saved. Please try again.')
@@ -72,14 +81,31 @@ export default function PublicRsvpPage() {
 
             <div className="mt-6 grid gap-3 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div className="flex gap-3"><span aria-hidden="true" style={{ color: 'var(--brand)' }}>◷</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Date and time</p><p className="mt-1 text-sm font-semibold">{new Date(details.event_date).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}</p></div></div>
-              {details.venue && <div className="flex gap-3"><span aria-hidden="true" style={{ color: 'var(--brand)' }}>⌖</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Venue</p><p className="mt-1 text-sm font-semibold">{details.venue}</p></div></div>}
               {details.response_deadline && <div className="flex gap-3"><span aria-hidden="true" style={{ color: 'var(--brand)' }}>✓</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Respond by</p><p className="mt-1 text-sm font-semibold">{new Date(details.response_deadline).toLocaleDateString('en-GB', { dateStyle: 'long' })}</p></div></div>}
             </div>
 
             {details.can_respond ? (
-              <div className="mt-7"><p className="text-center text-sm font-semibold">Will you be attending?</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><button disabled={!!submitting} onClick={() => respond('yes')} className="rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--brand)' }}>{submitting === 'yes' ? 'Confirming…' : 'Yes, I’ll attend'}</button><button disabled={!!submitting} onClick={() => respond('no')} className="rounded-lg px-4 py-3 text-sm font-semibold transition hover:opacity-80 disabled:opacity-50" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>{submitting === 'no' ? 'Submitting…' : 'No, I can’t attend'}</button></div></div>
+              <div className="mt-7">
+                <p className="text-center text-sm font-semibold">Will you be attending?</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’ll attend</button>
+                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I can’t attend</button>
+                </div>
+
+                {answer === 'yes' && details.collect_aso_ebi && (
+                  <div className="mt-5 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input type="checkbox" checked={asoEbiRequested} onChange={(e) => setAsoEbiRequested(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+                      <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this only if you want Aso Ebi included with your RSVP.</span></span>
+                    </label>
+                    {asoEbiRequested && <div className="mt-4"><label htmlFor="aso-ebi-quantity" className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Quantity needed</label><input id="aso-ebi-quantity" type="number" min="1" step="1" value={asoEbiQuantity} onChange={(e) => setAsoEbiQuantity(Math.max(1, Number(e.target.value) || 1))} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>Enter the total number of pieces you need.</p></div>}
+                  </div>
+                )}
+
+                {answer && <button type="button" disabled={!!submitting} onClick={() => respond(answer)} className="mt-5 w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--brand)' }}>{submitting ? 'Saving your response…' : 'Submit RSVP'}</button>}
+              </div>
             ) : (
-              <div className="mt-7 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#0d1016' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{details.closed_reason === 'deadline_passed' ? 'RSVP has closed' : details.closed_reason === 'workflow_inactive' ? 'Responses are currently closed' : RESPONSE_COPY[details.response_status].title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{details.closed_reason === 'deadline_passed' ? 'The response deadline for this event has passed.' : details.closed_reason === 'workflow_inactive' ? 'Please contact the event organiser if you need assistance.' : RESPONSE_COPY[details.response_status].body}</p></div>
+              <div className="mt-7 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#0d1016' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{details.closed_reason === 'deadline_passed' ? 'RSVP has closed' : details.closed_reason === 'workflow_inactive' ? 'Responses are currently closed' : RESPONSE_COPY[details.response_status].title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{details.closed_reason === 'deadline_passed' ? 'The response deadline for this event has passed.' : details.closed_reason === 'workflow_inactive' ? 'Please contact the event organiser if you need assistance.' : RESPONSE_COPY[details.response_status].body}</p>{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity}</p>}</div>
             )}
 
             {error && <p className="mt-4 rounded-lg px-3 py-2 text-center text-xs" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</p>}

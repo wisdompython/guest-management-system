@@ -74,6 +74,11 @@ export function UploadForm({
             <p style={{ color: 'var(--muted-2)' }}>
               WhatsApp delivery: <b style={{ color: 'var(--ink)' }}>{selectedEvent.whatsapp_enabled ? 'Enabled' : 'Disabled'}</b>
             </p>
+            {selectedEvent.collect_aso_ebi && (
+              <p className="leading-5" style={{ color: 'var(--muted-2)' }}>
+                For Aso Ebi, use <code>yes</code> or <code>no</code>. A quantity of at least 1 is required when the answer is yes.
+              </p>
+            )}
           </div>
         )}
 

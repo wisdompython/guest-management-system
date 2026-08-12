@@ -112,6 +112,7 @@ class GuestBulkExportMixin:
         columns = [
             'full_name', 'email', 'phone_number',
             'ticket_type', 'table_number', 'seat_number',
+            'aso_ebi_requested', 'aso_ebi_quantity',
             'status', 'registered_at', 'checked_in_at',
             'whatsapp_sent', 'event',
         ]
@@ -122,6 +123,8 @@ class GuestBulkExportMixin:
                 yield safe_csv_row([
                     g.full_name, g.email, g.phone_number,
                     g.ticket_type, g.table_number, g.seat_number,
+                    'Yes' if g.aso_ebi_requested else 'No',
+                    g.aso_ebi_quantity if g.aso_ebi_requested else 0,
                     g.get_status_display(),
                     g.registered_at.strftime('%Y-%m-%d %H:%M') if g.registered_at else '',
                     g.checked_in_at.strftime('%Y-%m-%d %H:%M') if g.checked_in_at else '',

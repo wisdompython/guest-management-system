@@ -86,6 +86,8 @@ def record_response(
     sender_phone: str = '',
     raw_payload: dict | None = None,
     require_phone_match: bool = False,
+    aso_ebi_requested: bool = False,
+    aso_ebi_quantity: int = 0,
 ) -> dict:
     """Record the first valid response and queue a pass when appropriate."""
     if answer not in {RsvpResponse.Answer.YES, RsvpResponse.Answer.NO}:
@@ -118,6 +120,10 @@ def record_response(
                 'reason': 'already_responded',
                 'response_status': recipient.response_status,
             }
+        if aso_ebi_requested and not recipient.workflow.event.collect_aso_ebi:
+            return {'accepted': False, 'reason': 'aso_ebi_not_enabled'}
+        if aso_ebi_requested and aso_ebi_quantity < 1:
+            return {'accepted': False, 'reason': 'invalid_aso_ebi_quantity'}
 
         _, created = RsvpResponse.objects.get_or_create(
             message_id=response_id,
@@ -139,12 +145,18 @@ def record_response(
         )
         if answer == RsvpResponse.Answer.YES:
             recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
+            recipient.guest.aso_ebi_requested = aso_ebi_requested
+            recipient.guest.aso_ebi_quantity = aso_ebi_quantity if aso_ebi_requested else 0
+            recipient.guest.save(update_fields=['aso_ebi_requested', 'aso_ebi_quantity'])
             if recipient.workflow.auto_send_pass and pass_due:
                 recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
                 recipient.pass_queued_at = now
         else:
             recipient.response_status = RsvpRecipient.ResponseStatus.DECLINED
             recipient.pass_status = RsvpRecipient.PassStatus.NOT_ISSUED
+            recipient.guest.aso_ebi_requested = False
+            recipient.guest.aso_ebi_quantity = 0
+            recipient.guest.save(update_fields=['aso_ebi_requested', 'aso_ebi_quantity'])
         recipient.responded_at = now
         recipient.save(update_fields=[
             'response_status',

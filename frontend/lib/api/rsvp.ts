@@ -80,11 +80,18 @@ export const rsvpApi = {
     request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST' }),
   getPublicRsvp: (token: string) =>
     request<PublicRsvpDetails>(`/rsvp/respond/${token}/`),
-  submitPublicRsvp: (token: string, answer: 'yes' | 'no') =>
+  submitPublicRsvp: (token: string, answer: 'yes' | 'no', asoEbiRequested = false, asoEbiQuantity = 0) =>
     request<{
       accepted: boolean
       already_responded?: boolean
       response_status: RsvpResponseStatus
       pass_queued?: boolean
-    }>(`/rsvp/respond/${token}/`, { method: 'POST', body: JSON.stringify({ answer }) }),
+    }>(`/rsvp/respond/${token}/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        answer,
+        aso_ebi_requested: answer === 'yes' && asoEbiRequested,
+        aso_ebi_quantity: answer === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
+      }),
+    }),
 }

@@ -8,6 +8,10 @@ from ..models import Event, BulkUpload
 from .event import _event_required_fields, _event_valid_ticket_values
 
 
+TRUE_VALUES = {'1', 'true', 'yes', 'y', 'requested'}
+FALSE_VALUES = {'', '0', 'false', 'no', 'n', 'not requested'}
+
+
 class BulkGuestUploadSerializer(serializers.Serializer):
     event = serializers.PrimaryKeyRelatedField(queryset=Event.objects.all())
     csv_file = serializers.FileField()
@@ -61,6 +65,24 @@ class BulkGuestUploadSerializer(serializers.Serializer):
                 continue
             errors = []
 
+            aso_ebi_requested = False
+            aso_ebi_quantity = 0
+            raw_aso_ebi = row.get('aso_ebi_requested', '').lower()
+            if raw_aso_ebi in TRUE_VALUES:
+                aso_ebi_requested = True
+            elif raw_aso_ebi not in FALSE_VALUES:
+                errors.append("'aso_ebi_requested' must be yes or no.")
+
+            if aso_ebi_requested:
+                if not event.collect_aso_ebi:
+                    errors.append('Aso Ebi requests are not enabled for this event.')
+                try:
+                    aso_ebi_quantity = int(row.get('aso_ebi_quantity', ''))
+                    if aso_ebi_quantity < 1:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    errors.append("'aso_ebi_quantity' must be a whole number of at least 1 when Aso Ebi is requested.")
+
             # Validate required fields
             for field in required:
                 if not row.get(field, ''):
@@ -94,6 +116,8 @@ class BulkGuestUploadSerializer(serializers.Serializer):
                 'ticket_type':  ticket_type,
                 'table_number': row.get('table_number', ''),
                 'seat_number':  row.get('seat_number', ''),
+                'aso_ebi_requested': aso_ebi_requested,
+                'aso_ebi_quantity': aso_ebi_quantity,
                 'scheduled_send_at': event.pass_send_at,
             })
 

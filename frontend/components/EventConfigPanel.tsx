@@ -3,6 +3,7 @@
 import { TicketTypesSection } from '@/components/event-config/TicketTypesSection'
 import { RequiredFieldsSection } from '@/components/event-config/RequiredFieldsSection'
 import { WhatsAppToggle } from '@/components/event-config/WhatsAppToggle'
+import { AsoEbiToggle } from '@/components/event-config/AsoEbiToggle'
 
 export interface TicketTypeDef {
   value: string
@@ -22,15 +23,17 @@ interface Props {
   ticketTypes:    TicketTypeDef[]
   requiredFields: string[]
   whatsappEnabled: boolean
+  collectAsoEbi: boolean
   onChange: (patch: {
     ticketTypes?:    TicketTypeDef[]
     requiredFields?: string[]
     whatsappEnabled?: boolean
+    collectAsoEbi?: boolean
   }) => void
 }
 
 export default function EventConfigPanel({
-  ticketTypes, requiredFields, whatsappEnabled, onChange,
+  ticketTypes, requiredFields, whatsappEnabled, collectAsoEbi, onChange,
 }: Props) {
   function toggleField(key: string) {
     const next = requiredFields.includes(key)
@@ -49,6 +52,10 @@ export default function EventConfigPanel({
         requiredFields={requiredFields}
         whatsappEnabled={whatsappEnabled}
         onToggle={toggleField}
+      />
+      <AsoEbiToggle
+        enabled={collectAsoEbi}
+        onChange={(enabled) => onChange({ collectAsoEbi: enabled })}
       />
       <WhatsAppToggle
         whatsappEnabled={whatsappEnabled}

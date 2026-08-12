@@ -54,6 +54,10 @@ class Event(models.Model):
         blank=True,
         help_text='Guest fields that are required for this event.',
     )
+    collect_aso_ebi = models.BooleanField(
+        default=False,
+        help_text='Allow guests to request Aso Ebi and specify a quantity.',
+    )
     # When False, WhatsApp delivery is not expected and phone_number is not auto-required
     whatsapp_enabled = models.BooleanField(default=True)
     # Optional override — if set, this template is used for pass delivery instead of the global default
@@ -92,6 +96,8 @@ class Guest(models.Model):
     ticket_type = models.CharField(max_length=50, blank=True, default='general')
     table_number = models.CharField(max_length=50, blank=True)
     seat_number = models.CharField(max_length=50, blank=True)
+    aso_ebi_requested = models.BooleanField(default=False)
+    aso_ebi_quantity = models.PositiveIntegerField(default=0)
 
     # Generated assets — created automatically after registration
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)

@@ -23,6 +23,8 @@ export function GuestDetailsCard({ guest, showPhone = false }: Props) {
             { label: 'Ticket',      value: guest.ticket_type.toUpperCase() },
             { label: 'Table',       value: guest.table_number || '—' },
             { label: 'Seat',        value: guest.seat_number || '—' },
+            { label: 'Aso Ebi',     value: guest.aso_ebi_requested ? 'Requested' : 'Not requested' },
+            guest.aso_ebi_requested ? { label: 'Aso Ebi Qty', value: String(guest.aso_ebi_quantity) } : null,
             { label: 'Registered',  value: new Date(guest.registered_at).toLocaleString() },
             { label: 'Checked In',  value: guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : '—' },
           ] as ({ label: string; value: string } | null)[]).filter((r): r is { label: string; value: string } => r !== null).map(({ label, value }) => (

@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 import { Event } from '@/lib/api'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
@@ -29,6 +31,12 @@ export function GuestForm({
   events, selectedEvent, submitting, uniqueRequired, ticketOptions,
   onSubmit, onEventChange, onCancel,
 }: Props) {
+  const [asoEbiRequested, setAsoEbiRequested] = useState(false)
+
+  useEffect(() => {
+    setAsoEbiRequested(false)
+  }, [selectedEvent?.id])
+
   return (
     <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       <div className="border-b border-[var(--line)] px-6 py-4">
@@ -81,6 +89,31 @@ export function GuestForm({
           )
         })}
 
+        {selectedEvent?.collect_aso_ebi && (
+          <div className="sm:col-span-2 rounded-[14px] border border-[var(--line)] bg-[var(--bg)] p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                name="aso_ebi_requested"
+                type="checkbox"
+                checked={asoEbiRequested}
+                onChange={(e) => setAsoEbiRequested(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[var(--brand)]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-[var(--ink)]">Guest wants Aso Ebi</span>
+                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Turn this on to record the number of pieces requested.</span>
+              </span>
+            </label>
+            {asoEbiRequested && (
+              <div className="mt-4 max-w-xs">
+                <label className={labelCls}>Quantity *</label>
+                <input name="aso_ebi_quantity" type="number" min="1" step="1" defaultValue="1" required className={field} />
+                <p className="mt-1.5 text-xs text-[var(--muted)]">Enter the total quantity this guest needs.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {selectedEvent?.whatsapp_enabled && (
           <div className="sm:col-span-2">
             <label className={labelCls}>
@@ -98,6 +131,7 @@ export function GuestForm({
           <span>WhatsApp: <b>{selectedEvent.whatsapp_enabled ? 'On' : 'Off'}</b></span>
           <span>·</span>
           <span>Ticket types: <b>{ticketOptions.map(t => t.label).join(', ')}</b></span>
+          {selectedEvent.collect_aso_ebi && <><span>·</span><span>Aso Ebi requests: <b>On</b></span></>}
         </div>
       )}
 
