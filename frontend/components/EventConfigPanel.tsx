@@ -53,14 +53,20 @@ export default function EventConfigPanel({
         whatsappEnabled={whatsappEnabled}
         onToggle={toggleField}
       />
-      <AsoEbiToggle
-        enabled={collectAsoEbi}
-        onChange={(enabled) => onChange({ collectAsoEbi: enabled })}
-      />
-      <WhatsAppToggle
-        whatsappEnabled={whatsappEnabled}
-        onChange={(enabled) => onChange({ whatsappEnabled: enabled })}
-      />
+      <div>
+        <p className="mb-1 text-sm font-semibold text-[var(--ink)]">Guest services</p>
+        <p className="mb-3 text-xs text-[var(--muted)]">Enable only the services that apply to this event.</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <AsoEbiToggle
+            enabled={collectAsoEbi}
+            onChange={(enabled) => onChange({ collectAsoEbi: enabled })}
+          />
+          <WhatsAppToggle
+            whatsappEnabled={whatsappEnabled}
+            onChange={(enabled) => onChange({ whatsappEnabled: enabled })}
+          />
+        </div>
+      </div>
     </div>
   )
 }

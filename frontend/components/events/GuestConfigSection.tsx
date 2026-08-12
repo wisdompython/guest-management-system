@@ -29,7 +29,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
   return (
     <div className="form-card">
       <FormSectionHeader step={step} tourId="event-guest-config-section" title="Guest setup" description="Choose ticket categories and the information to collect for each guest." />
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-5 sm:p-6">
         <EventConfigPanel
           ticketTypes={ticketTypes}
           requiredFields={requiredFields}
@@ -39,13 +39,15 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
         />
 
         {whatsappEnabled && (
-          <div className="space-y-1.5 pt-2 border-t border-[rgba(255,255,255,0.07)]">
-            <label className="form-label">
-              Guest-pass message template <span className="font-normal text-[var(--muted)]">(optional)</span>
-            </label>
-            <p className="mb-2 text-xs leading-5" style={{ color: 'var(--muted)' }}>
-              This approved Meta template accompanies the guest pass. Keep the global default unless this event needs different wording.
-            </p>
+          <div className="rounded-[14px] border border-[var(--line)] bg-[var(--bg)] p-4">
+            <div className="mb-3">
+              <label className="text-sm font-semibold text-[var(--ink)]">
+                Guest-pass message <span className="font-normal text-[var(--muted)]">(optional)</span>
+              </label>
+              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                Choose a Meta template, or keep the global default.
+              </p>
+            </div>
             <SearchableSelect
               data-tour="event-whatsapp-template"
               options={[
@@ -60,6 +62,7 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
               onChange={(val) => onChange({ whatsappTemplate: val ? Number(val) : null })}
               placeholder="— Use global default —"
               searchPlaceholder="Search templates…"
+              inlineMenu
               style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
             />
             {whatsappTemplate && selectedTemplate && (

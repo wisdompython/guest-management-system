@@ -101,7 +101,7 @@ export function GuestForm({
               />
               <span>
                 <span className="block text-sm font-semibold text-[var(--ink)]">Guest wants Aso Ebi</span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Turn this on to record the number of pieces requested.</span>
+                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Turn this on to record the requested quantity.</span>
               </span>
             </label>
             {asoEbiRequested && (

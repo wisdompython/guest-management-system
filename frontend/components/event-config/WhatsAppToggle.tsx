@@ -9,15 +9,15 @@ export function WhatsAppToggle({ whatsappEnabled, onChange }: Props) {
   return (
     <div
       data-tour="event-whatsapp-toggle"
-      className="flex items-start justify-between gap-4 rounded-[14px] p-4 transition-colors"
+      className="flex h-full items-start justify-between gap-4 rounded-[14px] p-4 transition-colors"
       style={{ border: '1px solid var(--line)', background: whatsappEnabled ? 'var(--brand-soft)' : 'var(--bg)' }}
     >
       <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>WhatsApp Delivery</p>
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>WhatsApp pass delivery</p>
+        <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>
           {whatsappEnabled
-            ? 'Passes will be sent via WhatsApp. Phone number is required for all guests.'
-            : 'WhatsApp delivery is off for this event. Phone number is optional.'}
+            ? 'Send passes through WhatsApp. Guest phone numbers become required.'
+            : 'Keep pass delivery off. Guest phone numbers remain optional.'}
         </p>
       </div>
       <button

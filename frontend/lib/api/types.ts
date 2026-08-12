@@ -159,6 +159,8 @@ export interface RsvpStats {
   invitation_failed: number;
   passes_sent: number;
   passes_failed: number;
+  aso_ebi_requests: number;
+  aso_ebi_quantity: number;
   response_rate: number;
   confirmation_rate: number;
 }

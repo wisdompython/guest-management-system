@@ -39,7 +39,7 @@ export default function PublicRsvpPage() {
 
   async function respond(answer: 'yes' | 'no') {
     if (answer === 'yes' && asoEbiRequested && asoEbiQuantity < 1) {
-      setError('Enter the number of Aso Ebi pieces you need.')
+      setError('Enter the Aso Ebi quantity you need.')
       return
     }
     setSubmitting(answer); setError('')
@@ -96,9 +96,9 @@ export default function PublicRsvpPage() {
                   <div className="mt-5 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input type="checkbox" checked={asoEbiRequested} onChange={(e) => setAsoEbiRequested(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
-                      <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this only if you want Aso Ebi included with your RSVP.</span></span>
+                      <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this to include an Aso Ebi request with your RSVP.</span></span>
                     </label>
-                    {asoEbiRequested && <div className="mt-4"><label htmlFor="aso-ebi-quantity" className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Quantity needed</label><input id="aso-ebi-quantity" type="number" min="1" step="1" value={asoEbiQuantity} onChange={(e) => setAsoEbiQuantity(Math.max(1, Number(e.target.value) || 1))} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>Enter the total number of pieces you need.</p></div>}
+                    {asoEbiRequested && <div className="mt-4"><label htmlFor="aso-ebi-quantity" className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Quantity needed</label><input id="aso-ebi-quantity" type="number" min="1" step="1" value={asoEbiQuantity} onChange={(e) => setAsoEbiQuantity(Math.max(1, Number(e.target.value) || 1))} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>Enter the total quantity you need.</p></div>}
                   </div>
                 )}
 

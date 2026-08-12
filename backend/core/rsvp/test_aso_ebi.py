@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 from guests.models import Event, Guest
 
 from .models import RsvpRecipient, RsvpWorkflow
+from .serializers import build_workflow_stats
 
 
 class PublicRsvpAsoEbiTests(TestCase):
@@ -53,6 +54,9 @@ class PublicRsvpAsoEbiTests(TestCase):
         self.guest.refresh_from_db()
         self.assertTrue(self.guest.aso_ebi_requested)
         self.assertEqual(self.guest.aso_ebi_quantity, 3)
+        stats = build_workflow_stats(self.workflow)
+        self.assertEqual(stats['aso_ebi_requests'], 1)
+        self.assertEqual(stats['aso_ebi_quantity'], 3)
         mock_send.assert_called_once_with(self.recipient.id)
 
     def test_confirmation_rejects_missing_quantity(self):

@@ -15,6 +15,7 @@ interface Props {
   placeholder?: string
   searchPlaceholder?: string
   dropUp?: boolean
+  inlineMenu?: boolean
   className?: string
   style?: React.CSSProperties
   'data-tour'?: string
@@ -25,6 +26,7 @@ export function SearchableSelect({
   placeholder = 'Select…',
   searchPlaceholder = 'Search…',
   dropUp = false,
+  inlineMenu = false,
   className = '',
   style,
   'data-tour': dataTour,
@@ -60,6 +62,11 @@ export function SearchableSelect({
   }
 
   function handleOpen() {
+    if (open) {
+      setOpen(false)
+      setSearch('')
+      return
+    }
     setOpen(true)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
@@ -88,11 +95,11 @@ export function SearchableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 w-full rounded-[12px] shadow-xl overflow-hidden"
+        <div className={`${inlineMenu ? 'relative mt-2' : 'absolute z-50'} w-full overflow-hidden rounded-[12px] shadow-xl`}
           style={{
             background: '#1a2030',
             border: '1px solid rgba(255,255,255,0.12)',
-            ...(dropUp ? { bottom: 'calc(100% + 4px)' } : { top: 'calc(100% + 4px)' }),
+            ...(!inlineMenu && (dropUp ? { bottom: 'calc(100% + 4px)' } : { top: 'calc(100% + 4px)' })),
           }}>
           <div className="flex items-center gap-2 px-3 py-2"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

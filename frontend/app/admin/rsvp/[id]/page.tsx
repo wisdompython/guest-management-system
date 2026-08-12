@@ -81,11 +81,12 @@ export default function RsvpWorkflowDetailPage() {
       {workflow.status === 'draft' && <div className="mt-5 rounded-[12px] px-4 py-3" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.25)' }}><p className="text-sm font-semibold">Ready for review</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{stats.invited} eligible guests were added. {workflow.invitation_send_at ? `Launch now to activate invitation delivery for ${new Date(workflow.invitation_send_at).toLocaleString('en-GB')}.` : 'No messages have been sent. Launch when the Meta RSVP template is approved and ready.'}{workflow.auto_send_pass && workflow.pass_send_at ? ` Confirmed passes are scheduled for ${new Date(workflow.pass_send_at).toLocaleString('en-GB')}.` : ''}</p></div>}
       {workflow.status === 'active' && workflow.invitation_send_at && new Date(workflow.invitation_send_at) > new Date() && <div className="mt-5 rounded-[12px] px-4 py-3" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.25)' }}><p className="text-sm font-semibold">Invitations scheduled</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>RSVP requests will begin sending at {new Date(workflow.invitation_send_at).toLocaleString('en-GB')}.</p></div>}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metric('Confirmed', stats.confirmed, `${stats.confirmation_rate}% of invitees`, 'var(--success)')}
         {metric('Declined', stats.declined, `${responded} total responses`)}
         {metric('Awaiting', stats.awaiting, 'Eligible for reminders')}
         {metric('Passes sent', stats.passes_sent, stats.passes_failed ? `${stats.passes_failed} failed` : 'No failed deliveries')}
+        {metric('Aso Ebi quantity', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}
       </div>
 
       <div className="mt-5 rounded-[12px] p-5" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>

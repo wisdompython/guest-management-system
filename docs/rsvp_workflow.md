@@ -9,7 +9,8 @@ Create two approved WhatsApp templates before configuring a workflow.
 ### RSVP invitation template
 
 - Must not require an image header.
-- May use the existing template variables such as guest name, event name, event date, and venue.
+- May use the existing template variables such as guest name, event name, and event date.
+- Keep the venue out of the RSVP invitation; guests receive it on the actual pass.
 - Must include `rsvp_link` in `body_params` at the position of the link placeholder.
 - Does not require WhatsApp quick-reply buttons.
 - The application replaces `rsvp_link` with a unique URL for each recipient, for example `https://your-domain/rsvp/<opaque-token>`.
@@ -32,6 +33,12 @@ Create two approved WhatsApp templates before configuring a workflow.
 8. Complete the workflow after RSVP closes. Completion releases the event from the RSVP pass hold.
 
 Guests added or imported while the workflow is a draft are attached to it automatically. The first valid Yes/No response submitted from the RSVP page is authoritative. Repeated submissions never queue another pass.
+
+## Aso Ebi requests
+
+Enable **Collect Aso Ebi requests** in the event's guest setup when the event offers Aso Ebi. A guest who confirms attendance can then choose whether they want Aso Ebi and must enter a quantity of at least one when they do.
+
+The workflow dashboard shows both the number of guest requests and the total quantity. Each request also appears in the recipient list, guest details, the regular guest CSV export, and the RSVP CSV export. For bulk guest uploads, use `aso_ebi_requested` with `yes` or `no`; when the value is `yes`, provide `aso_ebi_quantity` as a whole number of at least one.
 
 ## Original direct-delivery flow
 
