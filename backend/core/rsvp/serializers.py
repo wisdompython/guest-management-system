@@ -126,10 +126,6 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             instance.invitation_template if instance else None,
         )
         pass_template = attrs.get('pass_template', instance.pass_template if instance else None)
-        auto_send_pass = attrs.get(
-            'auto_send_pass',
-            instance.auto_send_pass if instance else True,
-        )
         deadline = attrs.get(
             'response_deadline',
             instance.response_deadline if instance else None,
@@ -182,10 +178,6 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
         if pass_template and not pass_template.is_active:
             raise serializers.ValidationError({
                 'pass_template': 'Select an active WhatsApp template.',
-            })
-        if auto_send_pass and invitation_template and not pass_template:
-            raise serializers.ValidationError({
-                'pass_template': 'A pass template is required when automatic pass delivery is enabled.',
             })
         return attrs
 

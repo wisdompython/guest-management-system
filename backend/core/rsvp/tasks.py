@@ -116,7 +116,7 @@ def send_confirmed_pass(self, recipient_id: int):
     try:
         recipient = (
             RsvpRecipient.objects
-            .select_related('workflow__pass_template', 'workflow__event', 'guest__event')
+            .select_related('workflow__pass_template', 'workflow__event', 'guest__event__whatsapp_template')
             .get(pk=recipient_id)
         )
     except RsvpRecipient.DoesNotExist:

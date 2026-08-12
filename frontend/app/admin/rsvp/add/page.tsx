@@ -70,6 +70,9 @@ export default function AddRsvpWorkflowPage() {
   const selectedEvent = events.find((event) => event.id === eventId)
   const selectedInvitation = templates.find((template) => template.id === invitationTemplate)
   const selectedPass = templates.find((template) => template.id === passTemplate)
+  const passDefaultLabel = selectedEvent?.whatsapp_template_name
+    ? `Event default (${selectedEvent.whatsapp_template_name})`
+    : 'Global default template'
   const invitationOptions = templates.filter((template) => (
     !template.has_header_image && template.body_params.includes('rsvp_link')
   ))
@@ -98,8 +101,8 @@ export default function AddRsvpWorkflowPage() {
   function continueSetup() {
     setError('')
     if (step === 1 && !eventId) return setError('Select an event to continue.')
-    if (step === 2 && (!invitationTemplate || (autoSendPass && !passTemplate))) {
-      return setError('Select the required invitation and pass templates.')
+    if (step === 2 && !invitationTemplate) {
+      return setError('Select an RSVP invitation template.')
     }
     if (step === 2 && invitationTiming === 'scheduled' && !invitationSendAt) {
       return setError('Choose a date and time for scheduled RSVP invitations.')
@@ -112,7 +115,7 @@ export default function AddRsvpWorkflowPage() {
 
   async function saveWorkflow(event: FormEvent) {
     event.preventDefault()
-    if (!eventId || !invitationTemplate || (autoSendPass && !passTemplate)) return
+    if (!eventId || !invitationTemplate) return
     if (invitationTiming === 'scheduled' && !invitationSendAt) {
       setError('Choose a date and time for scheduled RSVP invitations.'); return
     }
@@ -152,7 +155,7 @@ export default function AddRsvpWorkflowPage() {
     ['Eligible guests', selectedEvent ? `${selectedEvent.guest_count} registered (guests without phone numbers will be excluded)` : '—'],
     ['Invitation template', selectedInvitation?.display_name || selectedInvitation?.name],
     ['Invitation delivery', invitationTiming === 'scheduled' && invitationSendAt ? new Date(invitationSendAt).toLocaleString('en-GB') : 'Immediately when workflow is launched'],
-    ['Pass template', autoSendPass ? selectedPass?.display_name || selectedPass?.name : 'Manual delivery'],
+    ['Pass template', autoSendPass ? selectedPass?.display_name || selectedPass?.name || passDefaultLabel : 'Manual delivery'],
     ['Pass delivery', !autoSendPass ? 'Manual delivery' : passTiming === 'scheduled' && passSendAt ? new Date(passSendAt).toLocaleString('en-GB') : 'Immediately after each confirmation'],
     ['Response deadline', deadline ? new Date(`${deadline}T12:00:00`).toLocaleDateString('en-GB', { dateStyle: 'long' }) : 'No deadline'],
   ]
@@ -187,7 +190,7 @@ export default function AddRsvpWorkflowPage() {
           <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>The guest pass remains held until the guest confirms and its delivery time arrives.</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>RSVP invitation template</label><select value={invitationTemplate ?? ''} onChange={(e) => setInvitationTemplate(e.target.value ? Number(e.target.value) : null)} className={fieldClass} style={fieldStyle}><option value="">Select template</option>{invitationOptions.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}</option>)}</select>{invitationOptions.length === 0 && <p className="mt-2 text-[11px]" style={{ color: 'var(--warn)' }}>Create an active template containing the rsvp_link variable first.</p>}</div>
-            <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Pass template after “Yes”</label><select value={passTemplate ?? ''} disabled={!autoSendPass} onChange={(e) => setPassTemplate(e.target.value ? Number(e.target.value) : null)} className={`${fieldClass} disabled:opacity-50`} style={fieldStyle}><option value="">Select template</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}</option>)}</select></div>
+            <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Pass template after “Yes”</label><select value={passTemplate ?? ''} disabled={!autoSendPass} onChange={(e) => setPassTemplate(e.target.value ? Number(e.target.value) : null)} className={`${fieldClass} disabled:opacity-50`} style={fieldStyle}><option value="">— {passDefaultLabel} —</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}</option>)}</select><p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>Leave on the default to reuse the event’s guest-pass template.</p></div>
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Send RSVP invitations</label><select value={invitationTiming} onChange={(e) => setInvitationTiming(e.target.value as 'immediate' | 'scheduled')} className={fieldClass} style={fieldStyle}><option value="immediate">Send immediately on launch</option><option value="scheduled">Schedule for later</option></select>{invitationTiming === 'scheduled' && <input type="datetime-local" required value={invitationSendAt} onChange={(e) => setInvitationSendAt(e.target.value)} className={`${fieldClass} mt-3`} style={fieldStyle}/>}</div>
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Response deadline</label><input type="date" value={deadline} max={selectedEvent?.date.slice(0, 10)} onChange={(e) => setDeadline(e.target.value)} className={fieldClass} style={fieldStyle}/></div>
           </div>

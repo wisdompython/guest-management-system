@@ -158,11 +158,6 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     {'detail': 'The RSVP invitation template must include the rsvp_link variable.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if workflow.auto_send_pass and not workflow.pass_template_id:
-                return Response(
-                    {'detail': 'Select a pass template before launch.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             if workflow.response_deadline and workflow.response_deadline <= timezone.now():
                 return Response(
                     {'detail': 'The response deadline has passed.'},

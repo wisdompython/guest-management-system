@@ -68,10 +68,17 @@ def send_invitation(recipient):
 
 
 def send_configured_pass(recipient):
-    """Send a confirmed recipient's pass with the workflow's pass template."""
+    """Send a confirmed recipient's pass.
+
+    Template resolution mirrors the direct-delivery path in guests.whatsapp.send_pass:
+    workflow pass template → event guest-pass template → global default.
+    """
     workflow = recipient.workflow
     guest = recipient.guest
-    template = workflow.pass_template
+    event = guest.event
+    template = workflow.pass_template or (
+        event.whatsapp_template if event and event.whatsapp_template_id else None
+    )
 
     if not settings.WHATSAPP_PHONE_ID or not settings.WHATSAPP_TOKEN:
         raise RuntimeError('WhatsApp is not configured on this server.')
@@ -79,30 +86,37 @@ def send_configured_pass(recipient):
         raise ValueError('The RSVP recipient has no phone number.')
     if not guest.pass_image:
         raise ValueError('The guest pass image has not been generated.')
-    if not template:
-        raise ValueError('The RSVP workflow has no pass template.')
+
+    if template:
+        template_name = template.name
+        body_values = _resolve_template_params(guest, template.body_params or [])
+        has_header_image = template.has_header_image
+    else:
+        # Global default — image header + guest_name + event_name
+        template_name = settings.WHATSAPP_PASS_TEMPLATE
+        body_values = [guest.full_name, event.name if event else 'the event']
+        has_header_image = True
 
     from pywa.types.templates import BodyText, HeaderImage, TemplateLanguage
 
     params = []
-    if template.has_header_image:
+    if has_header_image:
         pass_url = _build_pass_url(guest)
         if not pass_url or 'localhost' in pass_url or '127.0.0.1' in pass_url:
             raise ValueError('The guest pass image does not have a public URL.')
         params.append(HeaderImage.params(image=pass_url))
 
-    body_values = _resolve_template_params(guest, template.body_params or [])
     if body_values:
         params.append(BodyText.params(*body_values))
 
     logger.info(
         'Sending confirmed RSVP pass to recipient %s with template %s',
         recipient.id,
-        template.name,
+        template_name,
     )
     return _get_client().send_template(
         to=_normalise_phone(guest.phone_number),
-        name=template.name,
+        name=template_name,
         language=TemplateLanguage.ENGLISH,
         params=params,
     )
