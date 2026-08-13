@@ -184,7 +184,10 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             if invitations_due:
                 workflow.recipients.filter(
                     invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
-                ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
+                ).update(
+                    invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+                    invitation_queued_at=None,
+                )
 
         if invitations_due:
             from .tasks import queue_workflow_invitations
@@ -219,10 +222,19 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             )
         workflow.status = RsvpWorkflow.Status.ACTIVE
         workflow.save(update_fields=['status', 'updated_at'])
+        # Re-approve failed sends and clear the dispatch stamp on invitations
+        # that were queued when the workflow paused (their tasks no-op'd), so
+        # queue_workflow_invitations re-dispatches all of them within budget.
         workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
-            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
-        ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
+            invitation_status__in=[
+                RsvpRecipient.InvitationStatus.FAILED,
+                RsvpRecipient.InvitationStatus.QUEUED,
+            ],
+        ).update(
+            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+            invitation_queued_at=None,
+        )
         from .tasks import queue_workflow_invitations
         queue_workflow_invitations.delay(workflow.id)
         return Response(self.get_serializer(workflow).data)
@@ -264,6 +276,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         )
         queued = eligible.update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+            invitation_queued_at=None,
             last_error='',
         )
         if queued:
@@ -332,8 +345,11 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         recipient.invitation_status = RsvpRecipient.InvitationStatus.QUEUED
+        recipient.invitation_queued_at = timezone.now()
         recipient.last_error = ''
-        recipient.save(update_fields=['invitation_status', 'last_error', 'updated_at'])
+        recipient.save(update_fields=[
+            'invitation_status', 'invitation_queued_at', 'last_error', 'updated_at',
+        ])
         from .tasks import send_rsvp_invitation
         send_rsvp_invitation.delay(recipient.id)
         return Response({'queued': True})

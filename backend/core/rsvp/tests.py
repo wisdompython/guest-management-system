@@ -688,7 +688,7 @@ class RsvpInvitationLinkTests(TestCase):
         template = make_template(
             'split_date_time_invitation',
             body_params=[
-                'guest_name', 'event_name', 'rsvp_link',
+                'guest_name', 'event_name', 'event_name', 'rsvp_link',
                 'event_date_only', 'event_time', 'venue',
             ],
         )
@@ -710,10 +710,11 @@ class RsvpInvitationLinkTests(TestCase):
         values = mock_client.return_value.send_template.call_args.kwargs['params'][0].positionals
         self.assertEqual(values[0], 'Guest Name')
         self.assertEqual(values[1], 'Lady Otunba Osibogun @ 70')
-        self.assertEqual(values[2], f'https://events.example.com/rsvp/{recipient.callback_token}')
-        self.assertEqual(values[3], 'Wednesday, 16 September 2026')
-        self.assertEqual(values[4], '1:00 PM')
-        self.assertEqual(values[5], event.venue)
+        self.assertEqual(values[2], 'Lady Otunba Osibogun @ 70')
+        self.assertEqual(values[3], f'https://events.example.com/rsvp/{recipient.callback_token}')
+        self.assertEqual(values[4], 'Wednesday, 16 September 2026')
+        self.assertEqual(values[5], '1:00 PM')
+        self.assertEqual(values[6], event.venue)
 
     @patch('rsvp.whatsapp._get_client')
     def test_invitation_contains_link_parameter_and_no_button_parameters(self, mock_client):
@@ -950,14 +951,125 @@ class RsvpScheduledDispatchTests(TestCase):
         first = dispatch_scheduled_rsvp_messages()
         second = dispatch_scheduled_rsvp_messages()
 
-        self.assertEqual(first, {'invitations_queued': 1, 'passes_queued': 1})
-        self.assertEqual(second, {'invitations_queued': 0, 'passes_queued': 0})
+        self.assertEqual(first['invitations_queued'], 1)
+        self.assertEqual(first['passes_queued'], 1)
+        self.assertEqual(second['invitations_queued'], 0)
+        self.assertEqual(second['passes_queued'], 0)
         mock_invitation.delay.assert_called_once()
         mock_pass.delay.assert_called_once()
         self.invited_recipient.refresh_from_db()
         self.confirmed_recipient.refresh_from_db()
         self.assertEqual(self.invited_recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
         self.assertEqual(self.confirmed_recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+
+
+class RsvpSendBudgetTests(TestCase):
+    """The daily WhatsApp send budget must gate every RSVP dispatch path."""
+
+    def setUp(self):
+        self.event = make_event(name='Budget Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        self.recipients = [
+            RsvpRecipient.objects.create(
+                workflow=self.workflow,
+                guest=Guest.objects.create(
+                    event=self.event,
+                    full_name=f'Budget Guest {index}',
+                    phone_number=f'234800000010{index}',
+                ),
+                invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+            )
+            for index in range(3)
+        ]
+
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=2)
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_queue_workflow_invitations_respects_daily_budget(self, mock_send):
+        from .tasks import queue_workflow_invitations
+
+        result = queue_workflow_invitations(self.workflow.id)
+
+        self.assertEqual(result['queued'], 2)
+        self.assertEqual(result['deferred'], 1)
+        self.assertEqual(mock_send.delay.call_count, 2)
+        # The overflow recipient stays approved (QUEUED) but unstamped, so
+        # the Beat dispatcher can drain it once the window frees up.
+        self.assertEqual(
+            RsvpRecipient.objects.filter(
+                invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+                invitation_queued_at__isnull=True,
+            ).count(),
+            1,
+        )
+
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=2)
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_dispatcher_drains_deferred_invitations_as_window_rolls(self, mock_send):
+        from .tasks import dispatch_scheduled_rsvp_messages, queue_workflow_invitations
+
+        queue_workflow_invitations(self.workflow.id)
+        blocked = dispatch_scheduled_rsvp_messages()
+        self.assertEqual(blocked['invitations_queued'], 0)
+
+        # Simulate the two dispatched sends completing more than 24h ago, so
+        # the trailing window has budget again.
+        RsvpRecipient.objects.filter(invitation_queued_at__isnull=False).update(
+            invitation_status=RsvpRecipient.InvitationStatus.SENT,
+            invitation_sent_at=timezone.now() - timezone.timedelta(hours=25),
+        )
+
+        drained = dispatch_scheduled_rsvp_messages()
+        self.assertEqual(drained['invitations_queued'], 1)
+        self.assertEqual(
+            RsvpRecipient.objects.filter(
+                invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+                invitation_queued_at__isnull=True,
+            ).count(),
+            0,
+        )
+
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_stale_dispatched_invitation_is_swept_and_requeued(self, mock_send):
+        from guests.send_budget import DISPATCHED_STALE_AFTER
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        stale_time = timezone.now() - DISPATCHED_STALE_AFTER - timezone.timedelta(minutes=5)
+        RsvpRecipient.objects.filter(pk=self.recipients[0].pk).update(
+            invitation_queued_at=stale_time,
+        )
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['requeued_stale'], 1)
+        refreshed = RsvpRecipient.objects.get(pk=self.recipients[0].pk)
+        self.assertGreater(refreshed.invitation_queued_at, stale_time)
+
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=1)
+    @patch('rsvp.tasks.send_confirmed_pass')
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_confirmed_passes_outrank_invitations_for_budget(
+        self, mock_invitation, mock_pass,
+    ):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self.workflow.auto_send_pass = True
+        self.workflow.pass_send_at = timezone.now() - timezone.timedelta(minutes=1)
+        self.workflow.save(update_fields=['auto_send_pass', 'pass_send_at'])
+        RsvpRecipient.objects.filter(pk=self.recipients[0].pk).update(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            invitation_status=RsvpRecipient.InvitationStatus.SENT,
+            pass_status=RsvpRecipient.PassStatus.HELD,
+        )
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['passes_queued'], 1)
+        self.assertEqual(result['invitations_queued'], 0)
+        mock_pass.delay.assert_called_once()
+        mock_invitation.delay.assert_not_called()
 
 
 class RsvpGuestSyncTests(TestCase):

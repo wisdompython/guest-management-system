@@ -154,6 +154,9 @@ class ReminderLog(models.Model):
     guest = models.ForeignKey(Guest, on_delete=models.CASCADE, related_name='reminder_logs')
     sent_at = models.DateTimeField(auto_now_add=True)
     success = models.BooleanField(default=False)
+    # Set when the send task is dispatched; a fresh claim keeps the next Beat
+    # run from re-queueing the same guest and counts against the send budget.
+    queued_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = [('reminder', 'guest')]

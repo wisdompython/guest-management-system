@@ -104,7 +104,7 @@ function TemplateForm({
   isNew: boolean
 }) {
   const varLabel = (key: string) => availableVars.find((v) => v.key === key)?.label ?? key
-  const unusedVars = availableVars.filter((v) => !form.body_params.includes(v.key))
+  const usageCount = (key: string) => form.body_params.filter((item) => item === key).length
 
   function addParam(key: string) {
     setForm((f) => ({ ...f, body_params: [...f.body_params, key] }))
@@ -128,8 +128,8 @@ function TemplateForm({
       name: 'event_rsvp_invitation',
       display_name: 'Event RSVP Invitation',
       description: 'Invites a guest to confirm availability using their secure RSVP link.',
-      body_text: '*RSVP Request: {{2}}* 📩\n\nDear *{{1}}*,\n\nPlease confirm your availability for *{{2}}* by clicking the link below:\n{{3}}\n\n*Event Details*\n\nDate: {{4}}\nTime: {{5}}\nVenue: {{6}}\n\nOnce confirmed, you will automatically receive your personalised QR access card.',
-      body_params: ['guest_name', 'event_name', 'rsvp_link', 'event_date_only', 'event_time', 'venue'],
+      body_text: '*RSVP Request: {{2}}* 📩\n\nDear *{{1}}*,\n\nPlease confirm your availability for *{{3}}* by clicking the link below:\n{{4}}\n\n*Event Details*\n\nDate: {{5}}\nTime: {{6}}\nVenue: {{7}}\n\nOnce confirmed, you will automatically receive your personalised QR access card.',
+      body_params: ['guest_name', 'event_name', 'event_name', 'rsvp_link', 'event_date_only', 'event_time', 'venue'],
       has_header_image: false,
     }))
   }
@@ -238,7 +238,7 @@ function TemplateForm({
       </section>
 
       <section className="form-card">
-        <FormSectionHeader step={4} title="Map placeholders" description="Add one variable for every numbered placeholder, in the same order as the message." />
+        <FormSectionHeader step={4} title="Map placeholders" description="Add one value for every numbered placeholder. The same value can be mapped more than once." />
         <div className="m-5">
         {form.body_params.length === 0 && (
           <p className="text-xs mb-2" style={{ color: 'var(--muted-2)' }}>No parameters yet.</p>
@@ -260,15 +260,17 @@ function TemplateForm({
               className="px-2 py-1 text-xs rounded-full" style={{ color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>✕</button>
           </div>
         ))}
-        {unusedVars.length > 0 && (
+        {availableVars.length > 0 && (
           <div className="mt-3">
-            <p className="text-[11px] mb-2" style={{ color: 'var(--muted-2)' }}>Add variable:</p>
+            <p className="text-[11px] mb-2" style={{ color: 'var(--muted-2)' }}>
+              Add value — select it again whenever another placeholder needs the same data:
+            </p>
             <div className="flex flex-wrap gap-2">
-              {unusedVars.map((v) => (
+              {availableVars.map((v) => (
                 <button key={v.key} type="button" onClick={() => addParam(v.key)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-full transition"
                   style={{ background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
-                  + {v.label}
+                  + {v.label}{usageCount(v.key) > 0 ? ` (${usageCount(v.key)}× used)` : ''}
                 </button>
               ))}
             </div>

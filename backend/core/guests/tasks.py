@@ -7,6 +7,12 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from datetime import timedelta
 
+from .send_budget import (
+    REMINDER_CLAIM_TIMEOUT,
+    SCHEDULED_SEND_CLAIM_TIMEOUT,
+    remaining_send_budget,
+)
+
 logger = logging.getLogger(__name__)
 
 # Max messages per second — stay well under Meta's rate limit
@@ -64,41 +70,80 @@ def send_whatsapp_pass(self, guest_id: str):
     return {'sent': False, 'reason': 'send_pass failed'}
 
 
+# How long a budget-deferred bulk send waits before checking the window again.
+BULK_SEND_BUDGET_RETRY_SECONDS = 30 * 60
+
+
 @shared_task
-def bulk_send_whatsapp_passes(event_id: int, resend: bool = False):
+def bulk_send_whatsapp_passes(event_id: int, resend: bool = False, guest_ids: list[str] | None = None):
     """
-    Dispatch individual pass tasks for each eligible guest. The worker-level
-    task rate limit controls throughput without reserving thousands of ETA
-    tasks in worker memory.
+    Dispatch individual pass tasks for each eligible guest, within the daily
+    send budget. The worker-level task rate limit controls throughput; when
+    the budget runs out, the task re-schedules itself with the remaining
+    guests and continues once the trailing 24h window frees up.
     """
+    from django.conf import settings as django_settings
+
     from .models import Guest
 
-    qs = Guest.objects.filter(
-        event_id=event_id,
-        pass_image__isnull=False,
-    ).exclude(pass_image='').values_list('id', flat=True)
+    if guest_ids is None:
+        qs = Guest.objects.filter(
+            event_id=event_id,
+            pass_image__isnull=False,
+        ).exclude(pass_image='').values_list('id', flat=True)
 
-    if not resend:
-        qs = qs.filter(whatsapp_sent=False)
+        if not resend:
+            qs = qs.filter(whatsapp_sent=False)
+        guest_ids = [str(guest_id) for guest_id in qs]
 
-    guest_ids = list(qs)
-    total = len(guest_ids)
+    now = timezone.now()
+    budget = remaining_send_budget(now)
+    to_send = guest_ids[:budget] if budget > 0 else []
+    deferred = guest_ids[len(to_send):]
 
-    for guest_id in guest_ids:
-        send_whatsapp_pass.delay(str(guest_id))
+    if to_send:
+        # Claim so the budget accounting counts these as in flight until sent.
+        Guest.objects.filter(id__in=to_send).update(scheduled_send_claimed_at=now)
+        for guest_id in to_send:
+            send_whatsapp_pass.delay(guest_id)
+
+    if deferred:
+        if getattr(django_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+            # Eager mode runs countdown tasks inline, which would recurse
+            # while the budget is still exhausted.
+            logger.warning(
+                'Bulk WhatsApp for event %s: %s sends dropped in eager mode '
+                '(daily send budget exhausted)', event_id, len(deferred),
+            )
+        else:
+            bulk_send_whatsapp_passes.apply_async(
+                args=[event_id],
+                kwargs={'resend': resend, 'guest_ids': deferred},
+                countdown=BULK_SEND_BUDGET_RETRY_SECONDS,
+            )
+            logger.info(
+                'Bulk WhatsApp for event %s: %s sends deferred until the '
+                'daily send window frees up', event_id, len(deferred),
+            )
 
     logger.info(
         "Bulk WhatsApp queued %s messages for event %s (~%s mins)",
-        total, event_id, round(total / WHATSAPP_MESSAGES_PER_MINUTE, 1),
+        len(to_send), event_id, round(len(to_send) / WHATSAPP_MESSAGES_PER_MINUTE, 1),
     )
     return {
-        'queued': total,
-        'estimated_minutes': round(total / WHATSAPP_MESSAGES_PER_MINUTE, 1),
+        'queued': len(to_send),
+        'deferred': len(deferred),
+        'estimated_minutes': round(len(to_send) / WHATSAPP_MESSAGES_PER_MINUTE, 1),
     }
 
 
 def _generate_guest_assets(guest_id: str, send_whatsapp: bool = True):
-    """Generate one guest's assets; shared by single and batched tasks."""
+    """Generate one guest's assets; shared by single and batched tasks.
+
+    Returns whether the pass may be sent right away ('send_ready'); the
+    caller dispatches through _dispatch_pass_sends so the daily send budget
+    is applied once per batch instead of once per guest.
+    """
     from .models import Guest
     from .utils import generate_qr_code, generate_pass_image
 
@@ -121,20 +166,52 @@ def _generate_guest_assets(guest_id: str, send_whatsapp: bool = True):
     wa_configured = bool(django_settings.WHATSAPP_PHONE_ID and django_settings.WHATSAPP_TOKEN)
     from rsvp.services import pass_delivery_allowed
     delivery_allowed = pass_delivery_allowed(guest.id, guest.event_id) if guest.event_id else True
-    if (
+    send_ready = bool(
         send_whatsapp and pass_ok and wa_configured and guest.event
         and guest.event.whatsapp_enabled and delivery_allowed
-    ):
-        guest.refresh_from_db(fields=['pass_image'])
-        send_whatsapp_pass.delay(guest_id)
+    )
+    return {'qr': qr_ok, 'pass': pass_ok, 'send_ready': send_ready}
 
-    return {'qr': qr_ok, 'pass': pass_ok}
+
+def _dispatch_pass_sends(guest_ids) -> int:
+    """Send freshly generated passes within the daily budget.
+
+    Guests over the budget get scheduled_send_at=now so the Beat scheduler
+    delivers them once the trailing 24h window frees up.
+    """
+    from .models import Guest
+
+    guest_ids = [str(guest_id) for guest_id in guest_ids]
+    if not guest_ids:
+        return 0
+    now = timezone.now()
+    budget = remaining_send_budget(now)
+    to_send = guest_ids[:budget] if budget > 0 else []
+    deferred = guest_ids[len(to_send):]
+    if to_send:
+        # Claim so the budget accounting counts these as in flight until sent.
+        Guest.objects.filter(id__in=to_send).update(scheduled_send_claimed_at=now)
+        for guest_id in to_send:
+            send_whatsapp_pass.delay(guest_id)
+    if deferred:
+        Guest.objects.filter(id__in=deferred).update(
+            scheduled_send_at=now,
+            scheduled_send_claimed_at=None,
+        )
+        logger.info(
+            'Deferred %s pass sends until the daily send window frees up',
+            len(deferred),
+        )
+    return len(to_send)
 
 
 @shared_task
 def generate_guest_assets(guest_id: str, send_whatsapp: bool = True):
     """Generate QR + pass image for one guest."""
-    return _generate_guest_assets(guest_id, send_whatsapp=send_whatsapp)
+    result = _generate_guest_assets(guest_id, send_whatsapp=send_whatsapp)
+    if result and result.get('send_ready') is True:
+        _dispatch_pass_sends([guest_id])
+    return result
 
 
 @shared_task(acks_late=True, reject_on_worker_lost=True)
@@ -143,14 +220,19 @@ def generate_guest_asset_batch(upload_id: int, guest_ids: list[str], send_whatsa
     from .models import BulkUpload
 
     failed = 0
+    send_ready_ids = []
     for guest_id in guest_ids:
         try:
             result = _generate_guest_assets(guest_id, send_whatsapp=send_whatsapp)
             if not result or not result.get('qr') or not result.get('pass'):
                 failed += 1
+            if result and result.get('send_ready') is True:
+                send_ready_ids.append(guest_id)
         except Exception:
             failed += 1
             logger.exception('Asset generation failed for imported guest %s', guest_id)
+    if send_ready_ids:
+        _dispatch_pass_sends(send_ready_ids)
 
     BulkUpload.objects.filter(
         pk=upload_id,
@@ -324,13 +406,14 @@ def send_reminder(reminder_id: int, guest_id: str):
 
     success = wa_send_reminder(guest, reminder.template_name)
     if success:
-        ReminderLog.objects.create(reminder=reminder, guest=guest, success=True)
+        # The dispatcher usually pre-created the log row as its claim; flip it
+        # to success (or create one for direct/manual invocations).
+        updated = ReminderLog.objects.filter(
+            reminder=reminder, guest=guest,
+        ).update(success=True, sent_at=timezone.now())
+        if not updated:
+            ReminderLog.objects.create(reminder=reminder, guest=guest, success=True)
     return {'sent': success}
-
-
-# If a claimed scheduled send still hasn't gone out after this long, treat the
-# claim as stale (worker likely died mid-flight) and let it be re-claimed.
-SCHEDULED_SEND_CLAIM_TIMEOUT = timedelta(hours=1)
 
 
 @shared_task
@@ -339,7 +422,8 @@ def dispatch_scheduled_sends():
     Periodic task — runs every 30 minutes.
     Finds guests whose scheduled_send_at has arrived (or passed) and whose
     pass hasn't been sent yet, then queues send_whatsapp_pass for each,
-    staggered to respect the WhatsApp rate limit.
+    staggered to respect the WhatsApp rate limit and capped by the daily
+    send budget (the overflow stays eligible for the next run).
 
     Guests are atomically claimed (scheduled_send_claimed_at set) before being
     queued so a run that takes longer than the 30-minute Beat interval can't
@@ -350,6 +434,10 @@ def dispatch_scheduled_sends():
 
     now = timezone.now()
     stale_before = now - SCHEDULED_SEND_CLAIM_TIMEOUT
+    budget = remaining_send_budget(now)
+    if budget <= 0:
+        logger.info('dispatch_scheduled_sends: daily send budget exhausted')
+        return {'queued': 0}
 
     eligible_ids = list(
         Guest.objects.filter(
@@ -369,7 +457,7 @@ def dispatch_scheduled_sends():
             event__rsvp_enabled=False,
             event__date__gte=now,
         )
-        .values_list('id', flat=True)
+        .values_list('id', flat=True)[:budget]
     )
 
     if not eligible_ids:
@@ -419,28 +507,69 @@ def dispatch_due_reminders():
         .select_related('event')
     )
 
+    budget = remaining_send_budget(now)
+    claim_cutoff = now - REMINDER_CLAIM_TIMEOUT
+
     queued = 0
     for reminder in due_reminders:
+        if budget <= 0:
+            logger.info(
+                'dispatch_due_reminders: daily send budget exhausted; '
+                'remaining reminders resume on a later run',
+            )
+            break
         fire_at = reminder.event.date - timedelta(hours=reminder.hours_before)
         if now < fire_at:
             continue
 
-        # Get guests for this event who have a phone number and haven't successfully
-        # received this reminder yet (a prior failed attempt is retried, not skipped)
-        already_sent = ReminderLog.objects.filter(
-            reminder=reminder, success=True,
+        # Skip guests already sent successfully, and guests claimed by a
+        # recent run whose task is still draining through the rate limiter
+        # (a prior failed attempt is retried once its claim goes stale).
+        blocked = ReminderLog.objects.filter(
+            reminder=reminder,
+        ).filter(
+            Q(success=True) | Q(queued_at__gte=claim_cutoff),
         ).values_list('guest_id', flat=True)
 
-        guests = (
+        guest_ids = list(
             reminder.event.guests
-            .exclude(pk__in=already_sent)
+            .exclude(pk__in=blocked)
             .exclude(phone_number='')
-            .values_list('id', flat=True)
+            .values_list('id', flat=True)[:budget]
         )
+        if not guest_ids:
+            continue
 
-        for guest_id in guests:
+        # Claim: one log row per (reminder, guest). New rows are created with
+        # the claim stamp; stale failed rows are atomically re-claimed.
+        ReminderLog.objects.bulk_create(
+            [
+                ReminderLog(reminder=reminder, guest_id=guest_id, queued_at=now)
+                for guest_id in guest_ids
+            ],
+            batch_size=500,
+            ignore_conflicts=True,
+        )
+        ReminderLog.objects.filter(
+            reminder=reminder,
+            guest_id__in=guest_ids,
+            success=False,
+        ).filter(
+            Q(queued_at__isnull=True) | Q(queued_at__lt=claim_cutoff),
+        ).update(queued_at=now)
+
+        claimed_ids = list(
+            ReminderLog.objects.filter(
+                reminder=reminder,
+                guest_id__in=guest_ids,
+                success=False,
+                queued_at=now,
+            ).values_list('guest_id', flat=True)
+        )
+        for guest_id in claimed_ids:
             send_reminder.delay(reminder.id, str(guest_id))
-            queued += 1
+        queued += len(claimed_ids)
+        budget -= len(claimed_ids)
 
     logger.info("dispatch_due_reminders: queued %s reminder sends", queued)
     return {'queued': queued}

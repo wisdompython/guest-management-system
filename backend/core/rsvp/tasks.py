@@ -5,6 +5,8 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from guests.send_budget import DISPATCHED_STALE_AFTER, remaining_send_budget
+
 logger = logging.getLogger(__name__)
 
 RSVP_MESSAGES_PER_MINUTE = 20
@@ -53,8 +55,42 @@ def _ensure_guest_pass(recipient):
         raise ValueError('The generated guest pass image could not be stored. Check media storage.')
 
 
+def _claim_and_dispatch(candidates, limit, now, *, updates, stamp_field, send_task):
+    """Atomically claim up to `limit` rows from `candidates` and enqueue sends.
+
+    The UPDATE re-applies the candidate filters, so a row whose state changed
+    in between is skipped. `updates` must set `stamp_field` to `now`; the
+    stamp identifies the rows this call actually claimed. Double-delivery is
+    additionally guarded by the send tasks' own QUEUED→SENDING claim.
+    """
+    from .models import RsvpRecipient
+
+    if limit <= 0:
+        return 0
+    ids = list(candidates.values_list('id', flat=True)[:limit])
+    if not ids:
+        return 0
+    candidates.filter(pk__in=ids).update(**updates)
+    claimed_ids = list(
+        RsvpRecipient.objects.filter(
+            pk__in=ids, **{stamp_field: now},
+        ).values_list('id', flat=True)
+    )
+    for recipient_id in claimed_ids:
+        send_task.delay(recipient_id)
+    return len(claimed_ids)
+
+
 @shared_task
 def queue_workflow_invitations(workflow_id: int):
+    """Dispatch this workflow's approved invitations within the send budget.
+
+    Views and the import sync mark recipients QUEUED without an
+    invitation_queued_at stamp ("approved, awaiting dispatch"). Up to the
+    remaining daily budget is dispatched and stamped here; the overflow keeps
+    its unstamped QUEUED state and is drained by
+    dispatch_scheduled_rsvp_messages as the trailing 24h window frees up.
+    """
     from .models import RsvpRecipient, RsvpWorkflow
 
     try:
@@ -65,17 +101,32 @@ def queue_workflow_invitations(workflow_id: int):
     if workflow.status != RsvpWorkflow.Status.ACTIVE:
         return {'queued': 0, 'reason': 'workflow is not active'}
 
-    recipient_ids = list(
-        workflow.recipients.filter(
-            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
-            response_status=RsvpRecipient.ResponseStatus.AWAITING,
-        ).values_list('id', flat=True)
+    now = timezone.now()
+    candidates = RsvpRecipient.objects.filter(
+        workflow=workflow,
+        invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        response_status=RsvpRecipient.ResponseStatus.AWAITING,
+        invitation_queued_at__isnull=True,
     )
-    for recipient_id in recipient_ids:
-        send_rsvp_invitation.delay(recipient_id)
+    total = candidates.count()
+    queued = _claim_and_dispatch(
+        candidates,
+        min(remaining_send_budget(now), total),
+        now,
+        updates={'invitation_queued_at': now},
+        stamp_field='invitation_queued_at',
+        send_task=send_rsvp_invitation,
+    )
+    deferred = total - queued
+    if deferred:
+        logger.info(
+            'RSVP workflow %s: %s invitations deferred until the daily send '
+            'window frees up.', workflow_id, deferred,
+        )
     return {
-        'queued': len(recipient_ids),
-        'estimated_minutes': round(len(recipient_ids) / RSVP_MESSAGES_PER_MINUTE, 1),
+        'queued': queued,
+        'deferred': deferred,
+        'estimated_minutes': round(queued / RSVP_MESSAGES_PER_MINUTE, 1),
     }
 
 
@@ -206,70 +257,109 @@ def send_confirmed_pass(self, recipient_id: int):
 
 @shared_task
 def dispatch_scheduled_rsvp_messages():
-    """Queue due RSVP invitations and confirmed passes exactly once."""
+    """Queue due RSVP invitations and passes exactly once, within budget.
+
+    Spends the remaining daily send budget in priority order:
+      1. dispatched sends gone stale (lost worker / exhausted retries)
+      2. scheduled passes now due (confirmed guests come first)
+      3. approved invitations deferred by an earlier budget check
+      4. scheduled invitations now due
+    Whatever doesn't fit is picked up on a later tick as the trailing 24h
+    window frees up.
+    """
     from .models import RsvpRecipient, RsvpWorkflow
 
     now = timezone.now()
-    workflows = RsvpWorkflow.objects.filter(
-        status=RsvpWorkflow.Status.ACTIVE,
-        event__date__gt=now,
-    )
+    stale_before = now - DISPATCHED_STALE_AFTER
+    budget = remaining_send_budget(now)
 
-    invitation_workflow_ids = list(
-        workflows.filter(
-            invitation_send_at__isnull=False,
-            invitation_send_at__lte=now,
-        ).values_list('id', flat=True)
-    )
-    invitation_ids = list(
-        RsvpRecipient.objects.filter(
-            workflow_id__in=invitation_workflow_ids,
-            response_status=RsvpRecipient.ResponseStatus.AWAITING,
-            invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
-        ).values_list('id', flat=True)
-    )
-    claimed_invitation_ids = []
-    for recipient_id in invitation_ids:
-        claimed = RsvpRecipient.objects.filter(
-            id=recipient_id,
-            invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
-        ).update(invitation_status=RsvpRecipient.InvitationStatus.QUEUED)
-        if claimed:
-            claimed_invitation_ids.append(recipient_id)
-    if claimed_invitation_ids:
-        for recipient_id in claimed_invitation_ids:
-            send_rsvp_invitation.delay(recipient_id)
+    live = {
+        'workflow__status': RsvpWorkflow.Status.ACTIVE,
+        'workflow__event__date__gt': now,
+    }
 
-    pass_workflow_ids = list(
-        workflows.filter(
-            auto_send_pass=True,
-            pass_send_at__isnull=False,
-            pass_send_at__lte=now,
-        ).values_list('id', flat=True)
+    stale_passes = RsvpRecipient.objects.filter(
+        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        pass_status=RsvpRecipient.PassStatus.QUEUED,
+        pass_queued_at__lt=stale_before,
+        **live,
     )
-    pass_ids = list(
-        RsvpRecipient.objects.filter(
-            workflow_id__in=pass_workflow_ids,
-            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
-            pass_status=RsvpRecipient.PassStatus.HELD,
-        ).values_list('id', flat=True)
+    requeued_passes = _claim_and_dispatch(
+        stale_passes, budget, now,
+        updates={'pass_queued_at': now},
+        stamp_field='pass_queued_at',
+        send_task=send_confirmed_pass,
     )
-    claimed_pass_ids = []
-    for recipient_id in pass_ids:
-        claimed = RsvpRecipient.objects.filter(
-            id=recipient_id,
-            pass_status=RsvpRecipient.PassStatus.HELD,
-        ).update(
-            pass_status=RsvpRecipient.PassStatus.QUEUED,
-            pass_queued_at=now,
-        )
-        if claimed:
-            claimed_pass_ids.append(recipient_id)
-    if claimed_pass_ids:
-        for recipient_id in claimed_pass_ids:
-            send_confirmed_pass.delay(recipient_id)
+    budget -= requeued_passes
+
+    stale_invitations = RsvpRecipient.objects.filter(
+        response_status=RsvpRecipient.ResponseStatus.AWAITING,
+        invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        invitation_queued_at__lt=stale_before,
+        **live,
+    )
+    requeued_invitations = _claim_and_dispatch(
+        stale_invitations, budget, now,
+        updates={'invitation_queued_at': now},
+        stamp_field='invitation_queued_at',
+        send_task=send_rsvp_invitation,
+    )
+    budget -= requeued_invitations
+
+    due_passes = RsvpRecipient.objects.filter(
+        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        pass_status=RsvpRecipient.PassStatus.HELD,
+        workflow__auto_send_pass=True,
+        workflow__pass_send_at__isnull=False,
+        workflow__pass_send_at__lte=now,
+        **live,
+    )
+    passes_queued = _claim_and_dispatch(
+        due_passes, budget, now,
+        updates={
+            'pass_status': RsvpRecipient.PassStatus.QUEUED,
+            'pass_queued_at': now,
+        },
+        stamp_field='pass_queued_at',
+        send_task=send_confirmed_pass,
+    )
+    budget -= passes_queued
+
+    deferred_invitations = RsvpRecipient.objects.filter(
+        response_status=RsvpRecipient.ResponseStatus.AWAITING,
+        invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        invitation_queued_at__isnull=True,
+        **live,
+    )
+    deferred_dispatched = _claim_and_dispatch(
+        deferred_invitations, budget, now,
+        updates={'invitation_queued_at': now},
+        stamp_field='invitation_queued_at',
+        send_task=send_rsvp_invitation,
+    )
+    budget -= deferred_dispatched
+
+    due_invitations = RsvpRecipient.objects.filter(
+        response_status=RsvpRecipient.ResponseStatus.AWAITING,
+        invitation_status=RsvpRecipient.InvitationStatus.NOT_SENT,
+        workflow__invitation_send_at__isnull=False,
+        workflow__invitation_send_at__lte=now,
+        **live,
+    )
+    invitations_queued = _claim_and_dispatch(
+        due_invitations, budget, now,
+        updates={
+            'invitation_status': RsvpRecipient.InvitationStatus.QUEUED,
+            'invitation_queued_at': now,
+        },
+        stamp_field='invitation_queued_at',
+        send_task=send_rsvp_invitation,
+    )
+    budget -= invitations_queued
 
     return {
-        'invitations_queued': len(claimed_invitation_ids),
-        'passes_queued': len(claimed_pass_ids),
+        'invitations_queued': invitations_queued + deferred_dispatched,
+        'passes_queued': passes_queued,
+        'requeued_stale': requeued_passes + requeued_invitations,
+        'budget_left': budget,
     }

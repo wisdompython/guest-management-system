@@ -29,7 +29,8 @@ def sync_guest_to_workflow(guest):
     if not workflow:
         return None
 
-    invitation_due = not workflow.invitation_send_at or workflow.invitation_send_at <= timezone.now()
+    now = timezone.now()
+    invitation_due = not workflow.invitation_send_at or workflow.invitation_send_at <= now
     initial_status = (
         RsvpRecipient.InvitationStatus.QUEUED
         if workflow.status == RsvpWorkflow.Status.ACTIVE and invitation_due
@@ -38,7 +39,14 @@ def sync_guest_to_workflow(guest):
     recipient, created = RsvpRecipient.objects.get_or_create(
         workflow=workflow,
         guest=guest,
-        defaults={'invitation_status': initial_status},
+        defaults={
+            'invitation_status': initial_status,
+            # Dispatched directly below, so stamp it as in flight for the
+            # send-budget accounting.
+            'invitation_queued_at': (
+                now if initial_status == RsvpRecipient.InvitationStatus.QUEUED else None
+            ),
+        },
     )
     if created and initial_status == RsvpRecipient.InvitationStatus.QUEUED:
         from .tasks import send_rsvp_invitation

@@ -144,6 +144,10 @@ class RsvpRecipient(models.Model):
     pass_message_id = models.CharField(max_length=255, blank=True, db_index=True)
     invitation_sent_at = models.DateTimeField(null=True, blank=True)
     responded_at = models.DateTimeField(null=True, blank=True)
+    # Set when the invitation send task is handed to the broker. A QUEUED
+    # recipient without this stamp is approved but still waiting for daily
+    # send budget; the Beat dispatcher drains those as the window frees up.
+    invitation_queued_at = models.DateTimeField(null=True, blank=True)
     pass_queued_at = models.DateTimeField(null=True, blank=True)
     reminder_count = models.PositiveIntegerField(default=0)
     last_reminded_at = models.DateTimeField(null=True, blank=True)
