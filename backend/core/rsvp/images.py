@@ -4,7 +4,7 @@ import logging
 from django.core.files.base import ContentFile
 from PIL import Image, ImageDraw
 
-from guests.utils.color import _draw_name_in_zone
+from guests.utils.color import _average_zone_color, _draw_name_in_zone
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ def generate_invitation_image(recipient) -> bool:
             font_path,
             event.name_font_color or '#ffffff',
             max(8, int(event.name_font_size_fraction * height)),
+            background_color=_average_zone_color(artwork, zone_px),
         )
 
         output = io.BytesIO()

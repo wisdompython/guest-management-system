@@ -2,13 +2,34 @@ import io
 import zipfile
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
+from PIL import Image, ImageDraw
 from rest_framework.test import APIClient
 from rest_framework import status
 
 from accounts.models import User
 from .models import Event, Guest
+
+
+class PassNameContrastTests(SimpleTestCase):
+    def test_low_contrast_name_gets_readability_outline(self):
+        from .utils.color import _average_zone_color, _draw_name_in_zone
+
+        artwork = Image.new('RGB', (320, 120), (245, 240, 225))
+        zone = {'x': 10, 'y': 10, 'w': 300, 'h': 100}
+        _draw_name_in_zone(
+            ImageDraw.Draw(artwork),
+            'Wisdom',
+            zone,
+            None,
+            '#ffffff',
+            48,
+            background_color=_average_zone_color(artwork, zone),
+        )
+
+        # White text on a cream panel should gain dark outline pixels.
+        self.assertTrue(any(max(pixel) < 80 for pixel in artwork.getdata()))
 
 
 def make_event(**kwargs):

@@ -14,6 +14,7 @@ interface UploadResult {
   assets_processed: number
   assets_failed: number
   error_message: string
+  uploaded_at: string
   errors: { row: number; error?: string; errors?: string[] }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }
@@ -21,12 +22,14 @@ interface UploadResult {
 export function UploadResults({ result }: { result: UploadResult }) {
   const [showErrors, setShowErrors] = useState(true)
   const running = result.status === 'pending' || result.status === 'processing'
+  const pendingTooLong = result.status === 'pending'
+    && Date.now() - new Date(result.uploaded_at).getTime() > 60_000
   const allOk = result.status === 'done' && result.failed === 0 && result.assets_failed === 0
   const assetPercent = result.assets_total
     ? Math.min(100, Math.round((result.assets_processed / result.assets_total) * 100))
     : 0
   const title = result.status === 'pending'
-    ? 'Import queued'
+    ? pendingTooLong ? 'Waiting for an import worker' : 'Import queued'
     : result.status === 'failed'
       ? 'Import could not be completed'
       : running && !result.total_rows
@@ -63,7 +66,11 @@ export function UploadResults({ result }: { result: UploadResult }) {
         <div className="h-2 overflow-hidden rounded-full bg-[var(--bg)]">
           <div className={`h-full rounded-full bg-[var(--brand)] transition-all ${result.assets_total ? '' : 'animate-pulse'}`} style={{ width: result.assets_total ? `${assetPercent}%` : '35%' }}/>
         </div>
-        <p className="mt-2 text-xs text-[var(--muted)]">You can leave this page. The import continues safely in the background.</p>
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          {pendingTooLong
+            ? 'The job has been queued for over a minute but has not started. Check that the Celery import worker is running.'
+            : 'You can leave this page. The import continues safely in the background.'}
+        </p>
       </div>}
 
       {result.status === 'failed' && result.error_message && <p className="border-t border-[var(--line)] px-5 py-3 text-xs leading-5 text-[var(--danger)]">{result.error_message}</p>}

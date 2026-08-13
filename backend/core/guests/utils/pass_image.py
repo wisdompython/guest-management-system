@@ -3,7 +3,7 @@ import logging
 from PIL import Image, ImageDraw
 from django.core.files.base import ContentFile
 
-from .color import _parse_color, _draw_name_in_zone
+from .color import _average_zone_color, _parse_color, _draw_name_in_zone
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,15 @@ def generate_pass_image(guest) -> bool:
             }
 
             draw = ImageDraw.Draw(composite)
-            _draw_name_in_zone(draw, guest.full_name, zone_px, font_path, font_color, font_size)
+            _draw_name_in_zone(
+                draw,
+                guest.full_name,
+                zone_px,
+                font_path,
+                font_color,
+                font_size,
+                background_color=_average_zone_color(composite, zone_px),
+            )
 
         buffer = io.BytesIO()
         composite.convert('RGB').save(buffer, format='PNG')

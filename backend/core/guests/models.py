@@ -215,6 +215,8 @@ class WhatsAppTemplate(models.Model):
         ('guest_name',  'Guest full name'),
         ('event_name',  'Event name'),
         ('event_date',  'Event date & time'),
+        ('event_date_only', 'Event date only'),
+        ('event_time',  'Event time only'),
         ('venue',       'Event venue'),
         ('ticket_type', 'Guest ticket type'),
         ('table_number','Guest table number'),

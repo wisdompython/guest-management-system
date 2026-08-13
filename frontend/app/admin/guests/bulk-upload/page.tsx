@@ -17,6 +17,7 @@ interface UploadResult {
   assets_processed: number
   assets_failed: number
   error_message: string
+  uploaded_at: string
   errors: { row: number; error?: string; errors?: string[] }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }

@@ -54,7 +54,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: ${APP_ENV_FILE:-.env}
-    command: celery -A core worker --loglevel=info --concurrency=1 -Q celery
+    # Fallback worker listens to every queue so a stopped specialist cannot
+    # leave imports or messages permanently pending. Dedicated workers below
+    # still provide isolation and throughput during large events.
+    command: celery -A core worker --loglevel=info --concurrency=1 -Q celery,imports,assets,messages
     depends_on:
       postgres:
         condition: service_healthy

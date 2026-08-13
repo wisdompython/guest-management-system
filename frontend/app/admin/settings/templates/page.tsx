@@ -11,6 +11,8 @@ const VAR_EXAMPLES: Record<string, string> = {
   guest_name:   'John Doe',
   event_name:   'The Grand Birthday Bash',
   event_date:   'Friday, 20 June 2025 at 7:00 PM',
+  event_date_only: 'Wednesday, 16 September 2026',
+  event_time:   '1:00 PM',
   venue:        'The Eko Hotel, Lagos',
   ticket_type:  'VIP',
   table_number: 'Table 12',
@@ -125,9 +127,9 @@ function TemplateForm({
       ...f,
       name: 'event_rsvp_invitation',
       display_name: 'Event RSVP Invitation',
-      description: 'Invites a guest to confirm attendance using their secure RSVP link.',
-      body_text: 'Hello {{1}},\n\nYou are invited to {{2}} on {{3}}.\n\nPlease confirm whether you can attend:\n{{4}}\n\nThis link is unique to you.',
-      body_params: ['guest_name', 'event_name', 'event_date', 'rsvp_link'],
+      description: 'Invites a guest to confirm availability using their secure RSVP link.',
+      body_text: '*RSVP Request: {{2}}* 📩\n\nDear *{{1}}*,\n\nPlease confirm your availability for *{{2}}* by clicking the link below:\n{{3}}\n\n*Event Details*\n\nDate: {{4}}\nTime: {{5}}\nVenue: {{6}}\n\nOnce confirmed, you will automatically receive your personalised QR access card.',
+      body_params: ['guest_name', 'event_name', 'rsvp_link', 'event_date_only', 'event_time', 'venue'],
       has_header_image: false,
     }))
   }

@@ -124,6 +124,12 @@ export default function AddRsvpWorkflowPage() {
       event_date: selectedEvent
         ? new Date(selectedEvent.date).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
         : '24 October 2026',
+      event_date_only: selectedEvent
+        ? new Date(selectedEvent.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'Wednesday, 16 September 2026',
+      event_time: selectedEvent
+        ? new Date(selectedEvent.date).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : '1:00 PM',
       venue: selectedEvent?.venue || 'Event venue',
       ticket_type: 'General',
       table_number: '12',

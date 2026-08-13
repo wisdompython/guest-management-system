@@ -3,6 +3,7 @@ import hmac
 import io
 import json
 import tempfile
+from datetime import datetime
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -673,6 +674,47 @@ class PublicRsvpPageApiTests(TestCase):
 
 
 class RsvpInvitationLinkTests(TestCase):
+    @patch('rsvp.whatsapp._get_client')
+    def test_invitation_supports_separate_date_and_time_parameters(self, mock_client):
+        event = make_event(name='Lady Otunba Osibogun @ 70')
+        event.date = timezone.make_aware(datetime(2026, 9, 16, 13, 0))
+        event.venue = 'Civic Centre Ibadan Agodi Gate Road, Iwo Road, Ibadan.'
+        event.save(update_fields=['date', 'venue'])
+        guest = Guest.objects.create(
+            event=event,
+            full_name='Guest Name',
+            phone_number='2348000000001',
+        )
+        template = make_template(
+            'split_date_time_invitation',
+            body_params=[
+                'guest_name', 'event_name', 'rsvp_link',
+                'event_date_only', 'event_time', 'venue',
+            ],
+        )
+        workflow = RsvpWorkflow.objects.create(
+            event=event,
+            invitation_template=template,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        recipient = RsvpRecipient.objects.create(workflow=workflow, guest=guest)
+        mock_client.return_value.send_template.return_value.id = 'wamid.split-date-time'
+
+        with self.settings(
+            WHATSAPP_PHONE_ID='phone-id',
+            WHATSAPP_TOKEN='token',
+            SITE_URL='https://events.example.com',
+        ):
+            send_invitation(recipient)
+
+        values = mock_client.return_value.send_template.call_args.kwargs['params'][0].positionals
+        self.assertEqual(values[0], 'Guest Name')
+        self.assertEqual(values[1], 'Lady Otunba Osibogun @ 70')
+        self.assertEqual(values[2], f'https://events.example.com/rsvp/{recipient.callback_token}')
+        self.assertEqual(values[3], 'Wednesday, 16 September 2026')
+        self.assertEqual(values[4], '1:00 PM')
+        self.assertEqual(values[5], event.venue)
+
     @patch('rsvp.whatsapp._get_client')
     def test_invitation_contains_link_parameter_and_no_button_parameters(self, mock_client):
         event = make_event()

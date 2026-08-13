@@ -8,8 +8,8 @@ import AsoEbiYardSelector from '@/components/rsvp/AsoEbiYardSelector'
 
 const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }> = {
   awaiting: {
-    title: 'Please Confirm Your Attendance',
-    body: 'Kindly confirm your attendance below.',
+    title: 'Please Confirm Your Availability',
+    body: 'Kindly confirm your availability below.',
   },
   confirmed: {
     title: 'Attendance confirmed',
@@ -82,8 +82,8 @@ export default function PublicRsvpPage() {
             )}
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>You’re invited</p>
             <h1 className="mt-2 text-2xl font-bold">{details.event_name}</h1>
-            <h2 className="mt-4 text-lg font-bold">Please Confirm Your Attendance</h2>
-            <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Hello {details.guest_name}, kindly confirm your attendance below.</p>
+            <h2 className="mt-4 text-lg font-bold">Please Confirm Your Availability</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Hello {details.guest_name}, kindly confirm your availability below.</p>
 
             <div className="mt-6 grid gap-3 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div className="flex gap-3"><span aria-hidden="true" style={{ color: 'var(--brand)' }}>◷</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Date and time</p><p className="mt-1 text-sm font-semibold">{new Date(details.event_date).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}</p></div></div>

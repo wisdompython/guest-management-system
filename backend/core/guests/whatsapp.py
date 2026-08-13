@@ -107,13 +107,19 @@ def _resolve_template_params(guest, body_params: list) -> list:
     """Resolve ordered variable keys to actual guest/event values."""
     event = guest.event
     event_date = ''
+    event_date_only = ''
+    event_time = ''
     if event and event.date:
         event_date = event.date.strftime('%A, %d %B %Y at %I:%M %p')
+        event_date_only = event.date.strftime('%A, %d %B %Y')
+        event_time = event.date.strftime('%I:%M %p').lstrip('0')
 
     var_map = {
         'guest_name':   guest.full_name or '',
         'event_name':   event.name if event else '',
         'event_date':   event_date,
+        'event_date_only': event_date_only,
+        'event_time':   event_time,
         'venue':        event.venue if event else '',
         'ticket_type':  guest.get_ticket_type_display() if hasattr(guest, 'get_ticket_type_display') else (guest.ticket_type or ''),
         'table_number': guest.table_number or '',
