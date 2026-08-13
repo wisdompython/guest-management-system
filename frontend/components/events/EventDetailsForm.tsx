@@ -73,7 +73,7 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
         </div>
 
         <div>
-          <label className={label}>Date and time <span className="text-[var(--brand)]">*</span></label>
+          <label className={label}>Date and time (WAT) <span className="text-[var(--brand)]">*</span></label>
           <input
             data-tour="event-date-field"
             name="date"
@@ -88,7 +88,7 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
           {dateError && (
             <p className="mt-1 text-[11px]" style={{ color: 'var(--danger)' }}>{dateError}</p>
           )}
-          {!dateError && <p className="form-hint">Scheduling and reminders use this date and time.</p>}
+          {!dateError && <p className="form-hint">Times are saved in West Africa Time (UTC+1) for scheduling and reminders.</p>}
         </div>
 
         <div>

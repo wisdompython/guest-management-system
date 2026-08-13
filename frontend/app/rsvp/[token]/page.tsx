@@ -64,9 +64,9 @@ export default function PublicRsvpPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10" style={{ background: 'var(--bg)' }}>
-      <div className="w-full max-w-lg overflow-hidden rounded-[18px]" style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 24px 70px rgba(0,0,0,0.28)' }}>
-        <header className="px-6 py-5 sm:px-8" style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
+    <main className="flex min-h-screen items-start justify-center sm:px-4 sm:py-8 lg:items-center lg:px-6 lg:py-12" style={{ background: 'var(--bg)' }}>
+      <div className="min-w-0 w-full overflow-hidden rounded-none sm:max-w-2xl sm:rounded-[18px] lg:max-w-3xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 24px 70px rgba(0,0,0,0.28)' }}>
+        <header className="px-4 py-4 sm:px-7 sm:py-5 lg:px-10" style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold" style={{ background: 'var(--brand)', color: '#0d1016' }}>T</div>
             <div><p className="text-sm font-semibold">TWS E-GuestPass</p><p className="text-xs" style={{ color: 'var(--muted)' }}>RSVP</p></div>
@@ -78,9 +78,9 @@ export default function PublicRsvpPage() {
         ) : error && !details ? (
           <div className="px-6 py-16 text-center sm:px-8"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>!</div><h1 className="mt-4 text-lg font-bold">Invitation unavailable</h1><p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>{error}</p></div>
         ) : details ? (
-          <div className="px-6 py-7 sm:px-8 sm:py-8">
+          <div className="px-4 py-5 sm:px-7 sm:py-7 lg:px-10 lg:py-9">
             {details.invitation_image ? (
-              <img src={details.invitation_image} alt={`RSVP banner for ${details.guest_name}`} className="mb-7 w-full rounded-xl object-cover" style={{ border: '1px solid var(--line)' }} />
+              <img src={details.invitation_image} alt={`RSVP banner for ${details.guest_name}`} className="mb-6 block h-auto w-full rounded-xl sm:mb-8" style={{ border: '1px solid var(--line)' }} />
             ) : (
               <div className="mb-7 rounded-xl px-5 py-8 text-center" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.3)' }}>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand)' }}>RSVP</p>
@@ -90,9 +90,9 @@ export default function PublicRsvpPage() {
 
             <section aria-labelledby="event-details-heading">
               <h1 id="event-details-heading" className="text-lg font-bold">Event Details</h1>
-              <div className="mt-4 divide-y divide-[var(--line)] overflow-hidden rounded-[14px]" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                <DetailRow icon="📅" label="Date" value={new Date(details.event_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
-                <DetailRow icon="🕑" label="Time" value={new Date(details.event_date).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })} />
+              <div className="mt-4 grid divide-y divide-[var(--line)] overflow-hidden rounded-[14px] md:grid-cols-3 md:divide-x md:divide-y-0" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <DetailRow icon="📅" label="Date" value={new Date(details.event_date).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
+                <DetailRow icon="🕑" label="Time (WAT)" value={new Date(details.event_date).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit', hour12: true })} />
                 {details.venue && <DetailRow icon="📍" label="Venue" value={details.venue} />}
               </div>
             </section>
@@ -106,15 +106,15 @@ export default function PublicRsvpPage() {
             </section>
 
             {details.can_respond ? (
-              <section className="mt-8 border-t border-[var(--line)] pt-7">
-                <p className="text-center text-base font-semibold">Hi {details.guest_name}, are you attending?</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’m Coming</button>
-                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
+              <section className="mt-7 border-t border-[var(--line)] pt-6 sm:mt-9 sm:pt-8">
+                <p className="mx-auto max-w-xl text-center text-base font-semibold leading-6 sm:text-lg">Hi {details.guest_name}, are you attending?</p>
+                <div className="mx-auto mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
+                  <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’m Coming</button>
+                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
                 </div>
 
                 {answer === 'yes' && details.collect_aso_ebi && (
-                  <div className="mt-5 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <div className="mx-auto mt-5 max-w-2xl rounded-[12px] p-4 sm:p-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input type="checkbox" checked={asoEbiRequested} onChange={(event) => setAsoEbiRequested(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
                       <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this to include an Aso Ebi request with your RSVP.</span></span>
@@ -123,7 +123,7 @@ export default function PublicRsvpPage() {
                   </div>
                 )}
 
-                {answer && <button type="button" disabled={!!submitting} onClick={() => respond(answer)} className="mt-5 w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--brand)' }}>{submitting ? 'Saving your response…' : 'Submit RSVP'}</button>}
+                {answer && <button type="button" disabled={!!submitting} onClick={() => respond(answer)} className="mx-auto mt-5 block min-h-12 w-full max-w-xl rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--brand)' }}>{submitting ? 'Saving your response…' : 'Submit RSVP'}</button>}
               </section>
             ) : (
               <ResponseCard details={details} />
@@ -138,7 +138,7 @@ export default function PublicRsvpPage() {
 }
 
 function DetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return <div className="flex items-start gap-4 px-4 py-4"><span className="text-xl" aria-hidden="true">{icon}</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</p><p className="mt-1 text-sm font-semibold leading-6">{value}</p></div></div>
+  return <div className="flex min-w-0 items-start gap-3 px-4 py-4 sm:gap-4 md:px-4 md:py-5"><span className="shrink-0 text-xl" aria-hidden="true">{icon}</span><div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</p><p className="mt-1 break-words text-sm font-semibold leading-6">{value}</p></div></div>
 }
 
 function ResponseCard({ details }: { details: PublicRsvpDetails }) {

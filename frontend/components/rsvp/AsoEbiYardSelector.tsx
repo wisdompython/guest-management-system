@@ -16,19 +16,19 @@ export default function AsoEbiYardSelector({ value, onChange, name, id = 'aso-eb
     <fieldset>
       <legend className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">How many yards?</legend>
       {name && <input type="hidden" name={name} value={value} />}
-      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7" role="radiogroup" aria-label="Aso Ebi yards">
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7" role="radiogroup" aria-label="Aso Ebi yards">
         {YARD_PRESETS.map((yards) => {
           const selected = value === yards
           return (
             <button key={yards} type="button" role="radio" aria-checked={selected} onClick={() => onChange(yards)}
-              className="min-h-11 rounded-lg px-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              className="min-h-11 min-w-0 rounded-lg px-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               style={{ background: selected ? 'var(--brand)' : 'var(--panel)', border: `1px solid ${selected ? 'var(--brand)' : 'var(--line)'}`, color: selected ? '#fff' : 'var(--ink)' }}>
               {yards}
             </button>
           )
         })}
         <button type="button" role="radio" aria-checked={isCustom} onClick={() => onChange(isCustom ? value : 1)}
-          className="min-h-11 rounded-lg px-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          className="min-h-11 min-w-0 rounded-lg px-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           style={{ background: isCustom ? 'var(--brand)' : 'var(--panel)', border: `1px solid ${isCustom ? 'var(--brand)' : 'var(--line)'}`, color: isCustom ? '#fff' : 'var(--ink)' }}>
           Custom
         </button>
@@ -36,7 +36,7 @@ export default function AsoEbiYardSelector({ value, onChange, name, id = 'aso-eb
       {isCustom && (
         <div className="mt-3">
           <label htmlFor={id} className="text-xs font-medium text-[var(--muted)]">Custom number of yards</label>
-          <div className="relative mt-1.5 max-w-xs">
+          <div className="relative mt-1.5 w-full sm:max-w-xs">
             <input id={id} type="number" min="1" step="1" required value={value}
               onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))}
               className="form-control pr-16" />

@@ -1,5 +1,6 @@
 import logging
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +111,10 @@ def _resolve_template_params(guest, body_params: list) -> list:
     event_date_only = ''
     event_time = ''
     if event and event.date:
-        event_date = event.date.strftime('%A, %d %B %Y at %I:%M %p')
-        event_date_only = event.date.strftime('%A, %d %B %Y')
-        event_time = event.date.strftime('%I:%M %p').lstrip('0')
+        local_event_date = timezone.localtime(event.date)
+        event_date = local_event_date.strftime('%A, %d %B %Y at %I:%M %p')
+        event_date_only = local_event_date.strftime('%A, %d %B %Y')
+        event_time = local_event_date.strftime('%I:%M %p').lstrip('0')
 
     var_map = {
         'guest_name':   guest.full_name or '',
@@ -151,7 +153,7 @@ def send_reminder(guest, template_name: str) -> bool:
         except WhatsAppTemplate.DoesNotExist:
             # Fallback: default param order for unregistered templates
             event = guest.event
-            event_date = event.date.strftime('%A, %d %B %Y at %I:%M %p') if (event and event.date) else ''
+            event_date = timezone.localtime(event.date).strftime('%A, %d %B %Y at %I:%M %p') if (event and event.date) else ''
             body_param_values = [guest.full_name, event.name if event else '', event_date]
             has_header_image = False
 

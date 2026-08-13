@@ -10,7 +10,7 @@ CELERY_CACHE_BACKEND      = 'default'
 CELERY_ACCEPT_CONTENT     = ['json']
 CELERY_TASK_SERIALIZER    = 'json'
 CELERY_RESULT_SERIALIZER  = 'json'
-CELERY_TIMEZONE           = 'UTC'
+CELERY_TIMEZONE           = os.environ.get('APP_TIME_ZONE', 'Africa/Lagos')
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # Keep CPU-heavy rendering away from imports and rate-limited WhatsApp sends.
