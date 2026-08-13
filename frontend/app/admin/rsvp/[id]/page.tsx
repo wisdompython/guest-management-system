@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 
 import { api, RsvpRecipient, RsvpResponseStatus, RsvpWorkflow } from '@/lib/api'
 
@@ -18,6 +18,7 @@ function metric(label: string, value: number, note: string, color?: string) {
 
 export default function RsvpWorkflowDetailPage() {
   const id = Number(useParams<{ id: string }>().id)
+  const router = useRouter()
   const [workflow, setWorkflow] = useState<RsvpWorkflow | null>(null)
   const [recipients, setRecipients] = useState<RsvpRecipient[]>([])
   const [recipientCount, setRecipientCount] = useState(0)
@@ -56,6 +57,23 @@ export default function RsvpWorkflowDetailPage() {
     finally { setWorking('') }
   }
 
+  async function deleteWorkflow() {
+    if (!workflow) return
+    const warning = workflow.status === 'active' || workflow.status === 'paused'
+      ? 'All collected responses will be removed and the event will return to direct guest-pass delivery.'
+      : 'All RSVP recipients and responses in this workflow will be removed.'
+    if (!confirm(`Delete this RSVP workflow?\n\n${warning}\n\nThis cannot be undone.`)) return
+    setWorking('delete')
+    setError('')
+    try {
+      await api.deleteRsvpWorkflow(id)
+      router.push('/admin/rsvp')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The RSVP workflow could not be deleted.')
+      setWorking('')
+    }
+  }
+
   if (loading && !workflow) return <div className="px-6 py-14 text-sm" style={{ color: 'var(--muted)' }}>Loading RSVP workflow…</div>
   if (!workflow) return <div className="px-6 py-14"><p className="text-sm" style={{ color: 'var(--danger)' }}>{error || 'Workflow not found.'}</p><Link href="/admin/rsvp" className="mt-4 inline-block text-xs font-semibold" style={{ color: 'var(--brand)' }}>← RSVP workflows</Link></div>
 
@@ -70,10 +88,12 @@ export default function RsvpWorkflowDetailPage() {
         <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{workflow.event_name}</h1><span className="rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize" style={{ background: workflow.status === 'active' ? 'var(--success-bg)' : 'var(--brand-soft)', color: workflow.status === 'active' ? 'var(--success)' : 'var(--brand)' }}>{workflow.status}</span></div><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{new Date(workflow.event_date).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}{workflow.response_deadline ? ` · Replies close ${new Date(workflow.response_deadline).toLocaleDateString('en-GB')}` : ''}</p></div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { window.location.href = `${BASE_URL}/rsvp/workflows/${id}/export/` }} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Export CSV</button>
+          <Link href={`/admin/rsvp/add?workflow=${id}`} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>Edit workflow</Link>
           {workflow.status === 'draft' && <button disabled={!!working} onClick={() => runAction('launch', () => api.launchRsvpWorkflow(id))} className="rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ background: 'var(--brand)' }}>{working === 'launch' ? 'Launching…' : workflow.invitation_send_at ? `Schedule for ${new Date(workflow.invitation_send_at).toLocaleString('en-GB')}` : `Launch to ${stats.invited} guests`}</button>}
           {workflow.status === 'active' && <><button disabled={!!working || stats.awaiting === 0} onClick={() => { if (confirm(`Send another RSVP invitation to ${stats.awaiting} awaiting guests?`)) runAction('remind', () => api.remindAwaitingRsvpGuests(id)) }} className="rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40" style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>Remind awaiting</button><button disabled={!!working} onClick={() => runAction('pause', () => api.pauseRsvpWorkflow(id))} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Pause</button></>}
           {workflow.status === 'paused' && <button disabled={!!working} onClick={() => runAction('resume', () => api.resumeRsvpWorkflow(id))} className="rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: 'var(--brand)' }}>Resume</button>}
           {(workflow.status === 'active' || workflow.status === 'paused') && <button disabled={!!working} onClick={() => { if (confirm('Complete this RSVP workflow? Normal pass delivery will resume for the event.')) runAction('complete', () => api.completeRsvpWorkflow(id)) }} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Complete</button>}
+          <button disabled={!!working} onClick={deleteWorkflow} className="rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40" style={{ border: '1px solid rgba(239,68,68,0.35)', color: 'var(--danger)' }}>{working === 'delete' ? 'Deleting…' : 'Delete workflow'}</button>
         </div>
       </div>
 
@@ -106,5 +126,5 @@ export default function RsvpWorkflowDetailPage() {
 
 function RecipientRow({ recipient, retry, working }: { recipient: RsvpRecipient; retry: (kind: 'invitation' | 'pass') => void; working: string }) {
   const responseColor = recipient.response_status === 'confirmed' ? 'var(--success)' : recipient.response_status === 'declined' ? 'var(--danger)' : 'var(--muted)'
-  return <tr style={{ borderBottom: '1px solid var(--line)' }}><td className="px-4 py-3"><p className="font-semibold">{recipient.guest_name}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{recipient.ticket_type || 'Guest'}{recipient.table_number ? ` · Table ${recipient.table_number}` : ''}{recipient.aso_ebi_requested ? ` · Aso Ebi ${recipient.aso_ebi_quantity} yd` : ''}</p></td><td className="px-4 py-3"><span className="text-xs font-semibold" style={{ color: responseColor }}>{RESPONSE_LABEL[recipient.response_status]}</span></td><td className="px-4 py-3 text-xs capitalize" style={{ color: recipient.invitation_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.invitation_status.replace('_', ' ')}</td><td className="px-4 py-3 text-xs capitalize" style={{ color: recipient.pass_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.pass_status.replace('_', ' ')}</td><td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{recipient.responded_at ? new Date(recipient.responded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td><td className="px-4 py-3 text-right">{recipient.invitation_status === 'failed' && <button disabled={!!working} onClick={() => retry('invitation')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `invitation-${recipient.id}` ? 'Queuing…' : 'Retry invitation'}</button>}{recipient.pass_status === 'failed' && <button disabled={!!working} onClick={() => retry('pass')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `pass-${recipient.id}` ? 'Queuing…' : 'Retry pass'}</button>}</td></tr>
+  return <tr style={{ borderBottom: '1px solid var(--line)' }}><td className="px-4 py-3"><p className="font-semibold">{recipient.guest_name}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{recipient.ticket_type || 'Guest'}{recipient.table_number ? ` · Table ${recipient.table_number}` : ''}{recipient.aso_ebi_requested ? ` · Aso Ebi ${recipient.aso_ebi_quantity} yd` : ''}</p></td><td className="px-4 py-3"><span className="text-xs font-semibold" style={{ color: responseColor }}>{RESPONSE_LABEL[recipient.response_status]}</span></td><td className="px-4 py-3 text-xs capitalize" style={{ color: recipient.invitation_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.invitation_status.replace('_', ' ')}</td><td className="px-4 py-3"><span className="text-xs capitalize" style={{ color: recipient.pass_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.pass_status.replace('_', ' ')}</span>{recipient.pass_status === 'failed' && recipient.last_error && <p className="mt-1 max-w-[240px] text-[10px] leading-4" style={{ color: 'var(--danger)' }}>{recipient.last_error}</p>}</td><td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{recipient.responded_at ? new Date(recipient.responded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td><td className="px-4 py-3 text-right">{recipient.invitation_status === 'failed' && <button disabled={!!working} onClick={() => retry('invitation')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `invitation-${recipient.id}` ? 'Queuing…' : 'Retry invitation'}</button>}{recipient.pass_status === 'failed' && <button disabled={!!working} onClick={() => retry('pass')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `pass-${recipient.id}` ? 'Queuing…' : 'Retry pass'}</button>}</td></tr>
 }

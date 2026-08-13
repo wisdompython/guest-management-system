@@ -8,8 +8,8 @@ import AsoEbiYardSelector from '@/components/rsvp/AsoEbiYardSelector'
 
 const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }> = {
   awaiting: {
-    title: 'Your response is awaiting confirmation',
-    body: 'Please select whether you will be available to attend.',
+    title: 'Confirm Your Attendance or Availability',
+    body: 'Please let us know whether you will be available to attend.',
   },
   confirmed: {
     title: 'Attendance confirmed',
@@ -82,7 +82,8 @@ export default function PublicRsvpPage() {
             )}
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>You’re invited</p>
             <h1 className="mt-2 text-2xl font-bold">{details.event_name}</h1>
-            <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>Hello {details.guest_name}, please confirm whether you will be available to attend.</p>
+            <h2 className="mt-4 text-lg font-bold">Confirm Your Attendance or Availability</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Hello {details.guest_name}, please let us know whether you will be available to attend.</p>
 
             <div className="mt-6 grid gap-3 rounded-[12px] p-4" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div className="flex gap-3"><span aria-hidden="true" style={{ color: 'var(--brand)' }}>◷</span><div><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Date and time</p><p className="mt-1 text-sm font-semibold">{new Date(details.event_date).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}</p></div></div>
@@ -91,7 +92,7 @@ export default function PublicRsvpPage() {
 
             {details.can_respond ? (
               <div className="mt-7">
-                <p className="text-center text-sm font-semibold">Will you be attending?</p>
+                <p className="text-center text-sm font-semibold">Will you be available to attend?</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’ll attend</button>
                   <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I can’t attend</button>

@@ -139,6 +139,10 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             instance.invitation_template if instance else None,
         )
         pass_template = attrs.get('pass_template', instance.pass_template if instance else None)
+        auto_send_pass = attrs.get(
+            'auto_send_pass',
+            instance.auto_send_pass if instance else True,
+        )
         invitation_design = attrs.get(
             'invitation_design',
             instance.invitation_design if instance else None,
@@ -160,11 +164,11 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'response_deadline': 'The response deadline must be before the event date.',
             })
-        if deadline and deadline <= timezone.now():
+        if not instance and deadline and deadline <= timezone.now():
             raise serializers.ValidationError({
                 'response_deadline': 'The response deadline must be in the future.',
             })
-        if invitation_send_at and invitation_send_at <= timezone.now():
+        if not instance and invitation_send_at and invitation_send_at <= timezone.now():
             raise serializers.ValidationError({
                 'invitation_send_at': 'The invitation send time must be in the future.',
             })
@@ -176,7 +180,7 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'invitation_send_at': 'Invitations must be sent before the event date.',
             })
-        if pass_send_at and pass_send_at <= timezone.now():
+        if not instance and pass_send_at and pass_send_at <= timezone.now():
             raise serializers.ValidationError({
                 'pass_send_at': 'The pass send time must be in the future.',
             })
@@ -232,6 +236,21 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
         if pass_template and not pass_template.is_active:
             raise serializers.ValidationError({
                 'pass_template': 'Select an active WhatsApp template.',
+            })
+        resolved_pass_template = pass_template or (
+            event.whatsapp_template if event and event.whatsapp_template_id else None
+        )
+        if auto_send_pass and event and not event.design_template:
+            raise serializers.ValidationError({
+                'event': 'Upload a guest-pass design before enabling automatic pass delivery.',
+            })
+        if auto_send_pass and resolved_pass_template and not resolved_pass_template.has_header_image:
+            raise serializers.ValidationError({
+                'pass_template': 'The guest-pass template must have an image header.',
+            })
+        if resolved_pass_template and 'rsvp_link' in (resolved_pass_template.body_params or []):
+            raise serializers.ValidationError({
+                'pass_template': 'Choose a guest-pass template, not an RSVP invitation template.',
             })
         return attrs
 

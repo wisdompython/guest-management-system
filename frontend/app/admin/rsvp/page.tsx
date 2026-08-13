@@ -17,6 +17,8 @@ export default function RsvpWorkflowsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | RsvpWorkflowStatus>('all')
+  const [deleting, setDeleting] = useState<number | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.getRsvpWorkflows().then(setWorkflows).catch(console.error).finally(() => setLoading(false))
@@ -28,13 +30,30 @@ export default function RsvpWorkflowsPage() {
     return matchesSearch && matchesStatus
   }), [workflows, search, statusFilter])
 
+  async function deleteWorkflow(workflow: RsvpWorkflow) {
+    const warning = workflow.status === 'active' || workflow.status === 'paused'
+      ? 'This will remove all RSVP responses and return the event to direct guest-pass delivery.'
+      : 'This will remove the workflow and all of its RSVP recipients and responses.'
+    if (!confirm(`Delete the RSVP workflow for "${workflow.event_name}"?\n\n${warning}\n\nThis cannot be undone.`)) return
+    setDeleting(workflow.id)
+    setError('')
+    try {
+      await api.deleteRsvpWorkflow(workflow.id)
+      setWorkflows((current) => current.filter((item) => item.id !== workflow.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The RSVP workflow could not be deleted.')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   return (
     <div className="px-6 py-6 lg:px-8 lg:py-7">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>Optional workflow</p>
           <h1 className="mt-1 text-xl font-bold" style={{ color: 'var(--ink)' }}>RSVP Workflows</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Confirm availability before issuing guest passes.</p>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Ask guests to confirm their attendance or availability before issuing passes.</p>
         </div>
         <Link href="/admin/rsvp/add" className="rounded-lg px-4 py-2 text-center text-sm font-semibold text-white transition hover:opacity-90" style={{ background: 'var(--brand)' }}>
           + New RSVP Workflow
@@ -59,6 +78,8 @@ export default function RsvpWorkflowsPage() {
         </div>
       )}
 
+      {error && <p className="mb-4 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</p>}
+
       <div className="overflow-hidden rounded-[12px]" style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
         {loading ? (
           <div className="py-16 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading workflows…</div>
@@ -68,7 +89,7 @@ export default function RsvpWorkflowsPage() {
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             </div>
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>No RSVP workflows yet</p>
-            <p className="mt-1 max-w-md text-xs" style={{ color: 'var(--muted)' }}>Create one for an event that needs availability confirmation. Events that do not need RSVP require no setup.</p>
+            <p className="mt-1 max-w-md text-xs" style={{ color: 'var(--muted)' }}>Create one for an event where guests need to confirm their attendance or availability. Events that do not need RSVP require no setup.</p>
             <Link href="/admin/rsvp/add" className="mt-5 rounded-full px-5 py-2 text-xs font-semibold text-white" style={{ background: 'var(--brand)' }}>Create first workflow</Link>
           </div>
         ) : filtered.length === 0 ? (
@@ -93,7 +114,7 @@ export default function RsvpWorkflowsPage() {
                     <td className="px-4 py-4"><div className="flex items-center justify-between gap-4 text-xs"><span>{responded} / {workflow.stats.invited}</span><span style={{ color: 'var(--muted)' }}>{workflow.stats.response_rate}%</span></div><div className="mt-2 h-1.5 min-w-[130px] overflow-hidden rounded-full" style={{ background: 'var(--line)' }}><div className="h-full rounded-full" style={{ width: `${workflow.stats.response_rate}%`, background: 'var(--brand)' }} /></div></td>
                     <td className="px-4 py-4 text-right font-semibold">{workflow.stats.confirmed}</td>
                     <td className="px-4 py-4 text-right">{workflow.stats.passes_sent}</td>
-                    <td className="px-4 py-4 text-right"><Link href={`/admin/rsvp/${workflow.id}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>{workflow.status === 'draft' ? 'Continue setup →' : 'View workflow →'}</Link></td>
+                    <td className="px-4 py-4 text-right"><div className="flex items-center justify-end gap-3"><Link href={`/admin/rsvp/${workflow.id}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>View</Link><Link href={`/admin/rsvp/add?workflow=${workflow.id}`} className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Edit</Link><button type="button" disabled={deleting === workflow.id} onClick={() => deleteWorkflow(workflow)} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--danger)' }}>{deleting === workflow.id ? 'Deleting…' : 'Delete'}</button></div></td>
                   </tr>
                 )
               })}</tbody>

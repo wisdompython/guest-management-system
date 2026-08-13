@@ -1,4 +1,5 @@
-from rest_framework import viewsets, serializers
+from django.db.models.deletion import ProtectedError
+from rest_framework import status, viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -110,3 +111,33 @@ class WhatsAppTemplateViewSet(viewsets.ModelViewSet):
         if cat := self.request.query_params.get('category'):
             qs = qs.filter(category_id=cat)
         return qs
+
+    def destroy(self, request, *args, **kwargs):
+        template = self.get_object()
+        if (
+            template.events.exists()
+            or template.rsvp_invitation_workflows.exists()
+            or template.rsvp_pass_workflows.exists()
+        ):
+            return Response(
+                {
+                    'detail': (
+                        'This template is currently used by an event or RSVP workflow. '
+                        'Choose another template there before deleting it.'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            template.delete()
+        except ProtectedError:
+            return Response(
+                {
+                    'detail': (
+                        'This template is currently used by an event or RSVP workflow. '
+                        'Choose another template there before deleting it.'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)

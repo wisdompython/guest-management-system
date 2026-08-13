@@ -25,6 +25,7 @@ def make_event(name='RSVP Test Event'):
         name=name,
         date=timezone.now() + timezone.timedelta(days=14),
         venue='Test Venue',
+        design_template='event_templates/test-pass.png',
         whatsapp_enabled=True,
     )
 
@@ -111,6 +112,65 @@ class RsvpWorkflowApiTests(TestCase):
         workflow.refresh_from_db()
         self.assertEqual(workflow.event, self.event)
 
+    def test_active_workflow_can_be_edited(self):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.invitation_send_at = timezone.now() - timezone.timedelta(hours=1)
+        workflow.save(update_fields=['status', 'invitation_send_at'])
+
+        response = self.client.patch(
+            f'/api/rsvp/workflows/{workflow.id}/',
+            {'auto_send_pass': False},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        workflow.refresh_from_db()
+        self.assertFalse(workflow.auto_send_pass)
+
+    def test_active_workflow_can_be_deleted(self):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_a)
+
+        response = self.client.delete(f'/api/rsvp/workflows/{workflow.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(RsvpWorkflow.objects.filter(pk=workflow.id).exists())
+        self.assertFalse(RsvpRecipient.objects.filter(workflow_id=workflow.id).exists())
+        self.assertTrue(Event.objects.filter(pk=self.event.id).exists())
+
+    def test_template_in_use_cannot_be_deleted(self):
+        self.create_workflow()
+
+        response = self.client.delete(
+            f'/api/whatsapp-templates/{self.invitation_template.id}/',
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn('currently used', str(response.data))
+
+    def test_unused_template_can_be_deleted(self):
+        unused = make_template('unused_template')
+
+        response = self.client.delete(f'/api/whatsapp-templates/{unused.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(WhatsAppTemplate.objects.filter(pk=unused.id).exists())
+
+    def test_event_template_in_use_cannot_be_deleted(self):
+        self.event.whatsapp_template = self.invitation_template
+        self.event.save(update_fields=['whatsapp_template'])
+
+        response = self.client.delete(
+            f'/api/whatsapp-templates/{self.invitation_template.id}/',
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.whatsapp_template_id, self.invitation_template.id)
+
     def test_invitation_template_must_contain_rsvp_link(self):
         template_without_link = make_template('rsvp_without_link')
         response = self.client.post('/api/rsvp/workflows/', {
@@ -120,6 +180,36 @@ class RsvpWorkflowApiTests(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('rsvp_link', str(response.data))
+
+    def test_pass_template_must_have_image_header(self):
+        text_only_pass = make_template(
+            'text_only_pass',
+            body_params=['guest_name', 'event_name'],
+        )
+
+        response = self.client.post('/api/rsvp/workflows/', {
+            'event': self.event.id,
+            'invitation_template': self.invitation_template.id,
+            'pass_template': text_only_pass.id,
+            'auto_send_pass': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('image header', str(response.data))
+
+    def test_auto_pass_delivery_requires_event_pass_design(self):
+        self.event.design_template = None
+        self.event.save(update_fields=['design_template'])
+
+        response = self.client.post('/api/rsvp/workflows/', {
+            'event': self.event.id,
+            'invitation_template': self.invitation_template.id,
+            'pass_template': self.pass_template.id,
+            'auto_send_pass': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('guest-pass design', str(response.data))
 
     def test_image_header_template_requires_rsvp_artwork(self):
         image_template = make_template(
@@ -688,8 +778,9 @@ class RsvpTaskClaimTests(TestCase):
         self.assertFalse(second['sent'])
         mock_send.assert_called_once()
 
+    @patch('rsvp.tasks._ensure_guest_pass')
     @patch('rsvp.whatsapp.send_configured_pass')
-    def test_duplicate_pass_task_only_calls_whatsapp_once(self, mock_send):
+    def test_duplicate_pass_task_only_calls_whatsapp_once(self, mock_send, mock_ensure):
         from .tasks import send_confirmed_pass
 
         mock_send.return_value.id = 'wamid.pass-claim'
@@ -703,6 +794,34 @@ class RsvpTaskClaimTests(TestCase):
         second = send_confirmed_pass(recipient.id)
         self.assertTrue(first['sent'])
         self.assertFalse(second['sent'])
+        mock_send.assert_called_once()
+
+    @patch('rsvp.whatsapp.send_configured_pass')
+    @patch('rsvp.tasks._stored_file_exists', side_effect=[False, False, True])
+    @patch('guests.utils.generate_qr_code', return_value=True)
+    @patch('guests.utils.generate_pass_image', return_value=True)
+    def test_missing_pass_is_generated_before_delivery(
+        self,
+        mock_generate_pass,
+        mock_generate_qr,
+        mock_file_exists,
+        mock_send,
+    ):
+        from .tasks import send_confirmed_pass
+
+        mock_send.return_value.id = 'wamid.generated-pass'
+        recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.guest,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.QUEUED,
+        )
+
+        result = send_confirmed_pass(recipient.id)
+
+        self.assertTrue(result['sent'])
+        mock_generate_qr.assert_called_once()
+        mock_generate_pass.assert_called_once()
         mock_send.assert_called_once()
 
 

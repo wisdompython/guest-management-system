@@ -294,7 +294,7 @@ function TemplateForm({
 }
 
 export default function TemplatesPage() {
-  useRequireAuth('super_admin')
+  useRequireAuth('event_manager')
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -310,6 +310,7 @@ export default function TemplatesPage() {
   const [newCatName, setNewCatName] = useState('')
   const [addingCat, setAddingCat] = useState(false)
   const [catSubmitting, setCatSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const selectedTemplate = templates.find((t) => t.id === selectedId)
@@ -374,12 +375,23 @@ export default function TemplatesPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Remove this template?')) return
-    await api.deleteWhatsAppTemplate(id)
-    setTemplates((prev) => prev.filter((t) => t.id !== id))
-    setCount((c) => c - 1)
-    if (selectedId === id) closePanel()
-    showToast('Template removed.')
+    const template = templates.find((item) => item.id === id)
+    if (!confirm(`Delete "${template?.display_name || template?.name || 'this template'}"?\n\nThis cannot be undone. Templates currently used by an event or RSVP workflow must be detached first.`)) return
+    setDeletingId(id)
+    setFormError('')
+    try {
+      await api.deleteWhatsAppTemplate(id)
+      setTemplates((prev) => prev.filter((t) => t.id !== id))
+      setCount((c) => c - 1)
+      if (selectedId === id) closePanel()
+      showToast('Template deleted.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'The template could not be deleted.'
+      setFormError(message)
+      showToast(message)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   async function handleAddCategory(e: React.FormEvent) {
@@ -504,14 +516,14 @@ export default function TemplatesPage() {
                 {templates.map((t) => {
                   const isActive = selectedId === t.id
                   return (
-                    <button key={t.id}
-                      onClick={() => isActive ? closePanel() : openEdit(t)}
-                      className="w-full text-left px-5 py-4 transition-colors"
+                    <div key={t.id}
+                      className="flex w-full items-center gap-3 px-5 py-4 transition-colors"
                       style={{
                         borderBottom: '1px solid var(--line)',
                         background: isActive ? 'var(--brand-soft)' : 'transparent',
                       }}>
-                      <div className="flex items-start justify-between gap-3">
+                      <button type="button" onClick={() => isActive ? closePanel() : openEdit(t)} className="min-w-0 flex-1 text-left">
+                      <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold truncate" style={{ color: isActive ? 'var(--brand)' : 'var(--ink)' }}>
                             {t.display_name || t.name}
@@ -539,12 +551,13 @@ export default function TemplatesPage() {
                             )}
                           </div>
                         </div>
-                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-                          style={{ color: isActive ? 'var(--brand)' : 'var(--muted-2)', flexShrink: 0, marginTop: 2 }}>
-                          <polyline points="9 18 15 12 9 6"/>
-                        </svg>
                       </div>
-                    </button>
+                      </button>
+                      <div className="flex flex-shrink-0 items-center gap-2">
+                        <button type="button" onClick={() => openEdit(t)} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>Edit</button>
+                        <button type="button" disabled={deletingId === t.id} onClick={() => handleDelete(t.id)} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--danger)' }}>{deletingId === t.id ? '…' : 'Delete'}</button>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
@@ -588,10 +601,10 @@ export default function TemplatesPage() {
               </div>
               <div className="flex items-center gap-2">
                 {typeof selectedId === 'number' && (
-                  <button onClick={() => handleDelete(selectedId)}
+                  <button onClick={() => handleDelete(selectedId)} disabled={deletingId === selectedId}
                     className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
                     style={{ border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}>
-                    Remove
+                    {deletingId === selectedId ? 'Deleting…' : 'Delete'}
                   </button>
                 )}
                 <button onClick={closePanel}

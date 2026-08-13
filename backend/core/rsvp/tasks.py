@@ -19,6 +19,40 @@ def _is_transient_whatsapp_error(exc):
     return isinstance(exc, WhatsAppError) and exc.is_transient
 
 
+def _stored_file_exists(file_field) -> bool:
+    if not file_field or not file_field.name:
+        return False
+    try:
+        return file_field.storage.exists(file_field.name)
+    except OSError:
+        return False
+
+
+def _ensure_guest_pass(recipient):
+    """Generate a missing/stale QR and guest pass before RSVP delivery."""
+    guest = recipient.guest
+    event = guest.event
+    if _stored_file_exists(guest.pass_image):
+        return
+    if not event or not event.design_template:
+        raise ValueError(
+            'No guest-pass design is configured for this event. '
+            'Upload a pass design, then retry the pass.'
+        )
+
+    from guests.utils import generate_pass_image, generate_qr_code
+
+    if not _stored_file_exists(guest.qr_code):
+        if not generate_qr_code(guest):
+            raise ValueError('The guest QR code could not be generated. Retry after checking the pass design.')
+        guest.refresh_from_db(fields=['qr_code'])
+    if not generate_pass_image(guest):
+        raise ValueError('The personalised guest pass could not be generated. Check the pass-design zones.')
+    guest.refresh_from_db(fields=['pass_image'])
+    if not _stored_file_exists(guest.pass_image):
+        raise ValueError('The generated guest pass image could not be stored. Check media storage.')
+
+
 @shared_task
 def queue_workflow_invitations(workflow_id: int):
     from .models import RsvpRecipient, RsvpWorkflow
@@ -120,7 +154,12 @@ def send_confirmed_pass(self, recipient_id: int):
     try:
         recipient = (
             RsvpRecipient.objects
-            .select_related('workflow__pass_template', 'workflow__event', 'guest__event__whatsapp_template')
+            .select_related(
+                'workflow__pass_template',
+                'workflow__event',
+                'guest__event__whatsapp_template',
+                'guest__event__name_font',
+            )
             .get(pk=recipient_id)
         )
     except RsvpRecipient.DoesNotExist:
@@ -139,6 +178,7 @@ def send_confirmed_pass(self, recipient_id: int):
         return {'sent': False, 'reason': 'pass already claimed'}
 
     try:
+        _ensure_guest_pass(recipient)
         sent_update = send_configured_pass(recipient)
     except Exception as exc:
         if _is_transient_whatsapp_error(exc):

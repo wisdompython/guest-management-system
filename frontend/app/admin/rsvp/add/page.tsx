@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { api, Event, WhatsAppTemplate } from '@/lib/api'
+import { api, Event, RsvpWorkflowStatus, WhatsAppTemplate } from '@/lib/api'
 import ZoneSelector, { Zone } from '@/components/ZoneSelector'
 
 function toLocalInput(value: string | null) {
@@ -23,6 +23,7 @@ export default function AddRsvpWorkflowPage() {
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [eventId, setEventId] = useState<number | null>(null)
   const [existingWorkflowId, setExistingWorkflowId] = useState<number | null>(null)
+  const [existingWorkflowStatus, setExistingWorkflowStatus] = useState<RsvpWorkflowStatus | null>(null)
   const [invitationTemplate, setInvitationTemplate] = useState<number | null>(null)
   const [passTemplate, setPassTemplate] = useState<number | null>(null)
   const [deadline, setDeadline] = useState('')
@@ -41,21 +42,27 @@ export default function AddRsvpWorkflowPage() {
   useEffect(() => {
     Promise.all([api.getEvents(), api.getWhatsAppTemplates(), api.getRsvpWorkflows()])
       .then(([allEvents, allTemplates, workflows]) => {
-        const requestedEventId = Number(new URLSearchParams(window.location.search).get('event')) || null
+        const params = new URLSearchParams(window.location.search)
+        const requestedWorkflowId = Number(params.get('workflow')) || null
+        const requestedEventId = Number(params.get('event')) || null
+        const existing = requestedWorkflowId
+          ? workflows.find((workflow) => workflow.id === requestedWorkflowId)
+          : workflows.find((workflow) => workflow.event === requestedEventId)
+        const effectiveEventId = existing?.event || requestedEventId
         const usedEvents = new Set(workflows.map((workflow) => workflow.event))
         setEvents(allEvents.filter((event) => (
-          !event.is_ended
-          && new Date(event.date) > new Date()
-          && (!usedEvents.has(event.id) || event.id === requestedEventId)
+          event.id === effectiveEventId || (
+            !event.is_ended
+            && new Date(event.date) > new Date()
+            && !usedEvents.has(event.id)
+          )
         )))
         setTemplates(allTemplates.filter((template) => template.is_active))
-        if (requestedEventId) {
-          setEventId(requestedEventId)
-          const existing = workflows.find((workflow) => (
-            workflow.event === requestedEventId && workflow.status === 'draft'
-          ))
+        if (effectiveEventId) {
+          setEventId(effectiveEventId)
           if (existing) {
             setExistingWorkflowId(existing.id)
+            setExistingWorkflowStatus(existing.status)
             setInvitationTemplate(existing.invitation_template)
             setPassTemplate(existing.pass_template)
             setDeadline(existing.response_deadline?.slice(0, 10) || '')
@@ -87,6 +94,9 @@ export default function AddRsvpWorkflowPage() {
     ? `Event default (${selectedEvent.whatsapp_template_name})`
     : 'Global default template'
   const invitationOptions = templates.filter((template) => template.body_params.includes('rsvp_link'))
+  const passOptions = templates.filter((template) => (
+    template.has_header_image && !template.body_params.includes('rsvp_link')
+  ))
   const hasInvitationArtwork = Boolean(invitationArtwork || invitationArtworkUrl)
 
   function chooseInvitationArtwork(file: File | null) {
@@ -148,6 +158,9 @@ export default function AddRsvpWorkflowPage() {
     if (step === 2 && autoSendPass && passTiming === 'scheduled' && !passSendAt) {
       return setError('Choose a date and time for scheduled guest-pass delivery.')
     }
+    if (step === 2 && autoSendPass && !selectedEvent?.design_template) {
+      return setError('Upload a guest-pass design for this event before enabling automatic pass delivery.')
+    }
     setStep((current) => Math.min(3, current + 1))
   }
 
@@ -181,7 +194,9 @@ export default function AddRsvpWorkflowPage() {
       const workflow = existingWorkflowId
         ? await api.updateRsvpWorkflow(existingWorkflowId, payload)
         : await api.createRsvpWorkflow(payload)
-      await api.populateRsvpRecipients(workflow.id)
+      if (!existingWorkflowId || existingWorkflowStatus === 'draft') {
+        await api.populateRsvpRecipients(workflow.id)
+      }
       router.push(`/admin/rsvp/${workflow.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save the workflow.')
@@ -208,8 +223,8 @@ export default function AddRsvpWorkflowPage() {
   return (
     <form onSubmit={saveWorkflow} className="max-w-3xl px-6 py-6 lg:px-8 lg:py-7">
       <button type="button" onClick={() => router.push('/admin/rsvp')} className="mb-4 text-xs font-semibold" style={{ color: 'var(--brand)' }}>← RSVP workflows</button>
-      <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{existingWorkflowId ? 'Configure RSVP Workflow' : 'Create RSVP Workflow'}</h1>
-      <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Attach availability confirmation to one event and control both delivery times.</p>
+      <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{existingWorkflowId ? 'Edit RSVP Workflow' : 'Create RSVP Workflow'}</h1>
+      <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{existingWorkflowId ? 'Update the message, artwork, deadline, or delivery settings.' : 'Ask guests to confirm their attendance or availability and control both delivery times.'}</p>
 
       <div className="my-6 grid grid-cols-3 gap-3">
         {['Choose event', 'Messages & timing', 'Review'].map((label, index) => {
@@ -235,7 +250,7 @@ export default function AddRsvpWorkflowPage() {
           <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>The guest pass remains held until the guest confirms and its delivery time arrives.</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>RSVP invitation template</label><select value={invitationTemplate ?? ''} onChange={(e) => setInvitationTemplate(e.target.value ? Number(e.target.value) : null)} className={fieldClass} style={fieldStyle}><option value="">Select template</option>{invitationOptions.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}{template.has_header_image ? ' — image' : ' — message only'}</option>)}</select>{invitationOptions.length === 0 && <p className="mt-2 text-[11px]" style={{ color: 'var(--warn)' }}>Create an active template containing the rsvp_link variable first.</p>}</div>
-            <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Pass template after “Yes”</label><select value={passTemplate ?? ''} disabled={!autoSendPass} onChange={(e) => setPassTemplate(e.target.value ? Number(e.target.value) : null)} className={`${fieldClass} disabled:opacity-50`} style={fieldStyle}><option value="">— {passDefaultLabel} —</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}</option>)}</select><p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>Leave on the default to reuse the event’s guest-pass template.</p></div>
+            <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Pass template after “Yes”</label><select value={passTemplate ?? ''} disabled={!autoSendPass} onChange={(e) => setPassTemplate(e.target.value ? Number(e.target.value) : null)} className={`${fieldClass} disabled:opacity-50`} style={fieldStyle}><option value="">— {passDefaultLabel} —</option>{passOptions.map((template) => <option key={template.id} value={template.id}>{template.display_name || template.name}</option>)}</select><p className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>Only image-header templates are shown. Leave on the default to reuse the event’s guest-pass template.</p></div>
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Send RSVP invitations</label><select value={invitationTiming} onChange={(e) => setInvitationTiming(e.target.value as 'immediate' | 'scheduled')} className={fieldClass} style={fieldStyle}><option value="immediate">Send immediately on launch</option><option value="scheduled">Schedule for later</option></select>{invitationTiming === 'scheduled' && <input type="datetime-local" required value={invitationSendAt} onChange={(e) => setInvitationSendAt(e.target.value)} className={`${fieldClass} mt-3`} style={fieldStyle}/>}</div>
             <div><label className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Response deadline</label><input type="date" value={deadline} max={selectedEvent?.date.slice(0, 10)} onChange={(e) => setDeadline(e.target.value)} className={fieldClass} style={fieldStyle}/></div>
           </div>

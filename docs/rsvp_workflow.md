@@ -1,5 +1,7 @@
 # RSVP Workflow Operations
 
+The guest-facing RSVP prompt is **Confirm Your Attendance or Availability**.
+
 The RSVP module is optional. Event creation now asks whether guests should confirm RSVP first or receive passes through the original direct-delivery workflow. Choosing RSVP creates a protected draft workflow immediately, so adding guests cannot accidentally send their passes before RSVP is configured. Normal delivery resumes when the workflow is completed.
 
 ## Meta templates
@@ -8,7 +10,7 @@ Create two approved WhatsApp templates before configuring a workflow.
 
 ### RSVP invitation template
 
-- Must not require an image header.
+- May be message-only, or use an image header when RSVP artwork is attached.
 - May use the existing template variables such as guest name, event name, and event date.
 - Keep the venue out of the RSVP invitation; guests receive it on the actual pass.
 - Must include `rsvp_link` in `body_params` at the position of the link placeholder.
@@ -43,6 +45,16 @@ The workflow dashboard shows both the number of guest requests and the total num
 ## RSVP artwork
 
 An RSVP workflow can include optional PNG or JPEG artwork up to 5 MB. The artwork is the RSVP design, so it should include a guest-name space but no QR-code space. During setup, the organiser drags over the guest-name area. The system creates a personalised copy for every recipient and attaches it to the WhatsApp RSVP invitation. Use an approved WhatsApp template with an image header when artwork is attached; message-only RSVP templates continue to work without artwork. The separate guest pass design still contains the name and QR-code spaces.
+
+## Editing and deleting
+
+Event managers can edit or delete an RSVP workflow from either the workflow list or its dashboard. Editing is available after launch for message, artwork, deadline, and delivery-setting changes. Deleting a workflow permanently removes its recipients and RSVP responses, then returns the event to the original direct guest-pass delivery flow.
+
+Event managers can also edit and delete WhatsApp templates from the Templates page. A template that is still attached to an event or RSVP workflow is protected from deletion; select a replacement template in those records first, then delete it.
+
+## Pass delivery after confirmation
+
+Automatic delivery requires an event guest-pass design and an approved WhatsApp template with an image header. RSVP invitation templates are excluded from the pass-template selector. When a confirmed guest has no stored pass image, the delivery task regenerates the QR code and personalised pass before sending. If delivery still fails, the recipient row shows the exact error and provides a Retry pass action.
 
 ## Original direct-delivery flow
 

@@ -51,12 +51,8 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
-        workflow = self.get_object()
-        if workflow.status in {RsvpWorkflow.Status.ACTIVE, RsvpWorkflow.Status.PAUSED}:
-            return Response(
-                {'detail': 'Pause and complete this workflow before deleting it.'},
-                status=status.HTTP_409_CONFLICT,
-            )
+        # Deleting the workflow also removes its recipients/responses and returns
+        # the event to the original direct-pass delivery flow.
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'], url_path='populate-recipients')

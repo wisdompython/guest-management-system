@@ -42,7 +42,7 @@ const NAV_GROUPS = [
   ]},
   { label: 'ADMIN', items: [
     { href: '/admin/users',              label: 'Team',      icon: Ic.team,      minRole: 'super_admin' as const, tourId: 'nav-team' },
-    { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'super_admin' as const, tourId: 'nav-templates' },
+    { href: '/admin/settings/templates', label: 'Templates', icon: Ic.templates, minRole: 'event_manager' as const, tourId: 'nav-templates' },
     { href: '/admin/docs',               label: 'Docs',      icon: Ic.docs,      minRole: 'check_in_staff' as const },
   ]},
 ]
