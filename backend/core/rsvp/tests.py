@@ -910,8 +910,8 @@ class RsvpScheduledDispatchTests(TestCase):
 
         self.assertEqual(first, {'invitations_queued': 1, 'passes_queued': 1})
         self.assertEqual(second, {'invitations_queued': 0, 'passes_queued': 0})
-        mock_invitation.apply_async.assert_called_once()
-        mock_pass.apply_async.assert_called_once()
+        mock_invitation.delay.assert_called_once()
+        mock_pass.delay.assert_called_once()
         self.invited_recipient.refresh_from_db()
         self.confirmed_recipient.refresh_from_db()
         self.assertEqual(self.invited_recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)

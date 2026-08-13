@@ -7,8 +7,8 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-RSVP_RATE_LIMIT = '20/m'
-RSVP_BATCH_COUNTDOWN = 3
+RSVP_MESSAGES_PER_MINUTE = 20
+RSVP_RATE_LIMIT = f'{RSVP_MESSAGES_PER_MINUTE}/m'
 
 
 def _is_transient_whatsapp_error(exc):
@@ -71,14 +71,11 @@ def queue_workflow_invitations(workflow_id: int):
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
         ).values_list('id', flat=True)
     )
-    for index, recipient_id in enumerate(recipient_ids):
-        send_rsvp_invitation.apply_async(
-            args=[recipient_id],
-            countdown=index * RSVP_BATCH_COUNTDOWN,
-        )
+    for recipient_id in recipient_ids:
+        send_rsvp_invitation.delay(recipient_id)
     return {
         'queued': len(recipient_ids),
-        'estimated_minutes': round(len(recipient_ids) * RSVP_BATCH_COUNTDOWN / 60, 1),
+        'estimated_minutes': round(len(recipient_ids) / RSVP_MESSAGES_PER_MINUTE, 1),
     }
 
 
@@ -240,11 +237,8 @@ def dispatch_scheduled_rsvp_messages():
         if claimed:
             claimed_invitation_ids.append(recipient_id)
     if claimed_invitation_ids:
-        for index, recipient_id in enumerate(claimed_invitation_ids):
-            send_rsvp_invitation.apply_async(
-                args=[recipient_id],
-                countdown=index * RSVP_BATCH_COUNTDOWN,
-            )
+        for recipient_id in claimed_invitation_ids:
+            send_rsvp_invitation.delay(recipient_id)
 
     pass_workflow_ids = list(
         workflows.filter(
@@ -272,11 +266,8 @@ def dispatch_scheduled_rsvp_messages():
         if claimed:
             claimed_pass_ids.append(recipient_id)
     if claimed_pass_ids:
-        for index, recipient_id in enumerate(claimed_pass_ids):
-            send_confirmed_pass.apply_async(
-                args=[recipient_id],
-                countdown=index * RSVP_BATCH_COUNTDOWN,
-            )
+        for recipient_id in claimed_pass_ids:
+            send_confirmed_pass.delay(recipient_id)
 
     return {
         'invitations_queued': len(claimed_invitation_ids),

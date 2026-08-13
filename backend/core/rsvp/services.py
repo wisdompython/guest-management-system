@@ -46,6 +46,70 @@ def sync_guest_to_workflow(guest):
     return recipient
 
 
+def bulk_sync_guests_to_workflow(event_id, guest_ids) -> int:
+    """Attach a large imported guest set using bounded queries and one insert."""
+    guest_ids = list(guest_ids)
+    if not guest_ids:
+        return 0
+    workflow = RsvpWorkflow.objects.filter(
+        event_id=event_id,
+        status__in=[
+            RsvpWorkflow.Status.DRAFT,
+            RsvpWorkflow.Status.ACTIVE,
+            RsvpWorkflow.Status.PAUSED,
+        ],
+    ).first()
+    if not workflow:
+        return 0
+
+    from guests.models import Guest
+
+    eligible_ids = list(
+        Guest.objects
+        .filter(id__in=guest_ids)
+        .exclude(phone_number='')
+        .values_list('id', flat=True)
+    )
+    existing_ids = set(
+        RsvpRecipient.objects
+        .filter(workflow=workflow, guest_id__in=eligible_ids)
+        .values_list('guest_id', flat=True)
+    )
+    new_ids = [guest_id for guest_id in eligible_ids if guest_id not in existing_ids]
+    if not new_ids:
+        return 0
+
+    invitation_due = (
+        not workflow.invitation_send_at
+        or workflow.invitation_send_at <= timezone.now()
+    )
+    initial_status = (
+        RsvpRecipient.InvitationStatus.QUEUED
+        if workflow.status == RsvpWorkflow.Status.ACTIVE and invitation_due
+        else RsvpRecipient.InvitationStatus.NOT_SENT
+    )
+    RsvpRecipient.objects.bulk_create(
+        [
+            RsvpRecipient(
+                workflow=workflow,
+                guest_id=guest_id,
+                invitation_status=initial_status,
+            )
+            for guest_id in new_ids
+        ],
+        batch_size=500,
+        ignore_conflicts=True,
+    )
+    created = RsvpRecipient.objects.filter(
+        workflow=workflow,
+        guest_id__in=new_ids,
+    ).count()
+    if created and initial_status == RsvpRecipient.InvitationStatus.QUEUED:
+        from .tasks import queue_workflow_invitations
+        transaction.on_commit(lambda: queue_workflow_invitations.delay(workflow.id))
+    return created
+
+
 def pass_delivery_allowed(guest_id, event_id) -> bool:
     """Allow direct delivery only when RSVP is off or this guest confirmed."""
     from guests.models import Event

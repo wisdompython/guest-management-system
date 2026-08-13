@@ -2,7 +2,7 @@ import io
 import zipfile
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -21,6 +21,24 @@ def make_guest(event, **kwargs):
     defaults = dict(full_name='Test Guest', phone_number='2348000000001')
     defaults.update(kwargs)
     return Guest.objects.create(event=event, **defaults)
+
+
+class WhatsAppTemplateVariableTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'template-manager', password='pass', role='event_manager'
+        )
+        self.client.force_authenticate(self.manager)
+
+    def test_available_variables_include_rsvp_link(self):
+        response = self.client.get('/api/whatsapp-templates/available-vars/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(
+            {'key': 'rsvp_link', 'label': 'Guest-specific RSVP link'},
+            response.data,
+        )
 
 
 class EventDeliveryWorkflowTests(TestCase):
@@ -196,7 +214,14 @@ def make_csv(rows: list[dict], extra_cols: list[str] | None = None) -> io.BytesI
     return io.BytesIO(buf.getvalue().encode())
 
 
-@patch('guests.views.guest_actions.generate_guest_assets')
+@patch(
+    'guests.tasks._generate_guest_assets',
+    return_value={'qr': True, 'pass': True},
+)
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    CELERY_TASK_EAGER_PROPAGATES=True,
+)
 class BulkUploadTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -216,7 +241,7 @@ class BulkUploadTests(TestCase):
     def test_small_upload_creates_all_guests(self, mock_task):
         rows = [{'full_name': f'Guest {i}', 'phone_number': f'23480000{i:05d}'} for i in range(10)]
         r, _ = self._upload(rows, mock_task)
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(r.data['successful'], 10)
         self.assertEqual(r.data['failed'], 0)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 10)
@@ -225,28 +250,30 @@ class BulkUploadTests(TestCase):
         """2000-row upload must complete and create all guests via bulk_create."""
         rows = [{'full_name': f'Guest {i}', 'phone_number': f'23480{i:07d}'} for i in range(2000)]
         r, _ = self._upload(rows, mock_task)
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(r.data['successful'], 2000)
         self.assertEqual(r.data['failed'], 0)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 2000)
 
-    def test_celery_tasks_queued_after_all_rows_committed(self, mock_task):
+    def test_assets_are_processed_in_background_batches(self, mock_task):
         """generate_guest_assets.delay() must be called once per created guest."""
         rows = [{'full_name': f'G{i}', 'phone_number': f'23480000{i:05d}'} for i in range(50)]
         r, _ = self._upload(rows, mock_task)
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.status_code, status.HTTP_202_ACCEPTED)
         # One .delay() call per guest — no more, no less
-        self.assertEqual(mock_task.delay.call_count, 50)
+        self.assertEqual(mock_task.call_count, 50)
         # Every call passes a guest ID that actually exists in the DB
-        queued_ids = {call.args[0] for call in mock_task.delay.call_args_list}
+        queued_ids = {call.args[0] for call in mock_task.call_args_list}
         db_ids = set(Guest.objects.filter(event=self.event).values_list('id', flat=True))
         db_ids_str = {str(i) for i in db_ids}
         self.assertEqual(queued_ids, db_ids_str)
+        self.assertEqual(r.data['assets_processed'], 50)
+        self.assertEqual(r.data['status'], 'done')
 
     def test_celery_tasks_queued_with_send_whatsapp_true(self, mock_task):
         rows = [{'full_name': 'Alice', 'phone_number': '2348000000001'}]
         self._upload(rows, mock_task)
-        _, kwargs = mock_task.delay.call_args
+        _, kwargs = mock_task.call_args
         self.assertTrue(kwargs.get('send_whatsapp', True))
 
     def test_invalid_rows_reported_valid_rows_still_created(self, mock_task):
@@ -257,12 +284,12 @@ class BulkUploadTests(TestCase):
             {'full_name': 'Another OK',  'phone_number': '2348000000003'},
         ]
         r, _ = self._upload(rows, mock_task)
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(r.data['successful'], 2)
         self.assertEqual(r.data['failed'], 1)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
 
-    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
     def test_replace_list_removes_old_guests_and_syncs_new_rsvp_recipients(
         self, mock_invitation, mock_assets,
     ):
@@ -287,7 +314,7 @@ class BulkUploadTests(TestCase):
                 'replace_existing': True,
             }, format='multipart')
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED, response.data)
         self.assertEqual(response.data['replaced'], 1)
         self.assertFalse(Guest.objects.filter(pk=old_guest.pk).exists())
         new_guest = Guest.objects.get(event=self.event)
@@ -296,7 +323,7 @@ class BulkUploadTests(TestCase):
             recipient.invitation_status,
             RsvpRecipient.InvitationStatus.QUEUED,
         )
-        mock_invitation.assert_called_once_with(recipient.id)
+        mock_invitation.assert_called_once_with(workflow.id)
 
     def test_invalid_replacement_preserves_existing_guest_list(self, mock_task):
         old_guest = make_guest(self.event, full_name='Keep Me')
@@ -309,15 +336,16 @@ class BulkUploadTests(TestCase):
             'replace_existing': True,
         }, format='multipart')
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['status'], 'failed')
         self.assertTrue(Guest.objects.filter(pk=old_guest.pk).exists())
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 1)
 
     def test_empty_csv_returns_zero_created(self, mock_task):
         r, _ = self._upload([], mock_task)
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(r.data['successful'], 0)
-        self.assertEqual(mock_task.delay.call_count, 0)
+        self.assertEqual(mock_task.call_count, 0)
 
     def test_unauthenticated_upload_denied(self, mock_task):
         self.client.force_authenticate(None)
@@ -325,14 +353,45 @@ class BulkUploadTests(TestCase):
         csv_file.name = 'g.csv'
         r = self.client.post('/api/guests/bulk-upload/', {'event': self.event.id, 'csv_file': csv_file}, format='multipart')
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(mock_task.delay.call_count, 0)
+        self.assertEqual(mock_task.call_count, 0)
 
     def test_missing_csv_returns_400(self, mock_task):
         r = self.client.post('/api/guests/bulk-upload/', {'event': self.event.id}, format='multipart')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_import_status_endpoint_reports_progress(self, mock_task):
+        response, _ = self._upload([{
+            'full_name': 'Progress Guest',
+            'phone_number': '2348000000042',
+        }], mock_task)
 
-@patch('guests.views.guest_actions.generate_guest_assets')
+        progress = self.client.get(
+            f"/api/guests/bulk-upload-status/{response.data['upload_id']}/",
+        )
+
+        self.assertEqual(progress.status_code, status.HTTP_200_OK)
+        self.assertEqual(progress.data['status'], 'done')
+        self.assertEqual(progress.data['assets_processed'], 1)
+
+    def test_5000_guest_import_completes_with_bounded_asset_batches(self, mock_task):
+        from rsvp.models import RsvpWorkflow
+
+        workflow = RsvpWorkflow.objects.create(event=self.event)
+        rows = [
+            {'full_name': f'Guest {index}', 'phone_number': f'2348{index:010d}'}
+            for index in range(5000)
+        ]
+
+        response, _ = self._upload(rows, mock_task)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['successful'], 5000)
+        self.assertEqual(response.data['recipients_created'], 5000)
+        self.assertEqual(response.data['assets_processed'], 5000)
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 5000)
+        self.assertEqual(workflow.recipients.count(), 5000)
+
+
 class DownloadAssetsTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -343,21 +402,21 @@ class DownloadAssetsTests(TestCase):
         self.g1 = make_guest(self.event, full_name='Alice')
         self.g2 = make_guest(self.event, full_name='Bob')
 
-    def test_download_assets_returns_zip(self, _mock):
+    def test_download_assets_returns_zip(self):
         r = self.client.get('/api/guests/download-assets/', {'event': self.event.id, 'mode': 'both'})
         self.assertEqual(r.status_code, 200)
         content_type = r.get('Content-Type', '')
         self.assertIn('zip', content_type)
 
-    def test_download_assets_missing_event_returns_400(self, _mock):
+    def test_download_assets_missing_event_returns_400(self):
         r = self.client.get('/api/guests/download-assets/')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_download_assets_nonexistent_event_returns_404(self, _mock):
+    def test_download_assets_nonexistent_event_returns_404(self):
         r = self.client.get('/api/guests/download-assets/', {'event': 99999})
         self.assertEqual(r.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_download_assets_zip_is_valid(self, _mock):
+    def test_download_assets_zip_is_valid(self):
         """Response body must be a parseable ZIP even when guests have no files."""
         r = self.client.get('/api/guests/download-assets/', {'event': self.event.id})
         # Collect streamed response
@@ -405,6 +464,7 @@ class PastEventWhatsAppGuardTests(TestCase):
         mock_bulk_task.delay.assert_not_called()
 
     def test_bulk_send_whatsapp_allowed_for_future_event(self, mock_task, mock_bulk_task):
+        mock_bulk_task.delay.return_value.id = 'test-task-id'
         r = self.client.post('/api/guests/bulk_send_whatsapp/', {'event_id': self.future_event.id}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data['queued'])
@@ -490,9 +550,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         guest = self._due_guest()
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 1)
-        mock_send.apply_async.assert_called_once()
-        args, kwargs = mock_send.apply_async.call_args
-        self.assertEqual(kwargs['args'], [str(guest.id)])
+        mock_send.delay.assert_called_once_with(str(guest.id))
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_future_scheduled_guest_not_queued(self, mock_send):
@@ -500,7 +558,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self._due_guest(scheduled_send_at=timezone.now() + timezone.timedelta(hours=1))
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_rsvp_enabled_event_never_queues_direct_scheduled_pass(self, mock_send):
@@ -512,7 +570,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         result = dispatch_scheduled_sends()
 
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_already_sent_guest_not_requeued(self, mock_send):
@@ -520,7 +578,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self._due_guest(whatsapp_sent=True)
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_guest_without_pass_image_not_queued(self, mock_send):
@@ -528,7 +586,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self._due_guest(pass_image='')
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_guest_without_phone_not_queued(self, mock_send):
@@ -536,7 +594,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self._due_guest(phone_number='')
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_past_event_not_queued(self, mock_send):
@@ -550,7 +608,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         )
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_guests_without_scheduled_send_at_ignored(self, mock_send):
@@ -558,17 +616,16 @@ class DispatchScheduledSendsTaskTests(TestCase):
         make_guest(self.event, phone_number='2348000000003', pass_image='passes/fake.png')
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
     @patch('guests.tasks.send_whatsapp_pass')
-    def test_multiple_due_guests_staggered_by_countdown(self, mock_send):
+    def test_multiple_due_guests_are_queued_without_worker_eta_tasks(self, mock_send):
         from .tasks import dispatch_scheduled_sends
         self._due_guest(full_name='G1', phone_number='2348000000004')
         self._due_guest(full_name='G2', phone_number='2348000000005')
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 2)
-        countdowns = sorted(c.kwargs['countdown'] for c in mock_send.apply_async.call_args_list)
-        self.assertEqual(countdowns, [0, 3])
+        self.assertEqual(mock_send.delay.call_count, 2)
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_repeated_run_does_not_requeue_claimed_guest(self, mock_send):
@@ -579,7 +636,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self.assertEqual(first['queued'], 1)
         second = dispatch_scheduled_sends()
         self.assertEqual(second['queued'], 0)
-        self.assertEqual(mock_send.apply_async.call_count, 1)
+        self.assertEqual(mock_send.delay.call_count, 1)
         guest.refresh_from_db()
         self.assertIsNotNone(guest.scheduled_send_claimed_at)
 
@@ -592,7 +649,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         )
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 1)
-        mock_send.apply_async.assert_called_once()
+        mock_send.delay.assert_called_once()
 
     @patch('guests.tasks.send_whatsapp_pass')
     def test_recent_claim_not_retried(self, mock_send):
@@ -601,7 +658,7 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self._due_guest(scheduled_send_claimed_at=timezone.now() - timezone.timedelta(minutes=5))
         result = dispatch_scheduled_sends()
         self.assertEqual(result['queued'], 0)
-        mock_send.apply_async.assert_not_called()
+        mock_send.delay.assert_not_called()
 
 
 class SendPassRetryTests(TestCase):
@@ -712,7 +769,7 @@ class DispatchDueRemindersTimingTests(TestCase):
         from .tasks import dispatch_due_reminders
         result = dispatch_due_reminders()
         self.assertEqual(result['queued'], 1)
-        mock_send_reminder.apply_async.assert_called_once()
+        mock_send_reminder.delay.assert_called_once()
 
     @patch('guests.tasks.send_reminder')
     def test_reminder_not_yet_due_is_skipped(self, mock_send_reminder):
@@ -725,8 +782,8 @@ class DispatchDueRemindersTimingTests(TestCase):
         dispatch_due_reminders()
         # Only the overdue one from setUp should have been queued
         queued_reminder_ids = {
-            c.kwargs['args'][0]
-            for c in mock_send_reminder.apply_async.call_args_list
+            c.args[0]
+            for c in mock_send_reminder.delay.call_args_list
         }
         self.assertEqual(queued_reminder_ids, {self.reminder.id})
 

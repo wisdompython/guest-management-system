@@ -1,12 +1,10 @@
 import csv
+import csv
 import io
 import logging
 import os
 import re
 import zipfile
-
-from django.db import transaction
-from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.decorators import action
@@ -16,8 +14,8 @@ from django.http import StreamingHttpResponse, HttpResponse
 
 from ..csv_utils import safe_csv_row
 from ..models import Event, Guest, BulkUpload
-from ..serializers import BulkGuestUploadSerializer
-from ..tasks import generate_guest_assets
+from ..serializers import BulkGuestUploadSerializer, BulkUploadSerializer
+from ..tasks import process_bulk_guest_upload
 
 logger = logging.getLogger(__name__)
 
@@ -30,110 +28,64 @@ class GuestBulkExportMixin:
     def bulk_upload(self, request):
         serializer = BulkGuestUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        event = serializer.validated_data['event']
-        csv_file = serializer.validated_data['csv_file']
-        replace_existing = serializer.validated_data['replace_existing']
-
-        upload_record = BulkUpload.objects.create(
-            event=event,
-            csv_file=csv_file,
+        upload = BulkUpload.objects.create(
+            event=serializer.validated_data['event'],
+            csv_file=serializer.validated_data['csv_file'],
+            replace_existing=serializer.validated_data['replace_existing'],
             uploaded_by=request.user if request.user.is_authenticated else None,
-            status=BulkUpload.UploadStatus.PROCESSING,
+            status=BulkUpload.UploadStatus.PENDING,
+        )
+        try:
+            task = process_bulk_guest_upload.delay(upload.id)
+        except Exception:
+            logger.exception('Could not queue bulk upload %s', upload.id)
+            upload.status = BulkUpload.UploadStatus.FAILED
+            upload.error_message = (
+                'The import service is temporarily unavailable. '
+                'Your current guest list was not changed.'
+            )
+            upload.save(update_fields=['status', 'error_message'])
+            return Response(
+                self._bulk_upload_payload(upload),
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        BulkUpload.objects.filter(pk=upload.id, task_id='').update(task_id=task.id or '')
+        upload.refresh_from_db()
+        return Response(
+            self._bulk_upload_payload(upload),
+            status=status.HTTP_202_ACCEPTED,
         )
 
-        valid_rows, error_report = serializer.parse()
-
-        # Replacing is deliberately all-or-nothing. Never erase the current list
-        # when the replacement file contains invalid rows or no usable guests.
-        if replace_existing and (error_report or not valid_rows):
-            upload_record.status = BulkUpload.UploadStatus.FAILED
-            upload_record.total_rows = len(valid_rows) + len(error_report)
-            upload_record.failed_rows = len(error_report)
-            upload_record.error_report = error_report
-            upload_record.save(update_fields=[
-                'status', 'total_rows', 'failed_rows', 'error_report',
-            ])
-            return Response({
-                'detail': (
-                    'The existing guest list was not changed. Fix every CSV error '
-                    'before replacing the list.'
-                    if error_report else
-                    'The existing guest list was not changed because the replacement CSV is empty.'
-                ),
-                'errors': error_report,
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Build Guest objects without hitting the DB yet
-        guest_objects = [Guest(**row) for row in valid_rows]
-
-        # Insert in chunks of 500 to keep each statement fast and memory bounded.
-        # Replacement is one transaction so a database error restores the old list.
-        CHUNK = 500
-        created_guests = []
-        replaced = 0
-        if replace_existing:
-            try:
-                with transaction.atomic():
-                    existing = Guest.objects.filter(event=event)
-                    replaced = existing.count()
-                    existing.delete()
-                    created_guests = Guest.objects.bulk_create(
-                        guest_objects,
-                        batch_size=CHUNK,
-                    )
-            except Exception as exc:
-                logger.error("Guest-list replacement failed: %s", exc, exc_info=True)
-                upload_record.status = BulkUpload.UploadStatus.FAILED
-                upload_record.error_report = [{'row': '?', 'error': str(exc)}]
-                upload_record.save(update_fields=['status', 'error_report'])
-                return Response(
-                    {'detail': 'The replacement failed and the existing guest list was restored.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-        else:
-            for i in range(0, len(guest_objects), CHUNK):
-                chunk = guest_objects[i:i + CHUNK]
-                try:
-                    inserted = Guest.objects.bulk_create(chunk, batch_size=CHUNK)
-                    created_guests.extend(inserted)
-                except Exception as exc:
-                    logger.error("bulk_create chunk %s failed: %s", i // CHUNK, exc, exc_info=True)
-                    # Fall back to individual creates so we don't lose the whole batch
-                    for obj in chunk:
-                        try:
-                            obj.save()
-                            created_guests.append(obj)
-                        except Exception as row_exc:
-                            error_report.append({'row': '?', 'error': str(row_exc)})
-
-        # Queue asset generation outside the insert loop — one .delay() call per guest,
-        # but only after all rows are committed so workers never race a missing row.
-        from rsvp.services import sync_guest_to_workflow
-        for guest in created_guests:
-            sync_guest_to_workflow(guest)
-            send_now = not (
-                guest.scheduled_send_at and guest.scheduled_send_at > timezone.now()
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path=r'bulk-upload-status/(?P<upload_id>\d+)',
+    )
+    def bulk_upload_status(self, request, upload_id=None):
+        uploads = BulkUpload.objects.all()
+        if not request.user.is_super_admin:
+            uploads = uploads.filter(uploaded_by=request.user)
+        try:
+            upload = uploads.get(pk=upload_id)
+        except BulkUpload.DoesNotExist:
+            return Response(
+                {'detail': 'Upload not found.'},
+                status=status.HTTP_404_NOT_FOUND,
             )
-            generate_guest_assets.delay(str(guest.id), send_whatsapp=send_now)
+        return Response(self._bulk_upload_payload(upload))
 
-        guest_ids = [str(g.id) for g in created_guests]
-        upload_record.total_rows = len(valid_rows) + len(error_report)
-        upload_record.successful_rows = len(guest_ids)
-        upload_record.failed_rows = len(error_report)
-        upload_record.error_report = error_report
-        upload_record.status = BulkUpload.UploadStatus.DONE
-        upload_record.save()
-        return Response({
-            'upload_id': upload_record.id,
-            'total_rows': upload_record.total_rows,
-            'successful': upload_record.successful_rows,
-            'failed': upload_record.failed_rows,
-            'replaced': replaced,
-            'errors': error_report,
+    @staticmethod
+    def _bulk_upload_payload(upload):
+        data = BulkUploadSerializer(upload).data
+        data.update({
+            'upload_id': upload.id,
+            'successful': upload.successful_rows,
+            'failed': upload.failed_rows,
+            'replaced': upload.replaced_rows,
+            'errors': upload.error_report,
             'asset_warnings': [],
-            'guest_ids': guest_ids,
-        }, status=status.HTTP_201_CREATED)
+        })
+        return data
 
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):

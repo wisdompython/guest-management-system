@@ -7,10 +7,16 @@ import { UploadResults } from '@/components/bulk-upload/UploadResults'
 
 interface UploadResult {
   upload_id: number
+  status: 'pending' | 'processing' | 'done' | 'failed'
   total_rows: number
   successful: number
   failed: number
   replaced: number
+  recipients_created: number
+  assets_total: number
+  assets_processed: number
+  assets_failed: number
+  error_message: string
   errors: { row: number; error?: string; errors?: string[] }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }
@@ -42,6 +48,25 @@ export default function BulkUploadPage() {
       setReplaceExisting(params.get('replace') === '1')
     }).catch(console.error)
   }, [])
+
+  useEffect(() => {
+    if (!result || result.status === 'done' || result.status === 'failed') return
+    let stopped = false
+    const timer = window.setInterval(async () => {
+      try {
+        const response = await fetch(
+          `${BASE_URL}/guests/bulk-upload-status/${result.upload_id}/`,
+          { credentials: 'include' },
+        )
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.detail || 'Could not read import progress.')
+        if (!stopped) setResult(data)
+      } catch (err) {
+        if (!stopped) setError(err instanceof Error ? err.message : 'Could not read import progress.')
+      }
+    }, 2000)
+    return () => { stopped = true; window.clearInterval(timer) }
+  }, [result?.upload_id, result?.status])
 
   function handleEventChange(id: string) {
     setSelectedEvent(events.find((e) => String(e.id) === id) ?? null)
@@ -102,9 +127,9 @@ export default function BulkUploadPage() {
       </div>
       {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       {result && <UploadResults result={result} />}
-      {result && selectedEvent && <a href={`/admin/guests?event=${selectedEvent.id}`} className="mb-5 inline-block text-sm font-semibold text-[var(--brand)]">View updated guest list &rarr;</a>}
+      {result?.status === 'done' && selectedEvent && <a href={`/admin/guests?event=${selectedEvent.id}`} className="mb-5 inline-block text-sm font-semibold text-[var(--brand)]">View updated guest list &rarr;</a>}
       <UploadForm
-        events={events} selectedEvent={selectedEvent} submitting={submitting}
+        events={events} selectedEvent={selectedEvent} submitting={submitting || result?.status === 'pending' || result?.status === 'processing'}
         requiredCols={requiredCols} optionalCols={optionalCols} ticketTypes={ticketTypes}
         replaceExisting={replaceExisting} onReplaceExistingChange={setReplaceExisting}
         onSubmit={handleSubmit} onEventChange={handleEventChange}

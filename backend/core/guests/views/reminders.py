@@ -37,7 +37,8 @@ class EventReminderViewSet(viewsets.ModelViewSet):
         reminder = self.get_object()
 
         already_sent = ReminderLog.objects.filter(
-            reminder=reminder
+            reminder=reminder,
+            success=True,
         ).values_list('guest_id', flat=True)
 
         guests = (
@@ -48,24 +49,16 @@ class EventReminderViewSet(viewsets.ModelViewSet):
         )
 
         queued = 0
-        for i, guest_id in enumerate(guests):
-            send_reminder.apply_async(
-                args=[reminder.id, str(guest_id)],
-                countdown=i * 3,
-            )
+        for guest_id in guests:
+            send_reminder.delay(reminder.id, str(guest_id))
             queued += 1
 
         return Response({'queued': queued})
 
 
 AVAILABLE_VARS = [
-    {'key': 'guest_name',   'label': 'Guest full name'},
-    {'key': 'event_name',   'label': 'Event name'},
-    {'key': 'event_date',   'label': 'Event date & time'},
-    {'key': 'venue',        'label': 'Event venue'},
-    {'key': 'ticket_type',  'label': 'Guest ticket type'},
-    {'key': 'table_number', 'label': 'Guest table number'},
-    {'key': 'seat_number',  'label': 'Guest seat number'},
+    {'key': key, 'label': label}
+    for key, label in WhatsAppTemplate.AVAILABLE_VARS
 ]
 
 

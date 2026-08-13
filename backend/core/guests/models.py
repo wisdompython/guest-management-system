@@ -175,10 +175,20 @@ class BulkUpload(models.Model):
         'accounts.User', on_delete=models.SET_NULL, null=True, blank=True
     )
     status = models.CharField(max_length=20, choices=UploadStatus.choices, default=UploadStatus.PENDING)
+    replace_existing = models.BooleanField(default=False)
     total_rows = models.PositiveIntegerField(default=0)
     successful_rows = models.PositiveIntegerField(default=0)
     failed_rows = models.PositiveIntegerField(default=0)
+    replaced_rows = models.PositiveIntegerField(default=0)
+    recipients_created = models.PositiveIntegerField(default=0)
+    assets_total = models.PositiveIntegerField(default=0)
+    assets_processed = models.PositiveIntegerField(default=0)
+    assets_failed = models.PositiveIntegerField(default=0)
     error_report = models.JSONField(default=list, blank=True)
+    error_message = models.TextField(blank=True)
+    task_id = models.CharField(max_length=255, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

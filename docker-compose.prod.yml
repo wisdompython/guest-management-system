@@ -3,7 +3,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file: .env
+    env_file: ${APP_ENV_FILE:-.env}
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -34,7 +34,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: .env
+    env_file: ${APP_ENV_FILE:-.env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,8 +53,59 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: .env
-    command: celery -A core worker --loglevel=info --concurrency=2
+    env_file: ${APP_ENV_FILE:-.env}
+    command: celery -A core worker --loglevel=info --concurrency=1 -Q celery
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+    networks:
+      - internal
+
+  celery-imports:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    command: celery -A core worker --loglevel=info --concurrency=1 -Q imports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+    networks:
+      - internal
+
+  celery-assets:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    command: celery -A core worker --loglevel=info --concurrency=${CELERY_ASSET_CONCURRENCY:-2} -Q assets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_files:/app/media
+    networks:
+      - internal
+
+  celery-messages:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    command: celery -A core worker --loglevel=info --concurrency=2 -Q messages
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,7 +121,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: .env
+    env_file: ${APP_ENV_FILE:-.env}
     command: celery -A core beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       postgres:
@@ -89,7 +140,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
-    env_file: .env
+    env_file: ${APP_ENV_FILE:-.env}
     ports:
       - "127.0.0.1:3000:3000"
     networks:

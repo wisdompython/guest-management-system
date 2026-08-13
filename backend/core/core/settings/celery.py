@@ -11,6 +11,21 @@ CELERY_ACCEPT_CONTENT     = ['json']
 CELERY_TASK_SERIALIZER    = 'json'
 CELERY_RESULT_SERIALIZER  = 'json'
 CELERY_TIMEZONE           = 'UTC'
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# Keep CPU-heavy rendering away from imports and rate-limited WhatsApp sends.
+# This prevents a 5,000-guest upload from starving live RSVP delivery.
+CELERY_TASK_ROUTES = {
+    'guests.tasks.process_bulk_guest_upload': {'queue': 'imports'},
+    'guests.tasks.generate_guest_assets': {'queue': 'assets'},
+    'guests.tasks.generate_guest_asset_batch': {'queue': 'assets'},
+    'guests.tasks.send_whatsapp_pass': {'queue': 'messages'},
+    'guests.tasks.bulk_send_whatsapp_passes': {'queue': 'messages'},
+    'guests.tasks.send_reminder': {'queue': 'messages'},
+    'guests.tasks.dispatch_scheduled_sends': {'queue': 'messages'},
+    'guests.tasks.dispatch_due_reminders': {'queue': 'messages'},
+    'rsvp.tasks.*': {'queue': 'messages'},
+}
 
 # In development (DEBUG=True and no broker configured), run tasks synchronously
 # so you don't need Redis or a Celery worker running locally.
