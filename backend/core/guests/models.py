@@ -16,6 +16,15 @@ class Event(models.Model):
     date = models.DateTimeField()
     venue = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
+    rsvp_message = models.TextField(
+        blank=True,
+        help_text='Guest-facing welcome message shown on the public RSVP page.',
+    )
+    color_of_day = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Optional dress colour or event colour shown on the RSVP page.',
+    )
     # Admins upload one design per event; all guest passes are rendered on top of it
     design_template = models.ImageField(upload_to='design_templates/', blank=True, null=True)
 

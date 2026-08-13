@@ -648,6 +648,32 @@ class DispatchScheduledSendsTaskTests(TestCase):
         self.assertEqual(result['queued'], 2)
         self.assertEqual(mock_send.delay.call_count, 2)
 
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=1)
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_daily_budget_caps_scheduled_sends(self, mock_send):
+        """Only the remaining daily budget is queued; the rest stays eligible."""
+        from .tasks import dispatch_scheduled_sends
+        self._due_guest(full_name='B1', phone_number='2348000000006')
+        self._due_guest(full_name='B2', phone_number='2348000000007')
+        result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 1)
+        self.assertEqual(mock_send.delay.call_count, 1)
+        # The deferred guest is unclaimed, so a later run picks it up.
+        self.assertEqual(
+            Guest.objects.filter(scheduled_send_claimed_at__isnull=True).count(), 1,
+        )
+
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=1, CELERY_TASK_ALWAYS_EAGER=True)
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_daily_budget_caps_bulk_send(self, mock_send):
+        from .tasks import bulk_send_whatsapp_passes
+        make_guest(self.event, full_name='P1', phone_number='2348000000008', pass_image='passes/a.png')
+        make_guest(self.event, full_name='P2', phone_number='2348000000009', pass_image='passes/b.png')
+        result = bulk_send_whatsapp_passes(self.event.id)
+        self.assertEqual(result['queued'], 1)
+        self.assertEqual(result['deferred'], 1)
+        self.assertEqual(mock_send.delay.call_count, 1)
+
     @patch('guests.tasks.send_whatsapp_pass')
     def test_repeated_run_does_not_requeue_claimed_guest(self, mock_send):
         """A second Beat tick before the first send completes must not re-queue the guest (P1 dup fix)."""
@@ -807,6 +833,26 @@ class DispatchDueRemindersTimingTests(TestCase):
             for c in mock_send_reminder.delay.call_args_list
         }
         self.assertEqual(queued_reminder_ids, {self.reminder.id})
+
+    @patch('guests.tasks.send_reminder')
+    def test_queued_reminder_is_not_requeued_by_next_tick(self, mock_send_reminder):
+        """A reminder still draining through the rate limiter must not be
+        queued again by the next Beat run (claim-based dedup)."""
+        from .tasks import dispatch_due_reminders
+        first = dispatch_due_reminders()
+        second = dispatch_due_reminders()
+        self.assertEqual(first['queued'], 1)
+        self.assertEqual(second['queued'], 0)
+        mock_send_reminder.delay.assert_called_once()
+
+    @override_settings(WHATSAPP_DAILY_SEND_LIMIT=1)
+    @patch('guests.tasks.send_reminder')
+    def test_daily_budget_caps_reminder_dispatch(self, mock_send_reminder):
+        from .tasks import dispatch_due_reminders
+        make_guest(self.event, full_name='Second', phone_number='2348000000003')
+        result = dispatch_due_reminders()
+        self.assertEqual(result['queued'], 1)
+        mock_send_reminder.delay.assert_called_once()
 
 
 class CheckInTests(TestCase):

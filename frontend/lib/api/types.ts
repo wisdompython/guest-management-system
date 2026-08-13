@@ -80,6 +80,8 @@ export interface Event {
   date: string;
   venue: string;
   description: string;
+  rsvp_message: string;
+  color_of_day: string;
   design_template: string | null;
   qr_zone_x: number | null;
   qr_zone_y: number | null;
@@ -229,6 +231,8 @@ export interface PublicRsvpDetails {
   event_name: string;
   event_date: string;
   venue: string;
+  rsvp_message: string;
+  color_of_day: string;
   collect_aso_ebi: boolean;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;

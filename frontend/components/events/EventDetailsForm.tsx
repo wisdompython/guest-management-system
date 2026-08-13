@@ -104,6 +104,23 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
             placeholder="Add a short internal note about this event" className={field} />
         </div>
 
+        <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--ink)]">RSVP page content</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Shown to guests beneath the event details. Leave the welcome message blank to use the standard celebration copy.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className={label}>Welcome message <span className="font-normal text-[var(--muted)]">(optional)</span></label>
+              <textarea name="rsvp_message" rows={3} defaultValue={event?.rsvp_message}
+                placeholder="Join us as we celebrate Lady Otunba Osibogun on the joyous occasion of her 70th birthday." className={field} />
+            </div>
+            <div>
+              <label className={label}>Colour of the day <span className="font-normal text-[var(--muted)]">(optional)</span></label>
+              <input name="color_of_day" type="text" defaultValue={event?.color_of_day}
+                placeholder="e.g. Burgundy and gold" className={field} />
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )

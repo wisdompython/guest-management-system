@@ -61,6 +61,8 @@ export default function AddEventPage() {
     fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
     fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
+    fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
+    fd.append('color_of_day', (form.elements.namedItem('color_of_day') as HTMLInputElement).value)
     fd.append('ticket_types', JSON.stringify(ticketTypes))
     fd.append('required_fields', JSON.stringify(requiredFields))
     fd.append('whatsapp_enabled', String(whatsappEnabled))

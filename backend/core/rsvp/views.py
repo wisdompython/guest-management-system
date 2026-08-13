@@ -402,6 +402,8 @@ class PublicRsvpResponseView(APIView):
             'event_name': workflow.event.name,
             'event_date': workflow.event.date,
             'venue': workflow.event.venue,
+            'rsvp_message': workflow.event.rsvp_message,
+            'color_of_day': workflow.event.color_of_day,
             'collect_aso_ebi': workflow.event.collect_aso_ebi,
             'aso_ebi_requested': recipient.guest.aso_ebi_requested,
             'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,

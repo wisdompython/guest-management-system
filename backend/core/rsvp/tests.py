@@ -608,10 +608,15 @@ class PublicRsvpPageApiTests(TestCase):
         self.url = f'/api/rsvp/respond/{self.recipient.callback_token}/'
 
     def test_public_details_are_available_without_authentication(self):
+        self.event.rsvp_message = 'Join us for a beautiful milestone celebration.'
+        self.event.color_of_day = 'Burgundy and gold'
+        self.event.save(update_fields=['rsvp_message', 'color_of_day'])
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['guest_name'], 'Public Guest')
         self.assertEqual(response.data['event_name'], 'Public RSVP Event')
+        self.assertEqual(response.data['rsvp_message'], self.event.rsvp_message)
+        self.assertEqual(response.data['color_of_day'], 'Burgundy and gold')
         self.assertTrue(response.data['can_respond'])
 
     def test_public_endpoint_is_throttled(self):
