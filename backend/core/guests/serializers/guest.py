@@ -86,7 +86,7 @@ class GuestSerializer(serializers.ModelSerializer):
             })
         if aso_ebi_requested and aso_ebi_quantity < 1:
             raise serializers.ValidationError({
-                'aso_ebi_quantity': 'Enter a quantity of at least 1 for an Aso Ebi request.',
+                'aso_ebi_quantity': 'Enter at least 1 yard for an Aso Ebi request.',
             })
         if not aso_ebi_requested:
             data['aso_ebi_quantity'] = 0

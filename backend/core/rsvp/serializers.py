@@ -87,6 +87,11 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             'invitation_template_name',
             'pass_template',
             'pass_template_name',
+            'invitation_design',
+            'invitation_name_zone_x',
+            'invitation_name_zone_y',
+            'invitation_name_zone_w',
+            'invitation_name_zone_h',
             'status',
             'response_deadline',
             'invitation_send_at',
@@ -110,6 +115,14 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
     def get_stats(self, obj):
         return build_workflow_stats(obj)
 
+    def validate_invitation_design(self, value):
+        if value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError('The RSVP artwork must be 5 MB or smaller.')
+        content_type = getattr(value, 'content_type', '')
+        if content_type and content_type not in {'image/jpeg', 'image/png'}:
+            raise serializers.ValidationError('Upload a PNG or JPEG RSVP artwork.')
+        return value
+
     def validate(self, attrs):
         instance = self.instance
         if (
@@ -126,6 +139,10 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             instance.invitation_template if instance else None,
         )
         pass_template = attrs.get('pass_template', instance.pass_template if instance else None)
+        invitation_design = attrs.get(
+            'invitation_design',
+            instance.invitation_design if instance else None,
+        )
         deadline = attrs.get(
             'response_deadline',
             instance.response_deadline if instance else None,
@@ -175,6 +192,43 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'invitation_template': 'The RSVP invitation template must include the rsvp_link variable.',
             })
+        if invitation_design and invitation_template and not invitation_template.has_header_image:
+            raise serializers.ValidationError({
+                'invitation_template': 'Choose a template with an image header when RSVP artwork is attached.',
+            })
+        if invitation_template and invitation_template.has_header_image and not invitation_design:
+            raise serializers.ValidationError({
+                'invitation_design': 'Attach RSVP artwork for the selected image-header template.',
+            })
+        zone_fields = (
+            'invitation_name_zone_x',
+            'invitation_name_zone_y',
+            'invitation_name_zone_w',
+            'invitation_name_zone_h',
+        )
+        zone_values = [
+            attrs.get(field, getattr(instance, field, None) if instance else None)
+            for field in zone_fields
+        ]
+        if invitation_design and any(value is None for value in zone_values):
+            raise serializers.ValidationError({
+                'invitation_design': 'Mark the guest-name area on the RSVP artwork.',
+            })
+        if any(value is not None and not 0 <= value <= 1 for value in zone_values):
+            raise serializers.ValidationError({
+                'invitation_design': 'The guest-name area must stay inside the artwork.',
+            })
+        if invitation_design and (
+            zone_values[0] + zone_values[2] > 1
+            or zone_values[1] + zone_values[3] > 1
+        ):
+            raise serializers.ValidationError({
+                'invitation_design': 'The guest-name area must stay inside the artwork.',
+            })
+        if invitation_design and (zone_values[2] <= 0 or zone_values[3] <= 0):
+            raise serializers.ValidationError({
+                'invitation_design': 'The guest-name area must have a visible width and height.',
+            })
         if pass_template and not pass_template.is_active:
             raise serializers.ValidationError({
                 'pass_template': 'Select an active WhatsApp template.',
@@ -206,6 +260,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'has_phone',
             'response_status',
             'invitation_status',
+            'invitation_image',
             'pass_status',
             'invitation_sent_at',
             'responded_at',

@@ -38,7 +38,11 @@ Guests added or imported while the workflow is a draft are attached to it automa
 
 Enable **Collect Aso Ebi requests** in the event's guest setup when the event offers Aso Ebi. A guest who confirms attendance can then choose whether they want Aso Ebi and must enter a quantity of at least one when they do.
 
-The workflow dashboard shows both the number of guest requests and the total quantity. Each request also appears in the recipient list, guest details, the regular guest CSV export, and the RSVP CSV export. For bulk guest uploads, use `aso_ebi_requested` with `yes` or `no`; when the value is `yes`, provide `aso_ebi_quantity` as a whole number of at least one.
+The workflow dashboard shows both the number of guest requests and the total number of yards. Guests can quickly select 2, 4, 5, 6, 10, or 15 yards, or enter a custom whole number. Each request also appears in the recipient list, guest details, the regular guest CSV export, and the RSVP CSV export. For bulk guest uploads, use `aso_ebi_requested` with `yes` or `no`; when the value is `yes`, provide `aso_ebi_yards` as a whole number of at least one. The legacy `aso_ebi_quantity` heading is still accepted when importing existing files.
+
+## RSVP artwork
+
+An RSVP workflow can include optional PNG or JPEG artwork up to 5 MB. The artwork is the RSVP design, so it should include a guest-name space but no QR-code space. During setup, the organiser drags over the guest-name area. The system creates a personalised copy for every recipient and attaches it to the WhatsApp RSVP invitation. Use an approved WhatsApp template with an image header when artwork is attached; message-only RSVP templates continue to work without artwork. The separate guest pass design still contains the name and QR-code spaces.
 
 ## Original direct-delivery flow
 

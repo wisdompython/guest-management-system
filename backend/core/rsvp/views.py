@@ -109,7 +109,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         def rows():
             yield writer.writerow([
                 'guest_name', 'ticket_type', 'table_number', 'response_status',
-                'aso_ebi_requested', 'aso_ebi_quantity',
+                'aso_ebi_requested', 'aso_ebi_yards',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
             ])
             for recipient in recipients.iterator():
@@ -380,6 +380,10 @@ class PublicRsvpResponseView(APIView):
             'collect_aso_ebi': workflow.event.collect_aso_ebi,
             'aso_ebi_requested': recipient.guest.aso_ebi_requested,
             'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,
+            'invitation_image': (
+                request.build_absolute_uri(recipient.invitation_image.url)
+                if recipient.invitation_image else None
+            ),
             'response_deadline': workflow.response_deadline,
             'response_status': recipient.response_status,
             'responded_at': recipient.responded_at,
@@ -424,7 +428,7 @@ class PublicRsvpResponseView(APIView):
             aso_ebi_quantity = 0
         if aso_ebi_requested and aso_ebi_quantity < 1:
             return Response(
-                {'detail': 'Enter an Aso Ebi quantity of at least 1.'},
+                {'detail': 'Enter at least 1 yard for the Aso Ebi request.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

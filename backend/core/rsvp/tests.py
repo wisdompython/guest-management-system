@@ -1,12 +1,16 @@
 import hashlib
 import hmac
+import io
 import json
+import tempfile
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+from PIL import Image
 
 from accounts.models import User
 from guests.models import Event, Guest, WhatsAppTemplate
@@ -116,6 +120,56 @@ class RsvpWorkflowApiTests(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('rsvp_link', str(response.data))
+
+    def test_image_header_template_requires_rsvp_artwork(self):
+        image_template = make_template(
+            'rsvp_image_header',
+            header=True,
+            body_params=['guest_name', 'rsvp_link'],
+        )
+        response = self.client.post('/api/rsvp/workflows/', {
+            'event': self.event.id,
+            'invitation_template': image_template.id,
+            'pass_template': self.pass_template.id,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('artwork', str(response.data).lower())
+
+    def test_workflow_accepts_uploaded_rsvp_artwork_and_name_zone(self):
+        image_template = make_template(
+            'rsvp_uploaded_artwork',
+            header=True,
+            body_params=['guest_name', 'rsvp_link'],
+        )
+        artwork_buffer = io.BytesIO()
+        Image.new('RGB', (400, 600), '#182030').save(artwork_buffer, format='PNG')
+        artwork = SimpleUploadedFile(
+            'rsvp.png',
+            artwork_buffer.getvalue(),
+            content_type='image/png',
+        )
+
+        with tempfile.TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            response = self.client.post('/api/rsvp/workflows/', {
+                'event': str(self.event.id),
+                'invitation_template': str(image_template.id),
+                'pass_template': '',
+                'response_deadline': '',
+                'invitation_send_at': '',
+                'auto_send_pass': 'true',
+                'pass_send_at': '',
+                'invitation_design': artwork,
+                'invitation_name_zone_x': '0.1',
+                'invitation_name_zone_y': '0.7',
+                'invitation_name_zone_w': '0.8',
+                'invitation_name_zone_h': '0.1',
+            }, format='multipart')
+
+            self.assertEqual(response.status_code, 201, response.data)
+            workflow = RsvpWorkflow.objects.get(pk=response.data['id'])
+            self.assertTrue(workflow.invitation_design.name.startswith('rsvp_designs/'))
+            self.assertEqual(workflow.invitation_name_zone_w, 0.8)
 
     def test_populate_recipients_adds_only_guests_with_phone_numbers(self):
         workflow = self.create_workflow()
@@ -518,6 +572,61 @@ class RsvpInvitationLinkTests(TestCase):
             params[0].positionals[1],
             f'https://events.example.com/rsvp/{recipient.callback_token}',
         )
+
+    @patch('rsvp.whatsapp._get_client')
+    def test_invitation_artwork_is_personalised_and_attached(self, mock_client):
+        event = make_event()
+        guest = Guest.objects.create(
+            event=event,
+            full_name='Artwork Guest',
+            phone_number='2348000000001',
+        )
+        template = make_template(
+            'image_invitation',
+            header=True,
+            body_params=['guest_name', 'rsvp_link'],
+        )
+        artwork_buffer = io.BytesIO()
+        Image.new('RGB', (600, 800), '#182030').save(artwork_buffer, format='PNG')
+        artwork = SimpleUploadedFile(
+            'rsvp.png',
+            artwork_buffer.getvalue(),
+            content_type='image/png',
+        )
+        mock_client.return_value.send_template.return_value.id = 'wamid.image-invite'
+
+        with tempfile.TemporaryDirectory() as media_root, self.settings(
+            MEDIA_ROOT=media_root,
+            MEDIA_URL='/media/',
+            WHATSAPP_MEDIA_BASE_URL='https://media.example.com',
+            WHATSAPP_PHONE_ID='phone-id',
+            WHATSAPP_TOKEN='token',
+            SITE_URL='https://events.example.com',
+        ):
+            workflow = RsvpWorkflow.objects.create(
+                event=event,
+                invitation_template=template,
+                invitation_design=artwork,
+                invitation_name_zone_x=0.1,
+                invitation_name_zone_y=0.7,
+                invitation_name_zone_w=0.8,
+                invitation_name_zone_h=0.1,
+                status=RsvpWorkflow.Status.ACTIVE,
+            )
+            recipient = RsvpRecipient.objects.create(workflow=workflow, guest=guest)
+
+            send_invitation(recipient)
+
+            recipient.refresh_from_db()
+            self.assertTrue(recipient.invitation_image.name.startswith('rsvp_invitations/rsvp_'))
+            params = mock_client.return_value.send_template.call_args.kwargs['params']
+            self.assertEqual(len(params), 2)
+            self.assertEqual(
+                params[0].media,
+                f'https://media.example.com/media/{recipient.invitation_image.name}',
+            )
+            with Image.open(recipient.invitation_image.path) as generated:
+                self.assertEqual(generated.size, (600, 800))
 
 
 class WebhookSignatureTests(TestCase):

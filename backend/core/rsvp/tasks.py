@@ -56,7 +56,11 @@ def send_rsvp_invitation(self, recipient_id: int):
     try:
         recipient = (
             RsvpRecipient.objects
-            .select_related('workflow__invitation_template', 'workflow__event', 'guest__event')
+            .select_related(
+                'workflow__invitation_template',
+                'workflow__event__name_font',
+                'guest__event',
+            )
             .get(pk=recipient_id)
         )
     except RsvpRecipient.DoesNotExist:

@@ -49,7 +49,7 @@ export function GuestTableRow({ g, isSel, deleting, showPhone = false, onToggleS
             <p className="text-[11px] font-mono" style={{ color: 'var(--muted-2)' }}>
               G-{g.id.slice(-3).toUpperCase()}
               {g.ticket_type === 'vip' && <span className="ml-1.5 text-[10px]" style={{ color: 'var(--muted)' }}>· VIP</span>}
-              {g.aso_ebi_requested && <span className="ml-1.5 text-[10px]" style={{ color: 'var(--brand)' }}>· Aso Ebi ×{g.aso_ebi_quantity}</span>}
+              {g.aso_ebi_requested && <span className="ml-1.5 text-[10px]" style={{ color: 'var(--brand)' }}>· Aso Ebi {g.aso_ebi_quantity} yd</span>}
             </p>
           </div>
         </div>

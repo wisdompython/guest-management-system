@@ -25,7 +25,8 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   }
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
-    throw new Error(error.detail ?? `Request failed: ${res.status}`);
+    const firstFieldError = Object.values(error).find((value) => Array.isArray(value) && value.length)
+    throw new Error(error.detail ?? (Array.isArray(firstFieldError) ? String(firstFieldError[0]) : `Request failed: ${res.status}`));
   }
   if (res.status === 204) return undefined as T
   return res.json();

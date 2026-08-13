@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 
 import { api, PublicRsvpDetails, RsvpResponseStatus } from '@/lib/api'
+import AsoEbiYardSelector from '@/components/rsvp/AsoEbiYardSelector'
 
 const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }> = {
   awaiting: {
@@ -27,7 +28,7 @@ export default function PublicRsvpPage() {
   const [submitting, setSubmitting] = useState<'yes' | 'no' | null>(null)
   const [answer, setAnswer] = useState<'yes' | 'no' | null>(null)
   const [asoEbiRequested, setAsoEbiRequested] = useState(false)
-  const [asoEbiQuantity, setAsoEbiQuantity] = useState(1)
+  const [asoEbiQuantity, setAsoEbiQuantity] = useState(2)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function PublicRsvpPage() {
 
   async function respond(answer: 'yes' | 'no') {
     if (answer === 'yes' && asoEbiRequested && asoEbiQuantity < 1) {
-      setError('Enter the Aso Ebi quantity you need.')
+      setError('Choose how many yards of Aso Ebi you need.')
       return
     }
     setSubmitting(answer); setError('')
@@ -75,6 +76,10 @@ export default function PublicRsvpPage() {
           <div className="px-6 py-16 text-center sm:px-8"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>!</div><h1 className="mt-4 text-lg font-bold">Invitation unavailable</h1><p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>{error}</p></div>
         ) : details ? (
           <div className="px-6 py-7 sm:px-8 sm:py-8">
+            {details.invitation_image && (
+              <img src={details.invitation_image} alt={`RSVP invitation for ${details.guest_name}`}
+                className="mb-6 w-full rounded-xl object-cover" style={{ border: '1px solid var(--line)' }} />
+            )}
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--brand)' }}>You’re invited</p>
             <h1 className="mt-2 text-2xl font-bold">{details.event_name}</h1>
             <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>Hello {details.guest_name}, please confirm whether you will be available to attend.</p>
@@ -98,14 +103,14 @@ export default function PublicRsvpPage() {
                       <input type="checkbox" checked={asoEbiRequested} onChange={(e) => setAsoEbiRequested(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
                       <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this to include an Aso Ebi request with your RSVP.</span></span>
                     </label>
-                    {asoEbiRequested && <div className="mt-4"><label htmlFor="aso-ebi-quantity" className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Quantity needed</label><input id="aso-ebi-quantity" type="number" min="1" step="1" value={asoEbiQuantity} onChange={(e) => setAsoEbiQuantity(Math.max(1, Number(e.target.value) || 1))} className="mt-2 w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>Enter the total quantity you need.</p></div>}
+                    {asoEbiRequested && <div className="mt-4"><AsoEbiYardSelector value={asoEbiQuantity} onChange={setAsoEbiQuantity} /></div>}
                   </div>
                 )}
 
                 {answer && <button type="button" disabled={!!submitting} onClick={() => respond(answer)} className="mt-5 w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--brand)' }}>{submitting ? 'Saving your response…' : 'Submit RSVP'}</button>}
               </div>
             ) : (
-              <div className="mt-7 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#0d1016' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{details.closed_reason === 'deadline_passed' ? 'RSVP has closed' : details.closed_reason === 'workflow_inactive' ? 'Responses are currently closed' : RESPONSE_COPY[details.response_status].title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{details.closed_reason === 'deadline_passed' ? 'The response deadline for this event has passed.' : details.closed_reason === 'workflow_inactive' ? 'Please contact the event organiser if you need assistance.' : RESPONSE_COPY[details.response_status].body}</p>{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity}</p>}</div>
+              <div className="mt-7 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#0d1016' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{details.closed_reason === 'deadline_passed' ? 'RSVP has closed' : details.closed_reason === 'workflow_inactive' ? 'Responses are currently closed' : RESPONSE_COPY[details.response_status].title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{details.closed_reason === 'deadline_passed' ? 'The response deadline for this event has passed.' : details.closed_reason === 'workflow_inactive' ? 'Please contact the event organiser if you need assistance.' : RESPONSE_COPY[details.response_status].body}</p>{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity} yards</p>}</div>
             )}
 
             {error && <p className="mt-4 rounded-lg px-3 py-2 text-center text-xs" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</p>}

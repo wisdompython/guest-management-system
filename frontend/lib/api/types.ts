@@ -174,6 +174,11 @@ export interface RsvpWorkflow {
   invitation_template_name: string | null;
   pass_template: number | null;
   pass_template_name: string | null;
+  invitation_design: string | null;
+  invitation_name_zone_x: number | null;
+  invitation_name_zone_y: number | null;
+  invitation_name_zone_w: number | null;
+  invitation_name_zone_h: number | null;
   status: RsvpWorkflowStatus;
   response_deadline: string | null;
   invitation_send_at: string | null;
@@ -199,6 +204,7 @@ export interface RsvpRecipient {
   has_phone: boolean;
   response_status: RsvpResponseStatus;
   invitation_status: RsvpInvitationStatus;
+  invitation_image: string | null;
   pass_status: RsvpPassStatus;
   invitation_sent_at: string | null;
   responded_at: string | null;
@@ -225,6 +231,7 @@ export interface PublicRsvpDetails {
   collect_aso_ebi: boolean;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
+  invitation_image: string | null;
   response_deadline: string | null;
   response_status: RsvpResponseStatus;
   responded_at: string | null;

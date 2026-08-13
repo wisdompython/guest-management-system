@@ -22,6 +22,15 @@ def build_rsvp_url(recipient) -> str:
     return f"{settings.SITE_URL.rstrip('/')}/rsvp/{recipient.callback_token}"
 
 
+def _build_invitation_image_url(recipient) -> str:
+    base = getattr(settings, 'WHATSAPP_MEDIA_BASE_URL', '')
+    if not base:
+        host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
+        scheme = 'https' if not settings.DEBUG else 'http'
+        base = f'{scheme}://{host}'
+    return f"{base.rstrip('/')}{settings.MEDIA_URL}{recipient.invitation_image.name}"
+
+
 def _resolve_invitation_params(recipient) -> list:
     values = []
     for key in recipient.workflow.invitation_template.body_params or []:
@@ -44,12 +53,23 @@ def send_invitation(recipient):
         raise ValueError('The RSVP recipient has no phone number.')
     if not template:
         raise ValueError('The RSVP workflow has no invitation template.')
-    if template.has_header_image:
-        raise ValueError('RSVP invitation templates cannot require a header image.')
+    if template.has_header_image and not workflow.invitation_design:
+        raise ValueError('This RSVP template requires invitation artwork.')
+    if workflow.invitation_design and not template.has_header_image:
+        raise ValueError('Select an RSVP template with an image header for this artwork.')
 
-    from pywa.types.templates import BodyText, TemplateLanguage
+    from pywa.types.templates import BodyText, HeaderImage, TemplateLanguage
 
     params = []
+    if workflow.invitation_design:
+        from .images import generate_invitation_image
+
+        if not generate_invitation_image(recipient):
+            raise ValueError('The personalised RSVP artwork could not be generated.')
+        image_url = _build_invitation_image_url(recipient)
+        if 'localhost' in image_url or '127.0.0.1' in image_url:
+            raise ValueError('The RSVP artwork does not have a public URL.')
+        params.append(HeaderImage.params(image=image_url))
     body_values = _resolve_invitation_params(recipient)
     if body_values:
         params.append(BodyText.params(*body_values))

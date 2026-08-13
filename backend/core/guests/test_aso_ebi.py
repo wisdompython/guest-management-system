@@ -79,5 +79,5 @@ class AsoEbiGuestTests(TestCase):
         )
         response = self.client.get('/api/guests/export/', {'event': self.event.id})
         body = b''.join(response.streaming_content).decode()
-        self.assertIn('aso_ebi_requested,aso_ebi_quantity', body)
+        self.assertIn('aso_ebi_requested,aso_ebi_yards', body)
         self.assertIn(',Yes,4,', body)

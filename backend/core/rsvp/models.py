@@ -30,6 +30,16 @@ class RsvpWorkflow(models.Model):
         blank=True,
         related_name='rsvp_pass_workflows',
     )
+    invitation_design = models.ImageField(
+        upload_to='rsvp_designs/',
+        blank=True,
+        null=True,
+        help_text='Optional RSVP artwork. Guest names are added before delivery.',
+    )
+    invitation_name_zone_x = models.FloatField(null=True, blank=True)
+    invitation_name_zone_y = models.FloatField(null=True, blank=True)
+    invitation_name_zone_w = models.FloatField(null=True, blank=True)
+    invitation_name_zone_h = models.FloatField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -126,6 +136,11 @@ class RsvpRecipient(models.Model):
         db_index=True,
     )
     invitation_message_id = models.CharField(max_length=255, blank=True, db_index=True)
+    invitation_image = models.ImageField(
+        upload_to='rsvp_invitations/',
+        blank=True,
+        null=True,
+    )
     pass_message_id = models.CharField(max_length=255, blank=True, db_index=True)
     invitation_sent_at = models.DateTimeField(null=True, blank=True)
     responded_at = models.DateTimeField(null=True, blank=True)

@@ -77,11 +77,13 @@ class BulkGuestUploadSerializer(serializers.Serializer):
                 if not event.collect_aso_ebi:
                     errors.append('Aso Ebi requests are not enabled for this event.')
                 try:
-                    aso_ebi_quantity = int(row.get('aso_ebi_quantity', ''))
+                    aso_ebi_quantity = int(
+                        row.get('aso_ebi_yards') or row.get('aso_ebi_quantity', '')
+                    )
                     if aso_ebi_quantity < 1:
                         raise ValueError
                 except (TypeError, ValueError):
-                    errors.append("'aso_ebi_quantity' must be a whole number of at least 1 when Aso Ebi is requested.")
+                    errors.append("'aso_ebi_yards' must be a whole number of at least 1 when Aso Ebi is requested.")
 
             # Validate required fields
             for field in required:

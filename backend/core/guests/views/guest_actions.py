@@ -112,7 +112,7 @@ class GuestBulkExportMixin:
         columns = [
             'full_name', 'email', 'phone_number',
             'ticket_type', 'table_number', 'seat_number',
-            'aso_ebi_requested', 'aso_ebi_quantity',
+            'aso_ebi_requested', 'aso_ebi_yards',
             'status', 'registered_at', 'checked_in_at',
             'whatsapp_sent', 'event',
         ]

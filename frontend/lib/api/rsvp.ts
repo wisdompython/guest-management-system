@@ -23,6 +23,10 @@ export interface CreateRsvpWorkflowPayload {
   invitation_send_at: string | null
   auto_send_pass: boolean
   pass_send_at: string | null
+  invitation_name_zone_x?: number
+  invitation_name_zone_y?: number
+  invitation_name_zone_w?: number
+  invitation_name_zone_h?: number
 }
 
 export interface RsvpRecipientFilters {
@@ -43,10 +47,10 @@ export const rsvpApi = {
     return request<{ results: RsvpWorkflow[] } | RsvpWorkflow[]>(`/rsvp/workflows/${query ? `?${query}` : ''}`).then(collection)
   },
   getRsvpWorkflow: (id: number) => request<RsvpWorkflow>(`/rsvp/workflows/${id}/`),
-  createRsvpWorkflow: (payload: CreateRsvpWorkflowPayload) =>
-    request<RsvpWorkflow>('/rsvp/workflows/', { method: 'POST', body: JSON.stringify(payload) }),
-  updateRsvpWorkflow: (id: number, payload: Partial<CreateRsvpWorkflowPayload>) =>
-    request<RsvpWorkflow>(`/rsvp/workflows/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  createRsvpWorkflow: (payload: CreateRsvpWorkflowPayload | FormData) =>
+    request<RsvpWorkflow>('/rsvp/workflows/', { method: 'POST', body: payload instanceof FormData ? payload : JSON.stringify(payload) }),
+  updateRsvpWorkflow: (id: number, payload: Partial<CreateRsvpWorkflowPayload> | FormData) =>
+    request<RsvpWorkflow>(`/rsvp/workflows/${id}/`, { method: 'PATCH', body: payload instanceof FormData ? payload : JSON.stringify(payload) }),
   deleteRsvpWorkflow: (id: number) =>
     request<void>(`/rsvp/workflows/${id}/`, { method: 'DELETE' }),
   populateRsvpRecipients: (id: number, guestIds?: string[]) =>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { Event } from '@/lib/api'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import AsoEbiYardSelector from '@/components/rsvp/AsoEbiYardSelector'
 
 const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.06)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
 const select = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
@@ -32,9 +33,11 @@ export function GuestForm({
   onSubmit, onEventChange, onCancel,
 }: Props) {
   const [asoEbiRequested, setAsoEbiRequested] = useState(false)
+  const [asoEbiYards, setAsoEbiYards] = useState(2)
 
   useEffect(() => {
     setAsoEbiRequested(false)
+    setAsoEbiYards(2)
   }, [selectedEvent?.id])
 
   return (
@@ -101,14 +104,12 @@ export function GuestForm({
               />
               <span>
                 <span className="block text-sm font-semibold text-[var(--ink)]">Guest wants Aso Ebi</span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Turn this on to record the requested quantity.</span>
+                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Turn this on to record how many yards are needed.</span>
               </span>
             </label>
             {asoEbiRequested && (
-              <div className="mt-4 max-w-xs">
-                <label className={labelCls}>Quantity *</label>
-                <input name="aso_ebi_quantity" type="number" min="1" step="1" defaultValue="1" required className={field} />
-                <p className="mt-1.5 text-xs text-[var(--muted)]">Enter the total quantity this guest needs.</p>
+              <div className="mt-4">
+                <AsoEbiYardSelector name="aso_ebi_quantity" id="guest-aso-ebi-yards" value={asoEbiYards} onChange={setAsoEbiYards} />
               </div>
             )}
           </div>
