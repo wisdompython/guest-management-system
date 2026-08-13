@@ -177,8 +177,9 @@ class GuestBulkExportMixin:
                     except (FileNotFoundError, ValueError):
                         pass
             response = StreamingHttpResponse(zs, content_type='application/zip')
-        except ImportError:
-            # zipstream-ng not installed — fall back to in-memory zip
+        except (ImportError, AttributeError):
+            # zipstream-ng not installed (or a different zipstream package is
+            # shadowing it) — fall back to in-memory zip
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for guest in guests.iterator():

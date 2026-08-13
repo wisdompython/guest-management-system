@@ -60,6 +60,43 @@ Automatic delivery requires an event guest-pass design and an approved WhatsApp 
 
 Choose **Send passes directly** during event creation to keep the original workflow. Select **Send immediately** or set one default scheduled delivery date and time for the event; every newly added or imported guest inherits it. A per-guest delivery time can still override the event default.
 
+## Daily send budget (Meta messaging tier)
+
+Meta limits how many unique guests a WhatsApp Business number can open
+business-initiated conversations with per rolling 24 hours (250 unverified,
+then 1K → 10K → 100K as the tier grows). Set `WHATSAPP_DAILY_SEND_LIMIT` to
+the account's current tier (default 2000).
+
+Every dispatch path — RSVP invitations, reminders to awaiting guests,
+scheduled and bulk pass sends, and event reminders — checks the trailing
+24-hour send count (including messages queued but not yet sent) before
+queueing more work. When the budget is exhausted:
+
+- RSVP invitations stay approved (`queued`, no dispatch stamp) and the
+  five-minute Beat dispatcher drains them automatically as the window rolls
+  over. Confirmed-guest passes take priority over new invitations.
+- Bulk direct sends re-schedule themselves every 30 minutes with the
+  remaining guests.
+- Scheduled sends and event reminders stay eligible and are picked up by
+  their next Beat run.
+
+A workflow larger than the daily tier therefore drains over multiple days
+without manual intervention. Passes sent immediately after a guest replies
+do not count against Meta's limit (they ride the guest's 24-hour service
+window), though the budget counts them conservatively.
+
+Practical notes for large events:
+
+- Sending 50%+ of the tier in a week with a medium/high quality rating
+  usually triggers Meta's automatic tier upgrade within 24 hours; raise
+  `WHATSAPP_DAILY_SEND_LIMIT` after the upgrade is visible in the WhatsApp
+  Manager.
+- The Celery task rate limit (20 messages/minute) is applied per worker
+  process; do not scale the `messages` queue to multiple workers without
+  accounting for the multiplied throughput.
+- A dispatched message that never completes (lost worker, exhausted
+  retries) is re-dispatched automatically by the Beat sweep after 6 hours.
+
 ## Webhook configuration
 
 - Keep the existing callback URL: `/api/webhooks/whatsapp/`.
