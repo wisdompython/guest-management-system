@@ -43,6 +43,7 @@ class EventDeliveryWorkflowTests(TestCase):
         self.assertEqual(workflow.status, RsvpWorkflow.Status.DRAFT)
         self.assertEqual(workflow.created_by, self.manager)
         self.assertEqual(response.data['rsvp_workflow_id'], workflow.id)
+        self.assertTrue(response.data['rsvp_enabled'])
 
     def test_direct_event_does_not_create_an_rsvp_workflow(self):
         from rsvp.models import RsvpWorkflow
@@ -56,6 +57,7 @@ class EventDeliveryWorkflowTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertFalse(RsvpWorkflow.objects.filter(event_id=response.data['id']).exists())
         self.assertIsNone(response.data['rsvp_workflow_id'])
+        self.assertFalse(response.data['rsvp_enabled'])
 
 
 class GuestListFilterTests(TestCase):
@@ -260,6 +262,57 @@ class BulkUploadTests(TestCase):
         self.assertEqual(r.data['failed'], 1)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
 
+    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    def test_replace_list_removes_old_guests_and_syncs_new_rsvp_recipients(
+        self, mock_invitation, mock_assets,
+    ):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+        old_guest = make_guest(self.event, full_name='Wrong Number')
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=old_guest)
+        csv_file = make_csv([{
+            'full_name': 'Correct Number',
+            'phone_number': '2348000099999',
+        }])
+        csv_file.name = 'replacement.csv'
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/guests/bulk-upload/', {
+                'event': self.event.id,
+                'csv_file': csv_file,
+                'replace_existing': True,
+            }, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['replaced'], 1)
+        self.assertFalse(Guest.objects.filter(pk=old_guest.pk).exists())
+        new_guest = Guest.objects.get(event=self.event)
+        recipient = RsvpRecipient.objects.get(workflow=workflow, guest=new_guest)
+        self.assertEqual(
+            recipient.invitation_status,
+            RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        mock_invitation.assert_called_once_with(recipient.id)
+
+    def test_invalid_replacement_preserves_existing_guest_list(self, mock_task):
+        old_guest = make_guest(self.event, full_name='Keep Me')
+        csv_file = make_csv([{'full_name': '', 'phone_number': '2348000000002'}])
+        csv_file.name = 'invalid-replacement.csv'
+
+        response = self.client.post('/api/guests/bulk-upload/', {
+            'event': self.event.id,
+            'csv_file': csv_file,
+            'replace_existing': True,
+        }, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Guest.objects.filter(pk=old_guest.pk).exists())
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 1)
+
     def test_empty_csv_returns_zero_created(self, mock_task):
         r, _ = self._upload([], mock_task)
         self.assertEqual(r.status_code, status.HTTP_201_CREATED)
@@ -446,6 +499,18 @@ class DispatchScheduledSendsTaskTests(TestCase):
         from .tasks import dispatch_scheduled_sends
         self._due_guest(scheduled_send_at=timezone.now() + timezone.timedelta(hours=1))
         result = dispatch_scheduled_sends()
+        self.assertEqual(result['queued'], 0)
+        mock_send.apply_async.assert_not_called()
+
+    @patch('guests.tasks.send_whatsapp_pass')
+    def test_rsvp_enabled_event_never_queues_direct_scheduled_pass(self, mock_send):
+        from .tasks import dispatch_scheduled_sends
+        self.event.rsvp_enabled = True
+        self.event.save(update_fields=['rsvp_enabled'])
+        self._due_guest()
+
+        result = dispatch_scheduled_sends()
+
         self.assertEqual(result['queued'], 0)
         mock_send.apply_async.assert_not_called()
 

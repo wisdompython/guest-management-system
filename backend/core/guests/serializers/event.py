@@ -67,6 +67,7 @@ class EventSerializer(serializers.ModelSerializer):
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
             'ticket_types', 'required_fields', 'collect_aso_ebi', 'whatsapp_enabled',
+            'rsvp_enabled',
             'whatsapp_template', 'whatsapp_template_name',
             'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
             'is_ended', 'guest_count', 'checked_in_count', 'created_at',
@@ -93,6 +94,9 @@ class EventSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         create_rsvp_workflow = validated_data.pop('create_rsvp_workflow', False)
+        if create_rsvp_workflow:
+            validated_data['rsvp_enabled'] = True
+            validated_data['pass_send_at'] = None
         event = super().create(validated_data)
         if create_rsvp_workflow:
             from rsvp.models import RsvpWorkflow

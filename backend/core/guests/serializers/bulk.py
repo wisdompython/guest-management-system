@@ -15,6 +15,7 @@ FALSE_VALUES = {'', '0', 'false', 'no', 'n', 'not requested'}
 class BulkGuestUploadSerializer(serializers.Serializer):
     event = serializers.PrimaryKeyRelatedField(queryset=Event.objects.all())
     csv_file = serializers.FileField()
+    replace_existing = serializers.BooleanField(required=False, default=False)
 
     def validate_csv_file(self, value):
         if not value.name.endswith('.csv'):

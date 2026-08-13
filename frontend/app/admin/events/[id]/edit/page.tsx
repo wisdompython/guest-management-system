@@ -35,6 +35,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [ticketTypes, setTicketTypes] = useState<TicketTypeDef[]>([])
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
+  const [rsvpEnabled, setRsvpEnabled] = useState(false)
   const [collectAsoEbi, setCollectAsoEbi] = useState(false)
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
@@ -57,6 +58,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         if (ev.ticket_types?.length) setTicketTypes(ev.ticket_types as TicketTypeDef[])
         if (ev.required_fields?.length) setRequiredFields(ev.required_fields as string[])
         setWhatsappEnabled(ev.whatsapp_enabled ?? true)
+        setRsvpEnabled(ev.rsvp_enabled ?? Boolean(ev.rsvp_workflow_id))
         setCollectAsoEbi(ev.collect_aso_ebi ?? false)
         setWhatsappTemplate(ev.whatsapp_template ?? null)
         if (ev.pass_send_at) {
@@ -84,7 +86,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!dateValid) { setError('Please set a future date and time for the event.'); return }
-    if (!event?.rsvp_workflow_id && whatsappEnabled && passTiming === 'scheduled' && !passSendAt) {
+    if (!rsvpEnabled && whatsappEnabled && passTiming === 'scheduled' && !passSendAt) {
       setError('Choose a date and time for scheduled guest-pass delivery.'); return
     }
     setError(''); setSubmitting(true)
@@ -98,8 +100,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     if (nameTouched) { if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) } else { fd.append('name_zone_x', ''); fd.append('name_zone_y', ''); fd.append('name_zone_w', ''); fd.append('name_zone_h', '') } }
     fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
     fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled)); fd.append('collect_aso_ebi', String(collectAsoEbi))
+    fd.append('rsvp_enabled', String(rsvpEnabled))
     fd.append('whatsapp_template', whatsappTemplate ? String(whatsappTemplate) : '')
-    if (!event?.rsvp_workflow_id) fd.append('pass_send_at', passTiming === 'scheduled' && passSendAt ? new Date(passSendAt).toISOString() : '')
+    if (!rsvpEnabled) fd.append('pass_send_at', passTiming === 'scheduled' && passSendAt ? new Date(passSendAt).toISOString() : '')
     try {
       const res = await fetch(`${BASE_URL}/events/${id}/`, { method: 'PATCH', body: fd, credentials: 'include' })
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail ?? JSON.stringify(err)) }
@@ -138,14 +141,13 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
         {whatsappEnabled && !event.rsvp_workflow_id && <div className="form-card">
-          <FormSectionHeader step={3} title="Direct pass delivery" description="Choose the default send time for guests added to this event." />
+          <FormSectionHeader step={3} title="Delivery flow" description="Choose whether guests must confirm before receiving a pass." />
           <div className="p-6">
-          <label className="form-label" htmlFor="edit-pass-timing">Default delivery timing for new guests</label>
-          <select id="edit-pass-timing" value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="form-control mt-2"><option value="immediate">Send immediately</option><option value="scheduled">Schedule for later</option></select>
-          {passTiming === 'scheduled' && (
-            <div className="mt-3"><label className="form-label" htmlFor="edit-pass-send-at">Delivery date and time</label><input id="edit-pass-send-at" type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="form-control mt-2"/></div>
-          )}
-          <p className="form-hint">Immediate delivery sends the pass when a guest is added. Scheduled delivery applies the selected time to new guests.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={`form-choice ${rsvpEnabled ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="edit_delivery_flow" checked={rsvpEnabled} onChange={() => setRsvpEnabled(true)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Confirm RSVP first</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Hold every guest pass until the guest confirms.</span></span></span></label>
+              <label className={`form-choice ${!rsvpEnabled ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="edit_delivery_flow" checked={!rsvpEnabled} onChange={() => setRsvpEnabled(false)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Send passes directly</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Skip RSVP confirmation for new guest passes.</span></span></span></label>
+            </div>
+            {rsvpEnabled ? <div className="mt-5 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4"><p className="text-sm font-semibold text-[var(--ink)]">Guest passes are currently held</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">This event still requires RSVP even though its previous workflow was deleted. Save your changes, then create a replacement workflow.</p><a href={`/admin/rsvp/add?event=${event.id}`} className="mt-3 inline-block text-xs font-semibold text-[var(--brand)]">Configure RSVP workflow &rarr;</a></div> : <div className="mt-5 border-t border-[var(--line)] pt-5"><label className="form-label" htmlFor="edit-pass-timing">Default delivery timing for new guests</label><select id="edit-pass-timing" value={passTiming} onChange={(e) => setPassTiming(e.target.value as 'immediate' | 'scheduled')} className="form-control mt-2"><option value="immediate">Send immediately</option><option value="scheduled">Schedule for later</option></select>{passTiming === 'scheduled' && <div className="mt-3"><label className="form-label" htmlFor="edit-pass-send-at">Delivery date and time</label><input id="edit-pass-send-at" type="datetime-local" required value={passSendAt} onChange={(e) => setPassSendAt(e.target.value)} className="form-control mt-2"/></div>}<p className="form-hint">Immediate delivery sends the pass when a guest is added. Scheduled delivery applies the selected time to new guests.</p></div>}
           </div>
         </div>}
         {whatsappEnabled && event.rsvp_workflow_id && <div className="form-card"><FormSectionHeader step={3} title="RSVP delivery" description="Invitation and confirmed-pass timing are managed in this event's RSVP workflow." /><div className="p-6"><button type="button" onClick={() => router.push(`/admin/rsvp/${event.rsvp_workflow_id}`)} className="text-sm font-semibold text-[var(--brand)]">Open RSVP workflow &rarr;</button></div></div>}

@@ -32,8 +32,8 @@ export default function RsvpWorkflowsPage() {
 
   async function deleteWorkflow(workflow: RsvpWorkflow) {
     const warning = workflow.status === 'active' || workflow.status === 'paused'
-      ? 'This will remove all RSVP responses and return the event to direct guest-pass delivery.'
-      : 'This will remove the workflow and all of its RSVP recipients and responses.'
+      ? 'This will remove all RSVP responses. The event will remain RSVP-enabled and guest passes will stay held.'
+      : 'This will remove the workflow and all of its RSVP recipients and responses. The event will remain RSVP-enabled.'
     if (!confirm(`Delete the RSVP workflow for "${workflow.event_name}"?\n\n${warning}\n\nThis cannot be undone.`)) return
     setDeleting(workflow.id)
     setError('')

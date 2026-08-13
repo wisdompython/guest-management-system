@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { api, Guest, Event, GuestListStats } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -43,16 +43,10 @@ export default function GuestsPage() {
   const [deleteError, setDeleteError]   = useState('')
   const [regeneratingAll, setRegeneratingAll] = useState(false)
   const [regenToast, setRegenToast]     = useState('')
-  const [undoToast, setUndoToast]       = useState<{ id: string; name: string; guest: Guest } | null>(null)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 50
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
-
-  useEffect(() => {
-    return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }
-  }, [])
 
   const { tokens, freeText } = parseTokens(query)
   const statusToken = tokens.find((t) => t.key === 'status')?.value ?? ''
@@ -98,66 +92,35 @@ export default function GuestsPage() {
     if (selected.size === filtered.length) setSelected(new Set())
     else setSelected(new Set(filtered.map((g) => g.id)))
   }
-  const commitDelete = useCallback(async (id: string, name: string) => {
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete ${name}?\n\nTheir RSVP record, response link, QR code, and pass will also be removed. This cannot be undone.`)) return
+    const guest = guests.find((item) => item.id === id)
+    setDeleting(id)
     setDeleteError('')
     try {
       await api.deleteGuest(id)
+      setGuests((current) => current.filter((item) => item.id !== id))
+      setCount((current) => Math.max(0, current - 1))
+      setSelected((current) => { const next = new Set(current); next.delete(id); return next })
+      if (guest) {
+        setStats((current) => current ? {
+          ...current,
+          checked_in: Math.max(0, current.checked_in - (guest.status === 'checked_in' ? 1 : 0)),
+          pending: Math.max(0, current.pending - (guest.status === 'checked_in' ? 0 : 1)),
+          wa_sent: Math.max(0, current.wa_sent - (guest.whatsapp_sent ? 1 : 0)),
+          wa_unsent: Math.max(0, current.wa_unsent - (guest.whatsapp_sent ? 0 : 1)),
+        } : current)
+      }
     } catch (err) {
-      // Guest already removed from UI — restore it by refreshing
       setDeleteError(err instanceof Error ? err.message : `Failed to remove ${name}.`)
+    } finally {
+      setDeleting(null)
     }
-  }, [])
-
-  function handleDelete(id: string, name: string) {
-    const guest = guests.find((g) => g.id === id)
-    if (!guest) return
-    // Cancel any pending undo, commit that deletion immediately
-    if (undoToast) {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-      commitDelete(undoToast.id, undoToast.name)
-      setUndoToast(null)
-    }
-    // Optimistically remove from list
-    setGuests((prev) => prev.filter((g) => g.id !== id))
-    setCount((c) => c - 1)
-    setSelected((s) => { const next = new Set(s); next.delete(id); return next })
-    setStats((s) => {
-      if (!s) return s
-      const wasCheckedIn = guest.status === 'checked_in'
-      return {
-        ...s,
-        checked_in: s.checked_in - (wasCheckedIn ? 1 : 0),
-        pending: s.pending - (wasCheckedIn ? 0 : 1),
-      }
-    })
-    // Show undo toast for 5s, then commit
-    setUndoToast({ id, name, guest })
-    undoTimerRef.current = setTimeout(() => {
-      commitDelete(id, name)
-      setUndoToast(null)
-    }, 5000)
-  }
-
-  function handleUndoDelete() {
-    if (!undoToast) return
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setGuests((prev) => [undoToast.guest, ...prev])
-    setCount((c) => c + 1)
-    setStats((s) => {
-      if (!s) return s
-      const wasCheckedIn = undoToast.guest.status === 'checked_in'
-      return {
-        ...s,
-        checked_in: s.checked_in + (wasCheckedIn ? 1 : 0),
-        pending: s.pending + (wasCheckedIn ? 0 : 1),
-      }
-    })
-    setUndoToast(null)
   }
 
   async function handleBulkDelete() {
     if (selected.size === 0) return
-    if (!confirm(`Delete ${selected.size} selected guest${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    if (!confirm(`Delete ${selected.size} selected guest${selected.size !== 1 ? 's' : ''}?\n\nTheir RSVP records, response links, QR codes, and passes will also be removed. This cannot be undone.`)) return
     setDeleting('bulk')
     setDeleteError('')
     try {
@@ -172,7 +135,7 @@ export default function GuestsPage() {
 
   async function handleDeleteAll() {
     if (!selectedEvent) return
-    if (!confirm(`Delete ALL ${count} guests from "${selectedEvent.name}"? This cannot be undone.`)) return
+    if (!confirm(`Delete ALL ${count} guests from "${selectedEvent.name}"?\n\nTheir RSVP records, responses, links, QR codes, and passes will also be removed. The RSVP workflow itself will remain. This cannot be undone.`)) return
     setDeleting('all')
     setDeleteError('')
     try {
@@ -264,17 +227,6 @@ export default function GuestsPage() {
   // ── Guest list ─────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
-      {undoToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-3 rounded-full px-5 py-2.5 shadow-xl"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
-          <span className="text-sm">Removed <strong>{undoToast.name}</strong></span>
-          <button onClick={handleUndoDelete}
-            className="rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80"
-            style={{ background: 'var(--brand)', color: '#fff' }}>
-            Undo
-          </button>
-        </div>
-      )}
       {regenToast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 shadow-xl text-sm"
           style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--brand)' }}>
@@ -337,7 +289,7 @@ export default function GuestsPage() {
                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
                 </svg>
-                Bulk upload
+                Upload / replace list
               </Link>
               <Link href={`/admin/guests/add?event=${selectedEvent.id}`} data-tour="guests-add-button"
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"

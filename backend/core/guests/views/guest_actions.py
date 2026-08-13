@@ -5,6 +5,7 @@ import os
 import re
 import zipfile
 
+from django.db import transaction
 from django.utils import timezone
 
 from rest_framework import status
@@ -32,6 +33,7 @@ class GuestBulkExportMixin:
 
         event = serializer.validated_data['event']
         csv_file = serializer.validated_data['csv_file']
+        replace_existing = serializer.validated_data['replace_existing']
 
         upload_record = BulkUpload.objects.create(
             event=event,
@@ -42,26 +44,68 @@ class GuestBulkExportMixin:
 
         valid_rows, error_report = serializer.parse()
 
+        # Replacing is deliberately all-or-nothing. Never erase the current list
+        # when the replacement file contains invalid rows or no usable guests.
+        if replace_existing and (error_report or not valid_rows):
+            upload_record.status = BulkUpload.UploadStatus.FAILED
+            upload_record.total_rows = len(valid_rows) + len(error_report)
+            upload_record.failed_rows = len(error_report)
+            upload_record.error_report = error_report
+            upload_record.save(update_fields=[
+                'status', 'total_rows', 'failed_rows', 'error_report',
+            ])
+            return Response({
+                'detail': (
+                    'The existing guest list was not changed. Fix every CSV error '
+                    'before replacing the list.'
+                    if error_report else
+                    'The existing guest list was not changed because the replacement CSV is empty.'
+                ),
+                'errors': error_report,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Build Guest objects without hitting the DB yet
         guest_objects = [Guest(**row) for row in valid_rows]
 
-        # Insert in chunks of 500 to keep each statement fast and memory bounded
+        # Insert in chunks of 500 to keep each statement fast and memory bounded.
+        # Replacement is one transaction so a database error restores the old list.
         CHUNK = 500
         created_guests = []
-        for i in range(0, len(guest_objects), CHUNK):
-            chunk = guest_objects[i:i + CHUNK]
+        replaced = 0
+        if replace_existing:
             try:
-                inserted = Guest.objects.bulk_create(chunk, batch_size=CHUNK)
-                created_guests.extend(inserted)
+                with transaction.atomic():
+                    existing = Guest.objects.filter(event=event)
+                    replaced = existing.count()
+                    existing.delete()
+                    created_guests = Guest.objects.bulk_create(
+                        guest_objects,
+                        batch_size=CHUNK,
+                    )
             except Exception as exc:
-                logger.error("bulk_create chunk %s failed: %s", i // CHUNK, exc, exc_info=True)
-                # Fall back to individual creates so we don't lose the whole batch
-                for obj in chunk:
-                    try:
-                        obj.save()
-                        created_guests.append(obj)
-                    except Exception as row_exc:
-                        error_report.append({'row': '?', 'error': str(row_exc)})
+                logger.error("Guest-list replacement failed: %s", exc, exc_info=True)
+                upload_record.status = BulkUpload.UploadStatus.FAILED
+                upload_record.error_report = [{'row': '?', 'error': str(exc)}]
+                upload_record.save(update_fields=['status', 'error_report'])
+                return Response(
+                    {'detail': 'The replacement failed and the existing guest list was restored.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+        else:
+            for i in range(0, len(guest_objects), CHUNK):
+                chunk = guest_objects[i:i + CHUNK]
+                try:
+                    inserted = Guest.objects.bulk_create(chunk, batch_size=CHUNK)
+                    created_guests.extend(inserted)
+                except Exception as exc:
+                    logger.error("bulk_create chunk %s failed: %s", i // CHUNK, exc, exc_info=True)
+                    # Fall back to individual creates so we don't lose the whole batch
+                    for obj in chunk:
+                        try:
+                            obj.save()
+                            created_guests.append(obj)
+                        except Exception as row_exc:
+                            error_report.append({'row': '?', 'error': str(row_exc)})
 
         # Queue asset generation outside the insert loop — one .delay() call per guest,
         # but only after all rows are committed so workers never race a missing row.
@@ -85,6 +129,7 @@ class GuestBulkExportMixin:
             'total_rows': upload_record.total_rows,
             'successful': upload_record.successful_rows,
             'failed': upload_record.failed_rows,
+            'replaced': replaced,
             'errors': error_report,
             'asset_warnings': [],
             'guest_ids': guest_ids,

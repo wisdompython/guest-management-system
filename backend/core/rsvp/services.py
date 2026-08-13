@@ -47,7 +47,15 @@ def sync_guest_to_workflow(guest):
 
 
 def pass_delivery_allowed(guest_id, event_id) -> bool:
-    """Preserve normal delivery unless an RSVP workflow is holding this guest's pass."""
+    """Allow direct delivery only when RSVP is off or this guest confirmed."""
+    from guests.models import Event
+
+    rsvp_enabled = (
+        Event.objects
+        .filter(pk=event_id)
+        .values_list('rsvp_enabled', flat=True)
+        .first()
+    )
     workflow = RsvpWorkflow.objects.filter(
         event_id=event_id,
         status__in=[
@@ -56,14 +64,19 @@ def pass_delivery_allowed(guest_id, event_id) -> bool:
             RsvpWorkflow.Status.PAUSED,
         ],
     ).first()
-    if not workflow:
+    # An open workflow also acts as a hold for compatibility with workflows
+    # created before the event-level flag was introduced.
+    if not rsvp_enabled and not workflow:
         return True
+    # Deleting a workflow must not silently turn RSVP into direct delivery.
+    if not workflow:
+        return False
     recipient = RsvpRecipient.objects.filter(
         workflow=workflow,
         guest_id=guest_id,
     ).only('response_status').first()
     if not recipient:
-        return True
+        return False
     return recipient.response_status == RsvpRecipient.ResponseStatus.CONFIRMED
 
 

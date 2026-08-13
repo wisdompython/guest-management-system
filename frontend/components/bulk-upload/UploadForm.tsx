@@ -12,12 +12,15 @@ interface Props {
   requiredCols: string[]
   optionalCols: string[]
   ticketTypes: { value: string; label: string }[] | undefined
+  replaceExisting: boolean
+  onReplaceExistingChange: (replace: boolean) => void
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
   onEventChange: (id: string) => void
 }
 
 export function UploadForm({
-  events, selectedEvent, submitting, requiredCols, optionalCols, ticketTypes, onSubmit, onEventChange,
+  events, selectedEvent, submitting, requiredCols, optionalCols, ticketTypes,
+  replaceExisting, onReplaceExistingChange, onSubmit, onEventChange,
 }: Props) {
   return (
     <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
@@ -26,8 +29,16 @@ export function UploadForm({
       </div>
       <div className="space-y-4 p-6">
         <div>
+          <p className={label}>Import action</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`form-choice ${!replaceExisting ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="upload_action" checked={!replaceExisting} onChange={() => onReplaceExistingChange(false)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Add to existing list</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Keep current guests and import additional people.</span></span></span></label>
+            <label className={`form-choice ${replaceExisting ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="upload_action" checked={replaceExisting} onChange={() => onReplaceExistingChange(true)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Replace entire list</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Validate the new CSV, then remove the old guests and RSVP records.</span></span></span></label>
+          </div>
+          {replaceExisting && <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">The current list stays untouched if the CSV has any validation errors. After a successful replacement, active RSVP workflows automatically receive the new guests.</p>}
+        </div>
+        <div>
           <label className={label}>Event *</label>
-          <select data-tour="bulk-event-select" name="event" required className={field} onChange={(e) => onEventChange(e.target.value)}>
+          <select data-tour="bulk-event-select" name="event" required value={selectedEvent?.id ?? ''} className={field} onChange={(e) => onEventChange(e.target.value)}>
             <option value="">Select an event…</option>
             {events.map(ev => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -95,7 +106,7 @@ export function UploadForm({
       <div className="border-t border-[var(--line)] px-6 py-4">
         <button data-tour="bulk-submit-button" type="submit" disabled={submitting}
           className="w-full rounded-full bg-[var(--brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-60">
-          {submitting ? 'Uploading…' : 'Upload Guests'}
+          {submitting ? 'Uploading…' : replaceExisting ? 'Validate and replace list' : 'Upload guests'}
         </button>
       </div>
     </form>

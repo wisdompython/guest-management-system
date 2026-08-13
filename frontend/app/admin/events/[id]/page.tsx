@@ -47,7 +47,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
     { label: 'Event details', detail: event.venue ? 'Date and venue added' : 'Date added; venue can follow later', done: Boolean(event.name && event.date), href: `/admin/events/${event.id}/edit` },
     { label: 'Guest list', detail: event.guest_count ? `${event.guest_count} guest${event.guest_count === 1 ? '' : 's'} added` : 'Add guests individually or upload a list', done: event.guest_count > 0, href: `/admin/guests?event=${event.id}` },
     { label: 'Pass design', detail: event.design_template ? 'Design uploaded' : 'Upload a design before passes are sent', done: Boolean(event.design_template), href: `/admin/events/${event.id}/edit#pass-design` },
-    { label: event.rsvp_workflow_id ? 'RSVP workflow' : 'Delivery choice', detail: workflow ? `${workflow.status[0].toUpperCase()}${workflow.status.slice(1)} workflow` : event.whatsapp_enabled ? 'Direct WhatsApp delivery selected' : 'WhatsApp delivery is off', done: event.rsvp_workflow_id ? Boolean(workflow) : true, href: event.rsvp_workflow_id ? `/admin/rsvp/${event.rsvp_workflow_id}` : `/admin/events/${event.id}/edit` },
+    { label: event.rsvp_enabled ? 'RSVP workflow' : 'Delivery choice', detail: workflow ? `${workflow.status[0].toUpperCase()}${workflow.status.slice(1)} workflow` : event.rsvp_enabled ? 'RSVP is enabled; configure a workflow' : event.whatsapp_enabled ? 'Direct WhatsApp delivery selected' : 'WhatsApp delivery is off', done: event.rsvp_enabled ? Boolean(workflow) : true, href: workflow ? `/admin/rsvp/${workflow.id}` : event.rsvp_enabled ? `/admin/rsvp/add?event=${event.id}` : `/admin/events/${event.id}/edit` },
   ]
   const completed = checks.filter((item) => item.done).length
   const progress = Math.round((completed / checks.length) * 100)
@@ -55,7 +55,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
 
   const workspaceLinks = [
     { label: 'Guests', detail: `${event.guest_count} registered`, href: `/admin/guests?event=${event.id}` },
-    { label: 'RSVP', detail: workflow ? `${workflow.stats.confirmed} confirmed` : 'Not configured', href: event.rsvp_workflow_id ? `/admin/rsvp/${event.rsvp_workflow_id}` : `/admin/rsvp/add?event=${event.id}` },
+    { label: 'RSVP', detail: workflow ? `${workflow.stats.confirmed} confirmed` : event.rsvp_enabled ? 'Enabled; setup needed' : 'Not configured', href: event.rsvp_workflow_id ? `/admin/rsvp/${event.rsvp_workflow_id}` : `/admin/rsvp/add?event=${event.id}` },
     { label: 'Pass & settings', detail: event.design_template ? 'Design ready' : 'Design needed', href: `/admin/events/${event.id}/edit` },
     { label: 'Reminders', detail: `${reminders.length} configured`, href: `/admin/events/${event.id}/reminders` },
     { label: 'Check-in', detail: `${event.checked_in_count} of ${event.guest_count}`, href: '/admin/check-in' },
@@ -69,7 +69,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${event.is_ended ? 'bg-white/5 text-[var(--muted)]' : 'bg-emerald-500/10 text-emerald-400'}`}>{event.is_ended ? 'Ended' : 'Upcoming'}</span>
-            {workflow && <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]">RSVP {workflow.status}</span>}
+            {event.rsvp_enabled && <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]">RSVP {workflow?.status || 'setup needed'}</span>}
           </div>
           <h1 className="mt-3 font-display text-3xl text-[var(--ink)] sm:text-4xl">{event.name}</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">{formatDate(event.date)}{event.venue ? ` · ${event.venue}` : ''}</p>
@@ -105,7 +105,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
 
           <section className="form-card p-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Delivery plan</p>
-            {!event.whatsapp_enabled ? <p className="mt-3 text-sm text-[var(--ink)]">WhatsApp delivery is off.</p> : workflow ? <div className="mt-4 space-y-4"><div className="border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">RSVP invitations</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{timingLabel(workflow.invitation_send_at, 'When workflow is launched')}</p></div><div className="border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">Confirmed guest passes</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{workflow.auto_send_pass ? timingLabel(workflow.pass_send_at, 'Immediately after confirmation') : 'Manual delivery'}</p></div></div> : <div className="mt-4 border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">Direct guest passes</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{timingLabel(event.pass_send_at, 'Immediately when a guest is added')}</p></div>}
+            {!event.whatsapp_enabled ? <p className="mt-3 text-sm text-[var(--ink)]">WhatsApp delivery is off.</p> : workflow ? <div className="mt-4 space-y-4"><div className="border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">RSVP invitations</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{timingLabel(workflow.invitation_send_at, 'When workflow is launched')}</p></div><div className="border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">Confirmed guest passes</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{workflow.auto_send_pass ? timingLabel(workflow.pass_send_at, 'Immediately after confirmation') : 'Manual delivery'}</p></div></div> : event.rsvp_enabled ? <div className="mt-4 border-l-2 border-amber-400 pl-3"><p className="text-xs text-[var(--muted)]">RSVP protection enabled</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">All guest passes are held until a replacement workflow is configured.</p><Link href={`/admin/rsvp/add?event=${event.id}`} className="mt-2 inline-block text-xs font-semibold text-[var(--brand)]">Configure workflow &rarr;</Link></div> : <div className="mt-4 border-l-2 border-[var(--brand)] pl-3"><p className="text-xs text-[var(--muted)]">Direct guest passes</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{timingLabel(event.pass_send_at, 'Immediately when a guest is added')}</p></div>}
           </section>
 
           <section className="form-card p-5">

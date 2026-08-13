@@ -7,7 +7,8 @@ interface UploadResult {
   total_rows: number
   successful: number
   failed: number
-  errors: { row: number; error: string }[]
+  replaced: number
+  errors: { row: number; error?: string; errors?: string[] }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }
 
@@ -36,7 +37,7 @@ export function UploadResults({ result }: Props) {
             }
           </div>
           <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            Upload complete — {result.total_rows} row{result.total_rows !== 1 ? 's' : ''} processed
+            {result.replaced ? `Guest list replaced — ${result.replaced} previous guest${result.replaced === 1 ? '' : 's'} removed` : `Upload complete — ${result.total_rows} row${result.total_rows !== 1 ? 's' : ''} processed`}
           </span>
         </div>
         <div className="flex items-center gap-4 text-sm ml-auto">
@@ -76,7 +77,7 @@ export function UploadResults({ result }: Props) {
                   {result.errors.map((e, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
                       <td className="px-5 py-2 font-mono font-bold" style={{ color: 'var(--danger)' }}>{e.row}</td>
-                      <td className="px-5 py-2" style={{ color: 'var(--ink)' }}>{e.error}</td>
+                      <td className="px-5 py-2" style={{ color: 'var(--ink)' }}>{e.error ?? e.errors?.join(' ') ?? 'Invalid row'}</td>
                     </tr>
                   ))}
                 </tbody>

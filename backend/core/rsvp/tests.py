@@ -87,6 +87,7 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(workflow.status, RsvpWorkflow.Status.DRAFT)
         self.event.refresh_from_db()
         self.assertTrue(self.event.whatsapp_enabled)
+        self.assertTrue(self.event.rsvp_enabled)
 
     def test_only_one_workflow_is_allowed_per_event(self):
         self.create_workflow()
@@ -140,6 +141,21 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertFalse(RsvpWorkflow.objects.filter(pk=workflow.id).exists())
         self.assertFalse(RsvpRecipient.objects.filter(workflow_id=workflow.id).exists())
         self.assertTrue(Event.objects.filter(pk=self.event.id).exists())
+        self.event.refresh_from_db()
+        self.assertTrue(self.event.rsvp_enabled)
+        self.assertFalse(pass_delivery_allowed(self.guest_a.id, self.event.id))
+
+    def test_completing_workflow_explicitly_restores_direct_delivery(self):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/complete/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.event.refresh_from_db()
+        self.assertFalse(self.event.rsvp_enabled)
+        self.assertTrue(pass_delivery_allowed(self.guest_a.id, self.event.id))
 
     def test_template_in_use_cannot_be_deleted(self):
         self.create_workflow()
@@ -393,6 +409,27 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(duplicate.data['queued'], 0)
         mock_queue.assert_called_once_with(workflow.id)
 
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_remind_awaiting_retries_failed_replacement_guest(self, mock_queue):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+        recipient = RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            last_error='Invalid destination number',
+        )
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/remind-awaiting/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['queued'], 1)
+        recipient.refresh_from_db()
+        self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
+        self.assertEqual(recipient.last_error, '')
+        mock_queue.assert_called_once_with(workflow.id)
+
 
 class RsvpIsolationTests(TestCase):
     def setUp(self):
@@ -415,9 +452,17 @@ class RsvpIsolationTests(TestCase):
         recipient.save(update_fields=['response_status'])
         self.assertTrue(pass_delivery_allowed(self.guest.id, self.event.id))
 
-    def test_guest_excluded_from_workflow_keeps_normal_pass_delivery(self):
+    def test_guest_excluded_from_workflow_is_still_held_for_rsvp(self):
         RsvpWorkflow.objects.create(event=self.event)
-        self.assertTrue(pass_delivery_allowed(self.guest.id, self.event.id))
+        self.assertFalse(pass_delivery_allowed(self.guest.id, self.event.id))
+
+    def test_deleted_workflow_does_not_disable_event_rsvp_hold(self):
+        self.event.rsvp_enabled = True
+        self.event.save(update_fields=['rsvp_enabled'])
+        workflow = RsvpWorkflow.objects.create(event=self.event)
+        workflow.delete()
+
+        self.assertFalse(pass_delivery_allowed(self.guest.id, self.event.id))
 
     def test_completed_workflow_restores_normal_delivery(self):
         RsvpWorkflow.objects.create(
@@ -890,3 +935,40 @@ class RsvpGuestSyncTests(TestCase):
 
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(workflow.recipients.filter(guest_id=response.data['id']).exists())
+
+    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    @patch('guests.views.guests.generate_guest_assets')
+    def test_corrected_guest_rejoins_active_workflow_and_is_sent(
+        self, mock_assets, mock_invitation,
+    ):
+        client = APIClient()
+        manager = User.objects.create_user('correct-manager', password='pass', role='event_manager')
+        client.force_authenticate(manager)
+        event = make_event(name='Correction Event')
+        workflow = RsvpWorkflow.objects.create(
+            event=event,
+            created_by=manager,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        wrong_guest = Guest.objects.create(
+            event=event,
+            full_name='Correct Me',
+            phone_number='2348000000000',
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=wrong_guest)
+
+        deleted = client.delete(f'/api/guests/{wrong_guest.id}/')
+        self.assertEqual(deleted.status_code, 204)
+        self.assertFalse(workflow.recipients.filter(guest_id=wrong_guest.id).exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            created = client.post('/api/guests/', {
+                'event': event.id,
+                'full_name': 'Correct Me',
+                'phone_number': '2348000000099',
+            }, format='json')
+
+        self.assertEqual(created.status_code, 201, created.data)
+        recipient = workflow.recipients.get(guest_id=created.data['id'])
+        self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
+        mock_invitation.assert_called_once_with(recipient.id)

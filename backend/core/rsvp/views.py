@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import ReadOnlyOrEventManager
 from guests.csv_utils import safe_csv_row
-from guests.models import Guest
+from guests.models import Event, Guest
 
 from .models import RsvpRecipient, RsvpWorkflow
 from .serializers import (
@@ -48,11 +48,16 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        workflow = serializer.save(created_by=self.request.user)
+        Event.objects.filter(pk=workflow.event_id).update(
+            rsvp_enabled=True,
+            pass_send_at=None,
+        )
 
     def destroy(self, request, *args, **kwargs):
-        # Deleting the workflow also removes its recipients/responses and returns
-        # the event to the original direct-pass delivery flow.
+        # Deleting the workflow removes its recipients/responses, but the event's
+        # RSVP hold intentionally remains enabled until an operator explicitly
+        # changes the delivery mode from the event settings.
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'], url_path='populate-recipients')
@@ -238,17 +243,24 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
 
         cooldown_minutes = settings.RSVP_REMINDER_COOLDOWN_MINUTES
         reminder_cutoff = timezone.now() - timedelta(minutes=cooldown_minutes)
-        eligible = workflow.recipients.filter(
+        awaiting = workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
-            invitation_status__in=[
-                RsvpRecipient.InvitationStatus.SENT,
-                RsvpRecipient.InvitationStatus.DELIVERED,
-                RsvpRecipient.InvitationStatus.READ,
-            ],
             reminder_count__lt=settings.RSVP_MAX_REMINDERS,
-        ).filter(
-            Q(last_reminded_at__lte=reminder_cutoff)
-            | Q(last_reminded_at__isnull=True, invitation_sent_at__lte=reminder_cutoff)
+        )
+        eligible = awaiting.filter(
+            Q(invitation_status__in=[
+                RsvpRecipient.InvitationStatus.FAILED,
+            ])
+            | Q(
+                invitation_status__in=[
+                    RsvpRecipient.InvitationStatus.SENT,
+                    RsvpRecipient.InvitationStatus.DELIVERED,
+                    RsvpRecipient.InvitationStatus.READ,
+                ],
+            ) & (
+                Q(last_reminded_at__lte=reminder_cutoff)
+                | Q(last_reminded_at__isnull=True, invitation_sent_at__lte=reminder_cutoff)
+            )
         )
         queued = eligible.update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
@@ -274,6 +286,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         workflow.status = RsvpWorkflow.Status.COMPLETED
         workflow.completed_at = timezone.now()
         workflow.save(update_fields=['status', 'completed_at', 'updated_at'])
+        Event.objects.filter(pk=workflow.event_id).update(rsvp_enabled=False)
         return Response(self.get_serializer(workflow).data)
 
 

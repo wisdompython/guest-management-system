@@ -60,6 +60,9 @@ class Event(models.Model):
     )
     # When False, WhatsApp delivery is not expected and phone_number is not auto-required
     whatsapp_enabled = models.BooleanField(default=True)
+    # RSVP is an event-level delivery decision. It intentionally survives deletion
+    # of an individual workflow so guests cannot fall through to direct pass sends.
+    rsvp_enabled = models.BooleanField(default=False)
     # Optional override — if set, this template is used for pass delivery instead of the global default
     whatsapp_template = models.ForeignKey(
         'WhatsAppTemplate',

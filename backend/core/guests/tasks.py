@@ -188,7 +188,11 @@ def dispatch_scheduled_sends():
         .exclude(pass_image='')
         .filter(pass_image__isnull=False)
         .exclude(phone_number='')
-        .filter(event__whatsapp_enabled=True, event__date__gte=now)
+        .filter(
+            event__whatsapp_enabled=True,
+            event__rsvp_enabled=False,
+            event__date__gte=now,
+        )
         .values_list('id', flat=True)
     )
 

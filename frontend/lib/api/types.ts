@@ -98,6 +98,7 @@ export interface Event {
   required_fields: string[];
   collect_aso_ebi: boolean;
   whatsapp_enabled: boolean;
+  rsvp_enabled: boolean;
   whatsapp_template: number | null;
   whatsapp_template_name: string | null;
   pass_send_at: string | null;
