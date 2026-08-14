@@ -11,14 +11,14 @@ const VAR_EXAMPLES: Record<string, string> = {
   guest_name:   'John Doe',
   event_name:   'The Grand Birthday Bash',
   event_date:   'Friday, 20 June 2025 at 7:00 PM',
-  event_date_only: 'Wednesday, 16 September 2026',
+  event_date_only: '16th September 2026',
   event_time:   '1:00 PM',
   venue:        'The Eko Hotel, Lagos',
   ticket_type:  'VIP',
   table_number: 'Table 12',
   seat_number:  'Seat 4A',
   rsvp_link:    'https://guestpass.example/r/A7kP4m',
-  rsvp_deadline: 'Wednesday, 9 September 2026',
+  rsvp_deadline: '9th September 2026',
 }
 
 type FormState = {

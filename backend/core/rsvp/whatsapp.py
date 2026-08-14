@@ -1,10 +1,10 @@
 import logging
 
 from django.conf import settings
-from django.utils import timezone
 
 from guests.whatsapp import (
     _build_pass_url,
+    _format_ordinal_date,
     _get_client,
     _normalise_phone,
     _resolve_template_params,
@@ -40,9 +40,7 @@ def _resolve_invitation_params(recipient) -> list:
         elif key == 'rsvp_deadline':
             deadline = recipient.workflow.response_deadline
             if deadline:
-                local_deadline = timezone.localtime(deadline)
-                deadline_date = f'{local_deadline.strftime("%A")}, {local_deadline.day} {local_deadline.strftime("%B %Y")}'
-                values.append(deadline_date)
+                values.append(_format_ordinal_date(deadline))
             else:
                 values.append('')
         else:

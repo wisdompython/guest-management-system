@@ -753,7 +753,7 @@ class RsvpInvitationLinkTests(TestCase):
         values = mock_client.return_value.send_template.call_args.kwargs['params'][0].positionals
         self.assertEqual(values[0], 'Deadline Guest')
         self.assertEqual(values[1], f'https://events.example.com/r/{recipient.public_code}')
-        self.assertEqual(values[2], 'Wednesday, 9 September 2026')
+        self.assertEqual(values[2], '9th September 2026')
 
     @patch('rsvp.whatsapp._get_client')
     def test_invitation_supports_separate_date_and_time_parameters(self, mock_client):
@@ -793,7 +793,7 @@ class RsvpInvitationLinkTests(TestCase):
         self.assertEqual(values[1], 'Lady Otunba Osibogun @ 70')
         self.assertEqual(values[2], 'Lady Otunba Osibogun @ 70')
         self.assertEqual(values[3], f'https://events.example.com/r/{recipient.public_code}')
-        self.assertEqual(values[4], 'Wednesday, 16 September 2026')
+        self.assertEqual(values[4], '16th September 2026')
         self.assertEqual(values[5], '1:00 PM')
         self.assertEqual(values[6], event.venue)
 

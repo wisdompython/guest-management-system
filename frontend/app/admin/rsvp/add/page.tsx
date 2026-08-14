@@ -13,6 +13,20 @@ function toLocalInput(value: string | null) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
+function ordinalDate(value: string) {
+  const date = new Date(value)
+  const day = Number(date.toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric' }))
+  const suffix = day % 100 >= 11 && day % 100 <= 13
+    ? 'th'
+    : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] || 'th'
+  const monthAndYear = date.toLocaleDateString('en-GB', {
+    timeZone: 'Africa/Lagos',
+    month: 'long',
+    year: 'numeric',
+  })
+  return `${day}${suffix} ${monthAndYear}`
+}
+
 const fieldClass = 'form-control mt-2'
 const fieldStyle = undefined
 
@@ -125,8 +139,8 @@ export default function AddRsvpWorkflowPage() {
         ? new Date(selectedEvent.date).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
         : '24 October 2026',
       event_date_only: selectedEvent
-        ? new Date(selectedEvent.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-        : 'Wednesday, 16 September 2026',
+        ? ordinalDate(selectedEvent.date)
+        : '16th September 2026',
       event_time: selectedEvent
         ? new Date(selectedEvent.date).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
         : '1:00 PM',
@@ -136,8 +150,8 @@ export default function AddRsvpWorkflowPage() {
       seat_number: '4',
       rsvp_link: 'https://guestpass.example/r/A7kP4m',
       rsvp_deadline: deadline
-        ? new Date(`${deadline}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-        : 'Wednesday, 9 September 2026',
+        ? ordinalDate(`${deadline}T12:00:00+01:00`)
+        : '9th September 2026',
     }
     let text = selectedInvitation.body_text
     selectedInvitation.body_params.forEach((key, index) => {

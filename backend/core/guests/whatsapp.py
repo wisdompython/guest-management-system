@@ -113,7 +113,7 @@ def _resolve_template_params(guest, body_params: list) -> list:
     if event and event.date:
         local_event_date = timezone.localtime(event.date)
         event_date = local_event_date.strftime('%A, %d %B %Y at %I:%M %p')
-        event_date_only = local_event_date.strftime('%A, %d %B %Y')
+        event_date_only = _format_ordinal_date(event.date)
         event_time = local_event_date.strftime('%I:%M %p').lstrip('0')
 
     var_map = {
@@ -128,6 +128,17 @@ def _resolve_template_params(guest, body_params: list) -> list:
         'seat_number':  guest.seat_number or '',
     }
     return [var_map.get(key, '') for key in body_params]
+
+
+def _format_ordinal_date(value) -> str:
+    """Format a date as `25th June 2026`, without a weekday."""
+    local_value = timezone.localtime(value)
+    day = local_value.day
+    if 10 <= day % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+    return f'{day}{suffix} {local_value.strftime("%B %Y")}'
 
 
 def send_reminder(guest, template_name: str) -> bool:
