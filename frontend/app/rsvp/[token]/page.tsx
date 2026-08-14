@@ -100,7 +100,15 @@ export default function PublicRsvpPage() {
             <section className="mt-6 space-y-4 text-sm leading-7" style={{ color: 'var(--muted)' }}>
               <p style={{ color: 'var(--ink)' }}>{details.rsvp_message || `Join us as we celebrate ${details.event_name} on this joyous occasion.`}</p>
               <p>It promises to be a beautiful celebration filled with love, laughter, cherished memories, family and friends.</p>
-              {details.color_of_day && <p><span className="font-semibold" style={{ color: 'var(--ink)' }}>Colour of the day:</span> {details.color_of_day}</p>}
+              {details.color_of_day && (
+                <div className="flex items-center gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.45)', boxShadow: 'inset 3px 0 0 var(--brand)' }}>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'rgba(184,150,62,0.18)', border: '1px solid rgba(184,150,62,0.35)' }} aria-hidden="true">🎨</div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>Colour of the day</p>
+                    <p className="mt-1 break-words text-lg font-bold leading-6" style={{ color: 'var(--ink)' }}>{details.color_of_day}</p>
+                  </div>
+                </div>
+              )}
               <p>We look forward to celebrating this special milestone with you. Kindly RSVP to confirm your availability.</p>
               {details.response_deadline && <p className="text-xs">Please respond by {new Date(details.response_deadline).toLocaleDateString('en-GB', { dateStyle: 'long' })}.</p>}
             </section>
