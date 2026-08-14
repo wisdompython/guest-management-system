@@ -131,9 +131,9 @@ Practical notes for large events:
   retries spend the daily send budget like any other send.
 - Permanent errors (invalid number, missing template, bad parameters) are
   never retried automatically and keep the Retry action in the recipient
-  table. A manual retry also resets the automatic retry cycle, so the
-  dispatcher takes over again if the manual attempt fails with a transient
-  error.
+  table. Manual retries preserve the attempt count and cannot bypass an
+  active transient-error cooldown; the API returns the next eligible retry
+  time when an operator tries too soon.
 - A failed invitation can be retried from the recipient table.
 - A failed pass can be retried only for a confirmed guest.
 - Pausing prevents queued invitation tasks from sending; resuming requeues eligible invitations.
