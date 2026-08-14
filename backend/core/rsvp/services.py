@@ -316,6 +316,29 @@ def process_incoming_message(message: dict) -> bool:
     return True
 
 
+def _format_status_error(status_payload: dict) -> str:
+    errors = status_payload.get('errors') or []
+    if not errors or not isinstance(errors[0], dict):
+        return 'WhatsApp delivery failed'
+
+    error = errors[0]
+    code = error.get('code')
+    details = error.get('error_data') or {}
+    candidates = [
+        error.get('title'),
+        error.get('message'),
+        details.get('details') if isinstance(details, dict) else '',
+    ]
+    messages = []
+    for candidate in candidates:
+        text = str(candidate or '').strip()
+        if text and text not in messages:
+            messages.append(text)
+
+    prefix = f'WhatsApp error {code}' if code else 'WhatsApp delivery failed'
+    return f"{prefix}: {' — '.join(messages)}" if messages else prefix
+
+
 def process_status_update(status_payload: dict) -> bool:
     """Apply a Meta status update to an RSVP invitation or pass by message ID."""
     message_id = status_payload.get('id', '')
@@ -331,10 +354,18 @@ def process_status_update(status_payload: dict) -> bool:
     if not recipient:
         return False
 
-    updates = {field: wa_status, 'last_error': ''}
+    is_invitation = field == 'invitation_status'
+    error_field = 'invitation_error' if is_invitation else 'pass_error'
+    retries_field = 'invitation_auto_retries' if is_invitation else 'pass_auto_retries'
+    updates = {field: wa_status, 'last_error': '', error_field: ''}
     if wa_status == 'failed':
-        errors = status_payload.get('errors') or []
-        updates['last_error'] = str(errors[0].get('title', 'WhatsApp delivery failed')) if errors else 'WhatsApp delivery failed'
+        message = _format_status_error(status_payload)
+        updates['last_error'] = message
+        updates[error_field] = message
+    elif wa_status in {'delivered', 'read'}:
+        # API acceptance is not final delivery. Preserve the attempt count
+        # through SENT so a later 131049 webhook cannot restart the retry cap.
+        updates[retries_field] = 0
     recipients = RsvpRecipient.objects.filter(pk=recipient.pk)
     if wa_status == 'sent':
         recipients = recipients.exclude(**{f'{field}__in': ['delivered', 'read']})

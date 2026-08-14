@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
 from guests.send_budget import DISPATCHED_STALE_AFTER, remaining_send_budget
@@ -17,10 +17,27 @@ RSVP_RATE_LIMIT = f'{RSVP_MESSAGES_PER_MINUTE}/m'
 # the status webhook (per-user marketing caps such as "healthy ecosystem
 # engagement", spam/rate limits). Those recipients land in FAILED without the
 # send task ever seeing an exception, so the Beat dispatcher retries them
-# automatically: up to this many attempts, waiting at least the matching
-# delay after the previous attempt. Meta's per-user caps usually lift within
-# 24 hours, so the delays escalate instead of hammering the same guest.
+# automatically, up to this many attempts.
 FAILED_SEND_MAX_AUTO_RETRIES = 3
+
+# Per-user marketing caps (error 131049, "healthy ecosystem engagement").
+# Meta's guidance is to wait about 24 hours before retrying — the cap is on
+# a daily-ish per-user window, so earlier attempts just fail again and burn
+# budget. One attempt per day.
+ECOSYSTEM_FAILURE_MARKERS = (
+    '131049',
+    'healthy ecosystem engagement',
+    'healthy ecosystem',
+    'meta chose not to deliver',
+)
+ECOSYSTEM_RETRY_DELAYS = (
+    timedelta(hours=24),
+    timedelta(hours=24),
+    timedelta(hours=24),
+)
+
+# Quick-clearing transient errors (throughput, rate/spam limits, generic
+# temporary failures) are worth retrying much sooner, with escalation.
 FAILED_SEND_RETRY_DELAYS = (
     timedelta(hours=1),
     timedelta(hours=4),
@@ -30,8 +47,7 @@ FAILED_SEND_RETRY_DELAYS = (
 # Lower-cased substrings of Meta error messages that are worth retrying.
 # Anything else (invalid number, missing template, bad parameters) stays
 # FAILED for manual review.
-RETRYABLE_FAILURE_MARKERS = (
-    'healthy ecosystem engagement',
+RETRYABLE_FAILURE_MARKERS = ECOSYSTEM_FAILURE_MARKERS + (
     'rate limit',
     'spam',
     'throughput',
@@ -47,6 +63,16 @@ RETRYABLE_FAILURE_MARKERS = (
 def is_retryable_failure(error_text: str) -> bool:
     error_text = (error_text or '').lower()
     return any(marker in error_text for marker in RETRYABLE_FAILURE_MARKERS)
+
+
+def retry_delay_for(error_text: str, attempts: int) -> timedelta:
+    """Delay to wait after the previous attempt before retrying this error."""
+    error_text = (error_text or '').lower()
+    if any(marker in error_text for marker in ECOSYSTEM_FAILURE_MARKERS):
+        schedule = ECOSYSTEM_RETRY_DELAYS
+    else:
+        schedule = FAILED_SEND_RETRY_DELAYS
+    return schedule[min(attempts, len(schedule) - 1)]
 
 
 def _is_transient_whatsapp_error(exc):
@@ -120,7 +146,7 @@ def _claim_and_dispatch(candidates, limit, now, *, updates, stamp_field, send_ta
 def _retry_failed_sends(
     now, budget, *,
     base_filters, status_field, failed_value, queued_value,
-    stamp_field, retries_field, send_task,
+    stamp_field, retries_field, error_field, send_task,
 ):
     """Re-queue transient delivery failures with escalating backoff.
 
@@ -132,22 +158,31 @@ def _retry_failed_sends(
 
     if budget <= 0:
         return 0
+    retryable_errors = Q()
+    for marker in RETRYABLE_FAILURE_MARKERS:
+        retryable_errors |= Q(**{f'{error_field}__icontains': marker})
+        retryable_errors |= Q(last_error__icontains=marker)
+
     rows = RsvpRecipient.objects.filter(
+        retryable_errors,
         **base_filters,
         **{
             status_field: failed_value,
             f'{retries_field}__lt': FAILED_SEND_MAX_AUTO_RETRIES,
         },
-    ).values('id', 'last_error', retries_field, stamp_field)[:500]
+    ).values(
+        'id', error_field, 'last_error', retries_field, stamp_field,
+    ).iterator(chunk_size=500)
 
     eligible_ids = []
     for row in rows:
-        if not is_retryable_failure(row['last_error']):
+        # Rows failed before the per-channel error fields existed only have
+        # last_error, hence the fallback.
+        error_text = row[error_field] or row['last_error']
+        if not is_retryable_failure(error_text):
             continue
         attempts = row[retries_field]
-        delay = FAILED_SEND_RETRY_DELAYS[
-            min(attempts, len(FAILED_SEND_RETRY_DELAYS) - 1)
-        ]
+        delay = retry_delay_for(error_text, attempts)
         last_attempt = row[stamp_field]
         if last_attempt and now - last_attempt < delay:
             continue
@@ -271,6 +306,7 @@ def send_rsvp_invitation(self, recipient_id: int):
             raise self.retry(exc=exc)
         RsvpRecipient.objects.filter(pk=recipient_id).update(
             invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_error=str(exc),
             last_error=str(exc),
         )
         logger.error('RSVP invitation failed for recipient %s: %s', recipient_id, exc)
@@ -280,7 +316,7 @@ def send_rsvp_invitation(self, recipient_id: int):
         'invitation_status': RsvpRecipient.InvitationStatus.SENT,
         'invitation_message_id': sent_update.id,
         'invitation_sent_at': timezone.now(),
-        'invitation_auto_retries': 0,
+        'invitation_error': '',
         'last_error': '',
     }
     if recipient.invitation_sent_at:
@@ -336,6 +372,7 @@ def send_confirmed_pass(self, recipient_id: int):
             raise self.retry(exc=exc)
         RsvpRecipient.objects.filter(pk=recipient_id).update(
             pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_error=str(exc),
             last_error=str(exc),
         )
         logger.error('RSVP pass failed for recipient %s: %s', recipient_id, exc)
@@ -346,7 +383,7 @@ def send_confirmed_pass(self, recipient_id: int):
         RsvpRecipient.objects.filter(pk=recipient_id).update(
             pass_status=RsvpRecipient.PassStatus.SENT,
             pass_message_id=sent_update.id,
-            pass_auto_retries=0,
+            pass_error='',
             last_error='',
         )
         Guest.objects.filter(pk=recipient.guest_id).update(
@@ -439,6 +476,7 @@ def dispatch_scheduled_rsvp_messages():
         queued_value=RsvpRecipient.PassStatus.QUEUED,
         stamp_field='pass_queued_at',
         retries_field='pass_auto_retries',
+        error_field='pass_error',
         send_task=send_confirmed_pass,
     )
     budget -= retried_passes
@@ -486,6 +524,7 @@ def dispatch_scheduled_rsvp_messages():
         queued_value=RsvpRecipient.InvitationStatus.QUEUED,
         stamp_field='invitation_queued_at',
         retries_field='invitation_auto_retries',
+        error_field='invitation_error',
         send_task=send_rsvp_invitation,
     )
     budget -= retried_invitations

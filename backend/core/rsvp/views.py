@@ -28,6 +28,28 @@ from .serializers import (
 )
 
 
+def _retry_cooldown_response(error_text, last_attempt, attempts):
+    """Return a conflict response while a retryable WhatsApp error cools down."""
+    from .tasks import is_retryable_failure, retry_delay_for
+
+    if not last_attempt or not is_retryable_failure(error_text):
+        return None
+    retry_at = last_attempt + retry_delay_for(error_text, attempts)
+    if timezone.now() >= retry_at:
+        return None
+    local_retry_at = timezone.localtime(retry_at)
+    return Response(
+        {
+            'detail': (
+                'This WhatsApp failure is still in its retry cooldown. '
+                f'Try again on or after {local_retry_at:%d %B %Y at %I:%M %p} WAT.'
+            ),
+            'retry_after': retry_at.isoformat(),
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
+
+
 class RsvpWorkflowViewSet(viewsets.ModelViewSet):
     serializer_class = RsvpWorkflowSerializer
     permission_classes = [ReadOnlyOrEventManager]
@@ -323,10 +345,37 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         .all()
     )
 
+    # Delivery-progress segments for the workflow dashboard. "Received" means
+    # Meta reported the message at least sent (sent/delivered/read).
+    DELIVERED_STATUSES = [
+        RsvpRecipient.InvitationStatus.SENT,
+        RsvpRecipient.InvitationStatus.DELIVERED,
+        RsvpRecipient.InvitationStatus.READ,
+    ]
+    SEGMENTS = {
+        'invited_awaiting': dict(
+            response_status=RsvpRecipient.ResponseStatus.AWAITING,
+            invitation_status__in=DELIVERED_STATUSES,
+        ),
+        'confirmed_with_pass': dict(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status__in=DELIVERED_STATUSES,
+        ),
+        'confirmed_no_pass': dict(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        ),
+    }
+
     def get_queryset(self):
         qs = super().get_queryset()
         if workflow_id := self.request.query_params.get('workflow'):
             qs = qs.filter(workflow_id=workflow_id)
+        if segment := self.request.query_params.get('segment'):
+            filters = self.SEGMENTS.get(segment)
+            if filters:
+                qs = qs.filter(**filters)
+                if segment == 'confirmed_no_pass':
+                    qs = qs.exclude(pass_status__in=self.DELIVERED_STATUSES)
         if response_status := self.request.query_params.get('response_status'):
             qs = qs.filter(response_status=response_status)
         if invitation_status := self.request.query_params.get('invitation_status'):
@@ -355,13 +404,18 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Only failed invitations can be retried.'},
                 status=status.HTTP_409_CONFLICT,
             )
+        if cooldown := _retry_cooldown_response(
+            recipient.invitation_error or recipient.last_error,
+            recipient.invitation_queued_at,
+            recipient.invitation_auto_retries,
+        ):
+            return cooldown
         recipient.invitation_status = RsvpRecipient.InvitationStatus.QUEUED
         recipient.invitation_queued_at = timezone.now()
-        # A manual retry re-arms the automatic retry cycle.
-        recipient.invitation_auto_retries = 0
+        recipient.invitation_error = ''
         recipient.last_error = ''
         recipient.save(update_fields=[
-            'invitation_status', 'invitation_queued_at', 'invitation_auto_retries',
+            'invitation_status', 'invitation_queued_at', 'invitation_error',
             'last_error', 'updated_at',
         ])
         from .tasks import send_rsvp_invitation
@@ -381,14 +435,19 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Only failed pass deliveries can be retried.'},
                 status=status.HTTP_409_CONFLICT,
             )
+        if cooldown := _retry_cooldown_response(
+            recipient.pass_error or recipient.last_error,
+            recipient.pass_queued_at,
+            recipient.pass_auto_retries,
+        ):
+            return cooldown
         recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
         recipient.pass_queued_at = timezone.now()
-        # A manual retry re-arms the automatic retry cycle.
-        recipient.pass_auto_retries = 0
+        recipient.pass_error = ''
         recipient.last_error = ''
         recipient.save(update_fields=[
-            'pass_status', 'pass_queued_at', 'pass_auto_retries',
-            'last_error', 'updated_at',
+            'pass_status', 'pass_queued_at', 'pass_error', 'last_error',
+            'updated_at',
         ])
         from .tasks import send_confirmed_pass
         send_confirmed_pass.delay(recipient.id)

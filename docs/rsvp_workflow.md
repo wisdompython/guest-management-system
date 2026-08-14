@@ -121,13 +121,14 @@ Practical notes for large events:
 ## Failure recovery
 
 - Transient WhatsApp restrictions are retried automatically. Meta sometimes
-  accepts a send and later reports a failure through the status webhook —
-  for example "This message was not delivered to maintain healthy ecosystem
-  engagement" (a per-user marketing cap), spam or rate limits, or a generic
-  temporary error. The five-minute dispatcher re-queues those recipients up
-  to three times, waiting 1 hour, then 4 hours, then 12 hours after the
-  previous attempt, because Meta's per-user caps usually lift within a day.
-  Automatic retries spend the daily send budget like any other send.
+  accepts a send and later reports a failure through the status webhook.
+  The five-minute dispatcher re-queues those recipients up to three times,
+  and the wait matches the error: "This message was not delivered to
+  maintain healthy ecosystem engagement" (Meta's per-user marketing cap,
+  error 131049) is retried once per 24 hours, per Meta's guidance; quick-
+  clearing errors (spam/rate limits, throughput, generic temporary
+  failures) retry after 1 hour, then 4 hours, then 12 hours. Automatic
+  retries spend the daily send budget like any other send.
 - Permanent errors (invalid number, missing template, bad parameters) are
   never retried automatically and keep the Retry action in the recipient
   table. A manual retry also resets the automatic retry cycle, so the

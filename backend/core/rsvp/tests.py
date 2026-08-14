@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -1167,6 +1168,11 @@ class RsvpAutoRetryTests(TestCase):
     )
 
     def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'retry-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
         self.event = make_event(name='Auto Retry Event')
         self.workflow = RsvpWorkflow.objects.create(
             event=self.event,
@@ -1189,14 +1195,15 @@ class RsvpAutoRetryTests(TestCase):
             pass_status=RsvpRecipient.PassStatus.FAILED,
             pass_queued_at=timezone.now() - timezone.timedelta(hours=queued_ago_hours),
             pass_auto_retries=retries,
+            pass_error=error,
             last_error=error,
         )
 
     @patch('rsvp.tasks.send_confirmed_pass')
-    def test_ecosystem_failed_pass_is_auto_requeued(self, mock_pass):
+    def test_ecosystem_failed_pass_is_auto_requeued_after_24h(self, mock_pass):
         from .tasks import dispatch_scheduled_rsvp_messages
 
-        self._fail_pass(error=self.ECOSYSTEM_ERROR)
+        self._fail_pass(error=self.ECOSYSTEM_ERROR, queued_ago_hours=25)
 
         result = dispatch_scheduled_rsvp_messages()
 
@@ -1207,10 +1214,36 @@ class RsvpAutoRetryTests(TestCase):
         self.assertEqual(self.recipient.pass_auto_retries, 1)
 
     @patch('rsvp.tasks.send_confirmed_pass')
+    def test_ecosystem_failure_waits_the_full_meta_window(self, mock_pass):
+        """Meta advises ~24h for the per-user marketing cap; retrying a few
+        hours in would fail again and waste an attempt plus budget."""
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(error=self.ECOSYSTEM_ERROR, queued_ago_hours=12)
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 0)
+        mock_pass.delay.assert_not_called()
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_rate_limit_failure_retries_on_the_short_schedule(self, mock_pass):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(error='Spam rate limit hit.', queued_ago_hours=2)
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 1)
+        mock_pass.delay.assert_called_once_with(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass')
     def test_recent_failure_waits_for_backoff(self, mock_pass):
         from .tasks import dispatch_scheduled_rsvp_messages
 
-        self._fail_pass(error=self.ECOSYSTEM_ERROR, queued_ago_hours=0)
+        self._fail_pass(error='Spam rate limit hit.', queued_ago_hours=0)
 
         result = dispatch_scheduled_rsvp_messages()
 
@@ -1245,6 +1278,131 @@ class RsvpAutoRetryTests(TestCase):
         self.assertEqual(result['retried_failed'], 0)
         mock_pass.delay.assert_not_called()
 
+    @patch('rsvp.tasks._ensure_guest_pass')
+    @patch('rsvp.whatsapp.send_configured_pass')
+    def test_retry_count_survives_api_acceptance_and_later_failure(
+        self, mock_send, mock_ensure,
+    ):
+        """A webhook failure arrives after the send API has accepted the retry."""
+        from .tasks import send_confirmed_pass
+
+        mock_send.return_value = SimpleNamespace(id='wamid.retry-lifecycle')
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.QUEUED,
+            pass_auto_retries=2,
+            pass_error=self.ECOSYSTEM_ERROR,
+            last_error=self.ECOSYSTEM_ERROR,
+        )
+
+        send_confirmed_pass(self.recipient.id)
+
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.SENT)
+        self.assertEqual(self.recipient.pass_auto_retries, 2)
+
+        process_status_update({
+            'id': 'wamid.retry-lifecycle',
+            'status': 'failed',
+            'errors': [{
+                'code': 131049,
+                'title': 'Meta chose not to deliver',
+                'error_data': {'details': self.ECOSYSTEM_ERROR},
+            }],
+        })
+
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
+        self.assertEqual(self.recipient.pass_auto_retries, 2)
+        self.assertIn('131049', self.recipient.pass_error)
+
+    def test_delivered_webhook_resets_retry_count(self):
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.SENT,
+            pass_message_id='wamid.delivered-retry',
+            pass_auto_retries=2,
+        )
+
+        process_status_update({
+            'id': 'wamid.delivered-retry',
+            'status': 'delivered',
+        })
+
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.DELIVERED)
+        self.assertEqual(self.recipient.pass_auto_retries, 0)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_manual_retry_cannot_bypass_ecosystem_cooldown(self, mock_send):
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=1,
+            retries=1,
+        )
+
+        response = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-pass/',
+        )
+
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertIn('retry cooldown', response.data['detail'])
+        self.assertIn('retry_after', response.data)
+        mock_send.assert_not_called()
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
+        self.assertEqual(self.recipient.pass_auto_retries, 1)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_manual_retry_after_cooldown_preserves_attempt_count(self, mock_send):
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=25,
+            retries=2,
+        )
+
+        response = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-pass/',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_send.assert_called_once_with(self.recipient.id)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+        self.assertEqual(self.recipient.pass_auto_retries, 2)
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_permanent_failures_do_not_hide_retryable_rows_after_500(self, mock_send):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        guests = Guest.objects.bulk_create([
+            Guest(
+                event=self.event,
+                full_name=f'A Permanent Failure {index:03d}',
+                phone_number=f'2348001{index:06d}',
+            )
+            for index in range(500)
+        ])
+        RsvpRecipient.objects.bulk_create([
+            RsvpRecipient(
+                workflow=self.workflow,
+                guest=guest,
+                public_code=f'P{index:05d}',
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                pass_status=RsvpRecipient.PassStatus.FAILED,
+                pass_queued_at=timezone.now() - timezone.timedelta(hours=48),
+                pass_error='Invalid destination number.',
+                last_error='Invalid destination number.',
+            )
+            for index, guest in enumerate(guests)
+        ])
+        self._fail_pass(error=self.ECOSYSTEM_ERROR, queued_ago_hours=25)
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 1)
+        mock_send.delay.assert_called_once_with(self.recipient.id)
+
     @patch('rsvp.tasks.send_rsvp_invitation')
     def test_failed_invitation_is_auto_requeued(self, mock_invitation):
         from .tasks import dispatch_scheduled_rsvp_messages
@@ -1264,6 +1422,137 @@ class RsvpAutoRetryTests(TestCase):
             self.recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED,
         )
         self.assertEqual(self.recipient.invitation_auto_retries, 1)
+
+
+class RsvpRecipientSegmentTests(TestCase):
+    """Dashboard segments: invite received / confirmed with and without pass."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'segment-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(name='Segment Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+
+        def recipient(name, phone, **state):
+            return RsvpRecipient.objects.create(
+                workflow=self.workflow,
+                guest=Guest.objects.create(
+                    event=self.event, full_name=name, phone_number=phone,
+                ),
+                **state,
+            )
+
+        self.awaiting_delivered = recipient(
+            'Invite Read', '2348000000301',
+            invitation_status=RsvpRecipient.InvitationStatus.READ,
+        )
+        self.awaiting_unsent = recipient('Invite Pending', '2348000000302')
+        self.confirmed_with_pass = recipient(
+            'Has Pass', '2348000000303',
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            invitation_status=RsvpRecipient.InvitationStatus.READ,
+            pass_status=RsvpRecipient.PassStatus.DELIVERED,
+        )
+        self.confirmed_no_pass = recipient(
+            'No Pass Yet', '2348000000304',
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            invitation_status=RsvpRecipient.InvitationStatus.READ,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+        )
+
+    def _names(self, segment):
+        response = self.client.get(
+            '/api/rsvp/recipients/',
+            {'workflow': self.workflow.id, 'segment': segment},
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        return {row['guest_name'] for row in response.data['results']}
+
+    def test_invited_awaiting_segment(self):
+        self.assertEqual(self._names('invited_awaiting'), {'Invite Read'})
+
+    def test_confirmed_with_pass_segment(self):
+        self.assertEqual(self._names('confirmed_with_pass'), {'Has Pass'})
+
+    def test_confirmed_no_pass_segment(self):
+        self.assertEqual(self._names('confirmed_no_pass'), {'No Pass Yet'})
+
+    def test_confirmed_no_pass_count_in_stats(self):
+        from .serializers import build_workflow_stats
+
+        stats = build_workflow_stats(self.workflow)
+        self.assertEqual(stats['confirmed_no_pass'], 1)
+        self.assertEqual(stats['passes_sent'], 1)
+
+
+class RsvpChannelErrorTests(TestCase):
+    """Failure reasons must be attributable to the exact message that failed."""
+
+    def setUp(self):
+        self.event = make_event(name='Channel Error Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        self.guest = Guest.objects.create(
+            event=self.event,
+            full_name='Error Guest',
+            phone_number='2348000000401',
+        )
+        self.recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.guest,
+        )
+
+    @patch('rsvp.whatsapp.send_invitation', side_effect=ValueError('The RSVP workflow has no invitation template.'))
+    def test_invitation_task_failure_stores_invitation_error(self, mock_send):
+        from .tasks import send_rsvp_invitation
+
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        send_rsvp_invitation(self.recipient.id)
+
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.invitation_status, RsvpRecipient.InvitationStatus.FAILED)
+        self.assertIn('invitation template', self.recipient.invitation_error)
+        self.assertEqual(self.recipient.pass_error, '')
+
+    def test_webhook_failure_lands_on_the_right_channel(self):
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            invitation_message_id='wamid.channel-invite',
+            pass_message_id='wamid.channel-pass',
+            invitation_status=RsvpRecipient.InvitationStatus.SENT,
+            pass_status=RsvpRecipient.PassStatus.SENT,
+        )
+
+        process_status_update({
+            'id': 'wamid.channel-pass',
+            'status': 'failed',
+            'errors': [{'title': 'This message was not delivered to maintain healthy ecosystem engagement.'}],
+        })
+
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, 'failed')
+        self.assertIn('ecosystem engagement', self.recipient.pass_error)
+        self.assertEqual(self.recipient.invitation_error, '')
+        self.assertEqual(self.recipient.invitation_status, RsvpRecipient.InvitationStatus.SENT)
+
+        process_status_update({
+            'id': 'wamid.channel-invite',
+            'status': 'failed',
+            'errors': [{'title': 'Spam rate limit hit.'}],
+        })
+
+        self.recipient.refresh_from_db()
+        self.assertIn('Spam rate limit', self.recipient.invitation_error)
+        self.assertIn('ecosystem engagement', self.recipient.pass_error)
 
 
 class RsvpGuestSyncTests(TestCase):

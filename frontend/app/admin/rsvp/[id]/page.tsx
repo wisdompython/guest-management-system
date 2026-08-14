@@ -4,12 +4,18 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 
-import { api, RsvpRecipient, RsvpResponseStatus, RsvpWorkflow } from '@/lib/api'
+import { api, RsvpRecipient, RsvpRecipientSegment, RsvpResponseStatus, RsvpWorkflow } from '@/lib/api'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
 
 const RESPONSE_LABEL: Record<RsvpResponseStatus, string> = {
   awaiting: 'Awaiting', confirmed: 'Confirmed', declined: 'Declined',
+}
+
+const SEGMENT_LABEL: Record<RsvpRecipientSegment, string> = {
+  invited_awaiting: 'Invite delivered · awaiting reply',
+  confirmed_with_pass: 'Confirmed · pass received',
+  confirmed_no_pass: 'Confirmed · no pass yet',
 }
 
 function metric(label: string, value: number, note: string, color?: string) {
@@ -23,6 +29,7 @@ export default function RsvpWorkflowDetailPage() {
   const [recipients, setRecipients] = useState<RsvpRecipient[]>([])
   const [recipientCount, setRecipientCount] = useState(0)
   const [responseFilter, setResponseFilter] = useState<'all' | RsvpResponseStatus>('all')
+  const [segmentFilter, setSegmentFilter] = useState<'all' | RsvpRecipientSegment>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -40,10 +47,11 @@ export default function RsvpWorkflowDetailPage() {
       page,
       search: search || undefined,
       response_status: responseFilter === 'all' ? undefined : responseFilter,
+      segment: segmentFilter === 'all' ? undefined : segmentFilter,
     })
     setRecipients(result.results)
     setRecipientCount(result.count)
-  }, [id, page, responseFilter, search])
+  }, [id, page, responseFilter, search, segmentFilter])
 
   useEffect(() => {
     setLoading(true)
@@ -105,7 +113,7 @@ export default function RsvpWorkflowDetailPage() {
         {metric('Confirmed', stats.confirmed, `${stats.confirmation_rate}% of invitees`, 'var(--success)')}
         {metric('Declined', stats.declined, `${responded} total responses`)}
         {metric('Awaiting', stats.awaiting, 'Eligible for reminders')}
-        {metric('Passes sent', stats.passes_sent, stats.passes_failed ? `${stats.passes_failed} failed` : 'No failed deliveries')}
+        {metric('Passes sent', stats.passes_sent, `${stats.confirmed_no_pass} confirmed awaiting pass${stats.passes_failed ? ` · ${stats.passes_failed} failed` : ''}`)}
         {metric('Aso Ebi yards', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}
       </div>
 
@@ -116,7 +124,7 @@ export default function RsvpWorkflowDetailPage() {
       </div>
 
       <div className="mt-5 overflow-hidden rounded-[12px]" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderBottom: '1px solid var(--line)' }}><div><h2 className="text-sm font-semibold">Recipients</h2><p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{recipientCount} matching guests</p></div><div className="flex flex-wrap gap-2"><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search guest…" className="min-w-[170px] flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><select value={responseFilter} onChange={(e) => { setResponseFilter(e.target.value as 'all' | RsvpResponseStatus); setPage(1) }} className="rounded-lg px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}><option value="all">All responses</option><option value="awaiting">Awaiting</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select></div></div>
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderBottom: '1px solid var(--line)' }}><div><h2 className="text-sm font-semibold">Recipients</h2><p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{recipientCount} matching guests</p></div><div className="flex flex-wrap gap-2"><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search guest…" className="min-w-[170px] flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} /><select value={responseFilter} onChange={(e) => { setResponseFilter(e.target.value as 'all' | RsvpResponseStatus); setPage(1) }} className="rounded-lg px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}><option value="all">All responses</option><option value="awaiting">Awaiting</option><option value="confirmed">Confirmed</option><option value="declined">Declined</option></select><select value={segmentFilter} onChange={(e) => { setSegmentFilter(e.target.value as 'all' | RsvpRecipientSegment); setPage(1) }} className="rounded-lg px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}><option value="all">All delivery states</option>{(Object.keys(SEGMENT_LABEL) as RsvpRecipientSegment[]).map((segment) => <option key={segment} value={segment}>{SEGMENT_LABEL[segment]}</option>)}</select></div></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Guest</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Response</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Invitation</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Pass</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Responded</th><th className="px-4 py-3"></th></tr></thead><tbody>{recipients.length === 0 ? <tr><td colSpan={6} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted)' }}>No recipients match these filters.</td></tr> : recipients.map((recipient) => <RecipientRow key={recipient.id} recipient={recipient} working={working} retry={(kind) => runAction(`${kind}-${recipient.id}`, () => kind === 'invitation' ? api.retryRsvpInvitation(recipient.id) : api.retryRsvpPass(recipient.id))} />)}</tbody></table></div>
         {totalPages > 1 && <div className="flex items-center justify-between px-4 py-3 text-xs" style={{ borderTop: '1px solid var(--line)', color: 'var(--muted)' }}><button disabled={page === 1} onClick={() => setPage((current) => current - 1)} className="rounded px-3 py-1.5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>← Previous</button><span>Page {page} of {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} className="rounded px-3 py-1.5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>Next →</button></div>}
       </div>
@@ -124,7 +132,18 @@ export default function RsvpWorkflowDetailPage() {
   )
 }
 
+function deliveryCell(status: string, error: string, autoRetries: number) {
+  const failed = status === 'failed'
+  return <>
+    <span className="text-xs capitalize" style={{ color: failed ? 'var(--danger)' : 'var(--muted)' }}>{status.replace('_', ' ')}</span>
+    {failed && error && <p className="mt-1 max-w-[240px] text-[10px] leading-4" style={{ color: 'var(--danger)' }}>{error}</p>}
+    {failed && autoRetries > 0 && <p className="mt-0.5 text-[10px]" style={{ color: 'var(--muted)' }}>Auto-retried {autoRetries}×</p>}
+  </>
+}
+
 function RecipientRow({ recipient, retry, working }: { recipient: RsvpRecipient; retry: (kind: 'invitation' | 'pass') => void; working: string }) {
   const responseColor = recipient.response_status === 'confirmed' ? 'var(--success)' : recipient.response_status === 'declined' ? 'var(--danger)' : 'var(--muted)'
-  return <tr style={{ borderBottom: '1px solid var(--line)' }}><td className="px-4 py-3"><p className="font-semibold">{recipient.guest_name}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{recipient.ticket_type || 'Guest'}{recipient.table_number ? ` · Table ${recipient.table_number}` : ''}{recipient.aso_ebi_requested ? ` · Aso Ebi ${recipient.aso_ebi_quantity} yd` : ''}</p></td><td className="px-4 py-3"><span className="text-xs font-semibold" style={{ color: responseColor }}>{RESPONSE_LABEL[recipient.response_status]}</span></td><td className="px-4 py-3 text-xs capitalize" style={{ color: recipient.invitation_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.invitation_status.replace('_', ' ')}</td><td className="px-4 py-3"><span className="text-xs capitalize" style={{ color: recipient.pass_status === 'failed' ? 'var(--danger)' : 'var(--muted)' }}>{recipient.pass_status.replace('_', ' ')}</span>{recipient.pass_status === 'failed' && recipient.last_error && <p className="mt-1 max-w-[240px] text-[10px] leading-4" style={{ color: 'var(--danger)' }}>{recipient.last_error}</p>}</td><td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{recipient.responded_at ? new Date(recipient.responded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td><td className="px-4 py-3 text-right">{recipient.invitation_status === 'failed' && <button disabled={!!working} onClick={() => retry('invitation')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `invitation-${recipient.id}` ? 'Queuing…' : 'Retry invitation'}</button>}{recipient.pass_status === 'failed' && <button disabled={!!working} onClick={() => retry('pass')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `pass-${recipient.id}` ? 'Queuing…' : 'Retry pass'}</button>}</td></tr>
+  const invitationError = recipient.invitation_error || (recipient.pass_status !== 'failed' ? recipient.last_error : '')
+  const passError = recipient.pass_error || (recipient.invitation_status !== 'failed' ? recipient.last_error : '')
+  return <tr style={{ borderBottom: '1px solid var(--line)' }}><td className="px-4 py-3"><p className="font-semibold">{recipient.guest_name}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{recipient.ticket_type || 'Guest'}{recipient.table_number ? ` · Table ${recipient.table_number}` : ''}{recipient.aso_ebi_requested ? ` · Aso Ebi ${recipient.aso_ebi_quantity} yd` : ''}</p></td><td className="px-4 py-3"><span className="text-xs font-semibold" style={{ color: responseColor }}>{RESPONSE_LABEL[recipient.response_status]}</span></td><td className="px-4 py-3">{deliveryCell(recipient.invitation_status, invitationError, recipient.invitation_auto_retries)}</td><td className="px-4 py-3">{deliveryCell(recipient.pass_status, passError, recipient.pass_auto_retries)}</td><td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{recipient.responded_at ? new Date(recipient.responded_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td><td className="px-4 py-3 text-right">{recipient.invitation_status === 'failed' && <button disabled={!!working} onClick={() => retry('invitation')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `invitation-${recipient.id}` ? 'Queuing…' : 'Retry invitation'}</button>}{recipient.pass_status === 'failed' && <button disabled={!!working} onClick={() => retry('pass')} className="text-xs font-semibold disabled:opacity-40" style={{ color: 'var(--brand)' }}>{working === `pass-${recipient.id}` ? 'Queuing…' : 'Retry pass'}</button>}</td></tr>
 }

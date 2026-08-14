@@ -16,6 +16,6 @@ export const api = {
 export type {
   EventReminder, WhatsAppTemplate, TemplateCategory, Guest, GuestList, GuestListStats,
   Event, CreateGuestPayload, RsvpWorkflow, RsvpWorkflowStatus, RsvpStats, RsvpRecipient,
-  RsvpResponseStatus, RsvpInvitationStatus, RsvpPassStatus, PaginatedRsvpRecipients,
-  PublicRsvpDetails,
+  RsvpRecipientSegment, RsvpResponseStatus, RsvpInvitationStatus, RsvpPassStatus,
+  PaginatedRsvpRecipients, PublicRsvpDetails,
 } from './types';

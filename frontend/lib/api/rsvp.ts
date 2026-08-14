@@ -5,6 +5,7 @@ import type {
   RsvpInvitationStatus,
   RsvpPassStatus,
   RsvpRecipient,
+  RsvpRecipientSegment,
   RsvpResponseStatus,
   RsvpStats,
   RsvpWorkflow,
@@ -36,6 +37,7 @@ export interface RsvpRecipientFilters {
   response_status?: RsvpResponseStatus
   invitation_status?: RsvpInvitationStatus
   pass_status?: RsvpPassStatus
+  segment?: RsvpRecipientSegment
 }
 
 export const rsvpApi = {
@@ -76,6 +78,7 @@ export const rsvpApi = {
     if (filters.response_status) params.set('response_status', filters.response_status)
     if (filters.invitation_status) params.set('invitation_status', filters.invitation_status)
     if (filters.pass_status) params.set('pass_status', filters.pass_status)
+    if (filters.segment) params.set('segment', filters.segment)
     return request<PaginatedRsvpRecipients>(`/rsvp/recipients/?${params}`)
   },
   retryRsvpInvitation: (recipientId: number) =>

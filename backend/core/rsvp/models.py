@@ -172,13 +172,18 @@ class RsvpRecipient(models.Model):
     invitation_queued_at = models.DateTimeField(null=True, blank=True)
     pass_queued_at = models.DateTimeField(null=True, blank=True)
     # Automatic retries consumed for delivery failures that Meta reported as
-    # transient (per-user marketing limits, spam/rate limits). Reset when a
-    # send succeeds or an operator retries manually.
+    # transient (per-user marketing limits, spam/rate limits). API acceptance
+    # is not delivery, so these reset only after a delivered/read webhook.
     invitation_auto_retries = models.PositiveIntegerField(default=0)
     pass_auto_retries = models.PositiveIntegerField(default=0)
     reminder_count = models.PositiveIntegerField(default=0)
     last_reminded_at = models.DateTimeField(null=True, blank=True)
+    # Most recent delivery error regardless of channel (kept for existing
+    # consumers); the per-channel fields below make it unambiguous which
+    # message the error belongs to when both have failed at some point.
     last_error = models.TextField(blank=True)
+    invitation_error = models.TextField(blank=True)
+    pass_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

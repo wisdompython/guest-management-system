@@ -162,6 +162,7 @@ export interface RsvpStats {
   invitation_failed: number;
   passes_sent: number;
   passes_failed: number;
+  confirmed_no_pass: number;
   aso_ebi_requests: number;
   aso_ebi_quantity: number;
   response_rate: number;
@@ -215,9 +216,18 @@ export interface RsvpRecipient {
   reminder_count: number;
   last_reminded_at: string | null;
   last_error: string;
+  invitation_error: string;
+  pass_error: string;
+  invitation_auto_retries: number;
+  pass_auto_retries: number;
   created_at: string;
   updated_at: string;
 }
+
+export type RsvpRecipientSegment =
+  | 'invited_awaiting'
+  | 'confirmed_with_pass'
+  | 'confirmed_no_pass';
 
 export interface PaginatedRsvpRecipients {
   count: number;
