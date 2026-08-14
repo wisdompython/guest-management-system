@@ -163,6 +163,14 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     {'detail': 'The RSVP invitation template must include the rsvp_link variable.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if (
+                'rsvp_deadline' in (workflow.invitation_template.body_params or [])
+                and not workflow.response_deadline
+            ):
+                return Response(
+                    {'detail': 'Set a response deadline because the invitation template includes the RSVP deadline.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             if workflow.response_deadline and workflow.response_deadline <= timezone.now():
                 return Response(
                     {'detail': 'The response deadline has passed.'},
@@ -377,21 +385,26 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PublicRsvpResponseView(APIView):
-    """Guest-facing RSVP details and response endpoint secured by an opaque token."""
+    """Guest-facing RSVP endpoint secured by a short code or legacy UUID."""
 
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'public_rsvp'
 
-    def get_recipient(self, token):
-        return get_object_or_404(
-            RsvpRecipient.objects.select_related('workflow__event', 'guest'),
-            callback_token=token,
-        )
+    def get_recipient(self, identifier):
+        recipients = RsvpRecipient.objects.select_related('workflow__event', 'guest')
+        recipient = recipients.filter(public_code=identifier).first()
+        if recipient:
+            return recipient
+        try:
+            legacy_token = uuid.UUID(str(identifier))
+        except (TypeError, ValueError, AttributeError):
+            legacy_token = None
+        return get_object_or_404(recipients, callback_token=legacy_token)
 
-    def get(self, request, token):
-        recipient = self.get_recipient(token)
+    def get(self, request, identifier):
+        recipient = self.get_recipient(identifier)
         workflow = recipient.workflow
         deadline_passed = bool(
             workflow.response_deadline
@@ -427,7 +440,7 @@ class PublicRsvpResponseView(APIView):
             ),
         })
 
-    def post(self, request, token):
+    def post(self, request, identifier):
         answer = request.data.get('answer')
         if answer not in {'yes', 'no'}:
             return Response(
@@ -435,7 +448,7 @@ class PublicRsvpResponseView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        recipient = self.get_recipient(token)
+        recipient = self.get_recipient(identifier)
         aso_ebi_requested = request.data.get('aso_ebi_requested', False)
         if not isinstance(aso_ebi_requested, bool):
             return Response(
@@ -462,7 +475,7 @@ class PublicRsvpResponseView(APIView):
         from .models import RsvpResponse
         from .services import record_response
         result = record_response(
-            callback_token=token,
+            callback_token=recipient.callback_token,
             answer=answer,
             response_id=f'web:{uuid.uuid4()}',
             source=RsvpResponse.Source.WEB,

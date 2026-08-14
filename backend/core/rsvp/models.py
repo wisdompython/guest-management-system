@@ -1,7 +1,16 @@
+import secrets
 import uuid
 
 from django.conf import settings
 from django.db import models
+
+
+RSVP_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+
+def generate_public_code():
+    """Return a compact, URL-safe, non-sequential RSVP access code."""
+    return ''.join(secrets.choice(RSVP_CODE_ALPHABET) for _ in range(12))
 
 
 class RsvpWorkflow(models.Model):
@@ -114,6 +123,12 @@ class RsvpRecipient(models.Model):
     )
     callback_token = models.UUIDField(
         default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+    public_code = models.CharField(
+        max_length=12,
+        default=generate_public_code,
         unique=True,
         editable=False,
     )

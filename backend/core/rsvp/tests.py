@@ -198,6 +198,20 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('rsvp_link', str(response.data))
 
+    def test_template_deadline_variable_requires_workflow_deadline(self):
+        deadline_template = make_template(
+            'rsvp_with_deadline',
+            body_params=['guest_name', 'rsvp_link', 'rsvp_deadline'],
+        )
+        response = self.client.post('/api/rsvp/workflows/', {
+            'event': self.event.id,
+            'invitation_template': deadline_template.id,
+            'auto_send_pass': False,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Set a response deadline', str(response.data))
+
     def test_pass_template_must_have_image_header(self):
         text_only_pass = make_template(
             'text_only_pass',
@@ -605,7 +619,8 @@ class PublicRsvpPageApiTests(TestCase):
             workflow=self.workflow,
             guest=self.guest,
         )
-        self.url = f'/api/rsvp/respond/{self.recipient.callback_token}/'
+        self.url = f'/api/rsvp/respond/{self.recipient.public_code}/'
+        self.legacy_url = f'/api/rsvp/respond/{self.recipient.callback_token}/'
 
     def test_public_details_are_available_without_authentication(self):
         self.event.rsvp_message = 'Join us for a beautiful milestone celebration.'
@@ -618,6 +633,11 @@ class PublicRsvpPageApiTests(TestCase):
         self.assertEqual(response.data['rsvp_message'], self.event.rsvp_message)
         self.assertEqual(response.data['color_of_day'], 'Burgundy and gold')
         self.assertTrue(response.data['can_respond'])
+
+    def test_legacy_uuid_link_remains_available(self):
+        response = self.client.get(self.legacy_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['guest_name'], 'Public Guest')
 
     def test_public_endpoint_is_throttled(self):
         cache.clear()
@@ -674,11 +694,44 @@ class PublicRsvpPageApiTests(TestCase):
         with self.settings(SITE_URL='https://events.example.com'):
             self.assertEqual(
                 build_rsvp_url(self.recipient),
-                f'https://events.example.com/rsvp/{self.recipient.callback_token}',
+                f'https://events.example.com/r/{self.recipient.public_code}',
             )
 
 
 class RsvpInvitationLinkTests(TestCase):
+    @patch('rsvp.whatsapp._get_client')
+    def test_invitation_resolves_workflow_deadline_in_wat(self, mock_client):
+        event = make_event()
+        guest = Guest.objects.create(
+            event=event,
+            full_name='Deadline Guest',
+            phone_number='2348000000001',
+        )
+        template = make_template(
+            'deadline_invitation',
+            body_params=['guest_name', 'rsvp_link', 'rsvp_deadline'],
+        )
+        workflow = RsvpWorkflow.objects.create(
+            event=event,
+            invitation_template=template,
+            status=RsvpWorkflow.Status.ACTIVE,
+            response_deadline=timezone.make_aware(datetime(2026, 9, 9, 23, 59)),
+        )
+        recipient = RsvpRecipient.objects.create(workflow=workflow, guest=guest)
+        mock_client.return_value.send_template.return_value.id = 'wamid.deadline'
+
+        with self.settings(
+            WHATSAPP_PHONE_ID='phone-id',
+            WHATSAPP_TOKEN='token',
+            SITE_URL='https://events.example.com',
+        ):
+            send_invitation(recipient)
+
+        values = mock_client.return_value.send_template.call_args.kwargs['params'][0].positionals
+        self.assertEqual(values[0], 'Deadline Guest')
+        self.assertEqual(values[1], f'https://events.example.com/r/{recipient.public_code}')
+        self.assertEqual(values[2], 'Wednesday, 9 September 2026')
+
     @patch('rsvp.whatsapp._get_client')
     def test_invitation_supports_separate_date_and_time_parameters(self, mock_client):
         event = make_event(name='Lady Otunba Osibogun @ 70')
@@ -716,7 +769,7 @@ class RsvpInvitationLinkTests(TestCase):
         self.assertEqual(values[0], 'Guest Name')
         self.assertEqual(values[1], 'Lady Otunba Osibogun @ 70')
         self.assertEqual(values[2], 'Lady Otunba Osibogun @ 70')
-        self.assertEqual(values[3], f'https://events.example.com/rsvp/{recipient.callback_token}')
+        self.assertEqual(values[3], f'https://events.example.com/r/{recipient.public_code}')
         self.assertEqual(values[4], 'Wednesday, 16 September 2026')
         self.assertEqual(values[5], '1:00 PM')
         self.assertEqual(values[6], event.venue)
@@ -753,7 +806,7 @@ class RsvpInvitationLinkTests(TestCase):
         self.assertEqual(params[0].positionals[0], 'Link Guest')
         self.assertEqual(
             params[0].positionals[1],
-            f'https://events.example.com/rsvp/{recipient.callback_token}',
+            f'https://events.example.com/r/{recipient.public_code}',
         )
 
     @patch('rsvp.whatsapp._get_client')

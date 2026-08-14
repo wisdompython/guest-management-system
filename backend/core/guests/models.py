@@ -234,6 +234,7 @@ class WhatsAppTemplate(models.Model):
         ('table_number','Guest table number'),
         ('seat_number', 'Guest seat number'),
         ('rsvp_link',   'Guest-specific RSVP link'),
+        ('rsvp_deadline', 'RSVP response deadline'),
     ]
 
     name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")

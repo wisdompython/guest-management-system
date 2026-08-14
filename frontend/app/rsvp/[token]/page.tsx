@@ -22,7 +22,8 @@ const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }>
 }
 
 export default function PublicRsvpPage() {
-  const token = useParams<{ token: string }>().token
+  const params = useParams<{ token?: string; code?: string }>()
+  const token = params.token ?? params.code ?? ''
   const [details, setDetails] = useState<PublicRsvpDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<'yes' | 'no' | null>(null)

@@ -17,7 +17,8 @@ const VAR_EXAMPLES: Record<string, string> = {
   ticket_type:  'VIP',
   table_number: 'Table 12',
   seat_number:  'Seat 4A',
-  rsvp_link:    'https://guestpass.example/rsvp/your-secure-link',
+  rsvp_link:    'https://guestpass.example/r/A7kP4mQ9xB2c',
+  rsvp_deadline: 'Wednesday, 9 September 2026',
 }
 
 type FormState = {
@@ -128,8 +129,8 @@ function TemplateForm({
       name: 'event_rsvp_invitation',
       display_name: 'Event RSVP Invitation',
       description: 'Invites a guest to confirm availability using their secure RSVP link.',
-      body_text: '*RSVP Request: {{2}}* 📩\n\nDear *{{1}}*,\n\nPlease confirm your availability for *{{3}}* by clicking the link below:\n{{4}}\n\n*Event Details*\n\nDate: {{5}}\nTime: {{6}}\nVenue: {{7}}\n\nOnce confirmed, you will automatically receive your personalised QR access card.',
-      body_params: ['guest_name', 'event_name', 'event_name', 'rsvp_link', 'event_date_only', 'event_time', 'venue'],
+      body_text: '*RSVP Request: {{2}}* 📩\n\nDear *{{1}}*,\n\nPlease confirm your availability for *{{3}}* by clicking the link below:\n{{4}}\n\n*Event Details*\n\nDate: {{5}}\nTime: {{6}}\nVenue: {{7}}\nRSVP by: {{8}}\n\nOnce confirmed, you will automatically receive your personalised QR access card.',
+      body_params: ['guest_name', 'event_name', 'event_name', 'rsvp_link', 'event_date_only', 'event_time', 'venue', 'rsvp_deadline'],
       has_header_image: false,
     }))
   }

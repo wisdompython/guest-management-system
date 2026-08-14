@@ -9,6 +9,6 @@ router.register('workflows', RsvpWorkflowViewSet, basename='rsvp-workflow')
 router.register('recipients', RsvpRecipientViewSet, basename='rsvp-recipient')
 
 urlpatterns = [
-    path('respond/<uuid:token>/', PublicRsvpResponseView.as_view(), name='public-rsvp-response'),
+    path('respond/<str:identifier>/', PublicRsvpResponseView.as_view(), name='public-rsvp-response'),
     path('', include(router.urls)),
 ]

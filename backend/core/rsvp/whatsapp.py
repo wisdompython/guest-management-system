@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.utils import timezone
 
 from guests.whatsapp import (
     _build_pass_url,
@@ -19,7 +20,7 @@ def build_callback_data(recipient, answer: str) -> str:
 
 
 def build_rsvp_url(recipient) -> str:
-    return f"{settings.SITE_URL.rstrip('/')}/rsvp/{recipient.callback_token}"
+    return f"{settings.SITE_URL.rstrip('/')}/r/{recipient.public_code}"
 
 
 def _build_invitation_image_url(recipient) -> str:
@@ -36,6 +37,14 @@ def _resolve_invitation_params(recipient) -> list:
     for key in recipient.workflow.invitation_template.body_params or []:
         if key == 'rsvp_link':
             values.append(build_rsvp_url(recipient))
+        elif key == 'rsvp_deadline':
+            deadline = recipient.workflow.response_deadline
+            if deadline:
+                local_deadline = timezone.localtime(deadline)
+                deadline_date = f'{local_deadline.strftime("%A")}, {local_deadline.day} {local_deadline.strftime("%B %Y")}'
+                values.append(deadline_date)
+            else:
+                values.append('')
         else:
             values.extend(_resolve_template_params(recipient.guest, [key]))
     return values

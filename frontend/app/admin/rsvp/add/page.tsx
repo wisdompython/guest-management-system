@@ -134,20 +134,26 @@ export default function AddRsvpWorkflowPage() {
       ticket_type: 'General',
       table_number: '12',
       seat_number: '4',
-      rsvp_link: 'https://guestpass.example/rsvp/your-secure-link',
+      rsvp_link: 'https://guestpass.example/r/A7kP4mQ9xB2c',
+      rsvp_deadline: deadline
+        ? new Date(`${deadline}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'Wednesday, 9 September 2026',
     }
     let text = selectedInvitation.body_text
     selectedInvitation.body_params.forEach((key, index) => {
       text = text.replaceAll(`{{${index + 1}}}`, samples[key] ?? key)
     })
     return text || selectedInvitation.description || 'Template body preview is unavailable.'
-  }, [selectedEvent, selectedInvitation])
+  }, [deadline, selectedEvent, selectedInvitation])
 
   function continueSetup() {
     setError('')
     if (step === 1 && !eventId) return setError('Select an event to continue.')
     if (step === 2 && !invitationTemplate) {
       return setError('Select an RSVP invitation template.')
+    }
+    if (step === 2 && selectedInvitation?.body_params.includes('rsvp_deadline') && !deadline) {
+      return setError('Set a response deadline because this WhatsApp template includes the RSVP deadline.')
     }
     if (step === 2 && hasInvitationArtwork && !selectedInvitation?.has_header_image) {
       return setError('Choose an RSVP template with an image header to attach this artwork.')

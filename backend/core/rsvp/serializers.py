@@ -196,6 +196,14 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'invitation_template': 'The RSVP invitation template must include the rsvp_link variable.',
             })
+        if (
+            invitation_template
+            and 'rsvp_deadline' in (invitation_template.body_params or [])
+            and not deadline
+        ):
+            raise serializers.ValidationError({
+                'response_deadline': 'Set a response deadline because the selected template includes the RSVP deadline.',
+            })
         if invitation_design and invitation_template and not invitation_template.has_header_image:
             raise serializers.ValidationError({
                 'invitation_template': 'Choose a template with an image header when RSVP artwork is attached.',

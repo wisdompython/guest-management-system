@@ -60,6 +60,10 @@ class WhatsAppTemplateVariableTests(TestCase):
             {'key': 'rsvp_link', 'label': 'Guest-specific RSVP link'},
             response.data,
         )
+        self.assertIn(
+            {'key': 'rsvp_deadline', 'label': 'RSVP response deadline'},
+            response.data,
+        )
 
 
 class EventDeliveryWorkflowTests(TestCase):
