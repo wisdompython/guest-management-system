@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, WhatsAppTemplate } from '@/lib/api'
+import { watDateTimeInputToIso } from '@/lib/datetime'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import { EventDetailsForm } from '@/components/events/EventDetailsForm'
 import { GuestConfigSection } from '@/components/events/GuestConfigSection'
@@ -58,7 +59,7 @@ export default function AddEventPage() {
     const form = e.currentTarget
     const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
-    fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
+    fd.append('date', watDateTimeInputToIso((form.elements.namedItem('date') as HTMLInputElement).value))
     fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)

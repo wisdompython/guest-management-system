@@ -2,22 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { Event } from '@/lib/api'
+import { toWatDateTimeInput } from '@/lib/datetime'
 import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
 const field = 'form-control'
 const label = 'form-label'
 const DEFAULT_RSVP_MESSAGE = 'Welcome. You are warmly invited to this special occasion. Please review the event details below and kindly confirm your availability.'
 
-function toLocalDateTimeValue(iso: string) {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function nowMin() {
   const now = new Date()
   now.setMinutes(now.getMinutes() + 5)
-  return toLocalDateTimeValue(now.toISOString())
+  return toWatDateTimeInput(now)
 }
 
 interface Props {
@@ -32,7 +27,7 @@ interface Props {
 export function EventDetailsForm({ event, localDateValue, subtitle, step, onDateChange, onValidationChange }: Props) {
   const [minVal] = useState(nowMin)
   const [dateVal, setDateVal] = useState(
-    localDateValue ?? (event?.date ? toLocalDateTimeValue(event.date) : '')
+    localDateValue ?? (event?.date ? toWatDateTimeInput(event.date) : '')
   )
   const [dateError, setDateError] = useState('')
 
@@ -44,7 +39,7 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
   }
 
   useEffect(() => {
-    const initial = localDateValue ?? (event?.date ? toLocalDateTimeValue(event.date) : '')
+    const initial = localDateValue ?? (event?.date ? toWatDateTimeInput(event.date) : '')
     if (initial) {
       setDateVal(initial)
       const isPast = Boolean(initial && initial < minVal)
@@ -52,7 +47,7 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
       onValidationChange?.(!isPast)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localDateValue])
+  }, [event?.date, localDateValue])
 
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value

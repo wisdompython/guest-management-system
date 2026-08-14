@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, Event, Font, WhatsAppTemplate } from '@/lib/api'
+import { watDateTimeInputToIso } from '@/lib/datetime'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
 import type { Zone } from '@/components/PassDesignPanel'
@@ -92,7 +93,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     setError(''); setSubmitting(true)
     const form = e.currentTarget; const fd = new FormData()
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
-    fd.append('date', (form.elements.namedItem('date') as HTMLInputElement).value)
+    fd.append('date', watDateTimeInputToIso((form.elements.namedItem('date') as HTMLInputElement).value))
     fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
@@ -132,7 +133,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       </div>
       {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <EventDetailsForm step={1} event={event} localDateValue={event.date ? new Date(event.date).toISOString().slice(0, 16) : ''} onValidationChange={setDateValid} />
+        <EventDetailsForm step={1} event={event} onValidationChange={setDateValid} />
         <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields}
           whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} whatsappTemplate={whatsappTemplate} templates={waTemplates}
           onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, collectAsoEbi: ae, whatsappTemplate: wt }) => {
