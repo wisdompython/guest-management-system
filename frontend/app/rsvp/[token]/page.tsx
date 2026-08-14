@@ -139,7 +139,7 @@ export default function PublicRsvpPage() {
                 {details.response_deadline && (
                   <div className="mx-auto mt-4 flex max-w-xl items-center justify-center gap-2 rounded-lg px-4 py-3 text-center text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
                     <span aria-hidden="true">⏳</span>
-                    <p>Kindly confirm your availability before <strong style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</strong>.</p>
+                    <p>Kindly confirm your availability on or before <strong style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</strong>.</p>
                   </div>
                 )}
 
