@@ -137,13 +137,9 @@ export default function PublicRsvpPage() {
                 </div>
 
                 {details.response_deadline && (
-                  <div className="mx-auto mt-4 flex max-w-xl items-start gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }} aria-hidden="true">⏳</div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>RSVP deadline</p>
-                      <p className="mt-1 text-lg font-bold leading-6" style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</p>
-                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>Kindly confirm your availability before the deadline.</p>
-                    </div>
+                  <div className="mx-auto mt-4 flex max-w-xl items-center justify-center gap-2 rounded-lg px-4 py-3 text-center text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                    <span aria-hidden="true">⏳</span>
+                    <p>Kindly confirm your availability before <strong style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</strong>.</p>
                   </div>
                 )}
 
