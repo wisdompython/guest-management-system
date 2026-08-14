@@ -115,11 +115,10 @@ export default function PublicRsvpPage() {
               </div>
             </section>
 
-            <section className="mt-6 space-y-4 text-sm leading-7" style={{ color: 'var(--muted)' }}>
-              <p style={{ color: 'var(--ink)' }}>{details.rsvp_message || `Join us as we celebrate ${details.event_name} on this joyous occasion.`}</p>
-              <p>It promises to be a beautiful celebration filled with love, laughter, cherished memories, family and friends.</p>
+            <section className="mt-6 text-sm leading-7" style={{ color: 'var(--muted)' }}>
+              <p className="whitespace-pre-line" style={{ color: 'var(--ink)' }}>{details.rsvp_message || 'Please review the event details and confirm your availability below.'}</p>
               {details.color_of_day && (
-                <div className="flex items-center gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.45)', boxShadow: 'inset 3px 0 0 var(--brand)' }}>
+                <div className="mt-4 flex items-center gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.45)', boxShadow: 'inset 3px 0 0 var(--brand)' }}>
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'rgba(184,150,62,0.18)', border: '1px solid rgba(184,150,62,0.35)' }} aria-hidden="true">🎨</div>
                   <div className="min-w-0">
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>Colour of the day</p>
@@ -127,17 +126,6 @@ export default function PublicRsvpPage() {
                   </div>
                 </div>
               )}
-              {details.response_deadline && (
-                <div className="flex items-start gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }} aria-hidden="true">⏳</div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>RSVP deadline</p>
-                    <p className="mt-1 text-lg font-bold leading-6" style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</p>
-                    <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>Kindly confirm your availability before the deadline.</p>
-                  </div>
-                </div>
-              )}
-              <p>We look forward to celebrating this special milestone with you. Kindly RSVP to confirm your availability.</p>
             </section>
 
             {details.can_respond ? (
@@ -147,6 +135,17 @@ export default function PublicRsvpPage() {
                   <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’m Coming</button>
                   <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
                 </div>
+
+                {details.response_deadline && (
+                  <div className="mx-auto mt-4 flex max-w-xl items-start gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }} aria-hidden="true">⏳</div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>RSVP deadline</p>
+                      <p className="mt-1 text-lg font-bold leading-6" style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</p>
+                      <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>Kindly confirm your availability before the deadline.</p>
+                    </div>
+                  </div>
+                )}
 
                 {answer === 'yes' && details.collect_aso_ebi && (
                   <div className="mx-auto mt-5 max-w-2xl rounded-[12px] p-4 sm:p-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
