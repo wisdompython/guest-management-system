@@ -10,7 +10,7 @@ RSVP_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 def generate_public_code():
     """Return a compact, URL-safe, non-sequential RSVP access code."""
-    return ''.join(secrets.choice(RSVP_CODE_ALPHABET) for _ in range(12))
+    return ''.join(secrets.choice(RSVP_CODE_ALPHABET) for _ in range(6))
 
 
 class RsvpWorkflow(models.Model):
@@ -127,9 +127,16 @@ class RsvpRecipient(models.Model):
         editable=False,
     )
     public_code = models.CharField(
-        max_length=12,
+        max_length=6,
         default=generate_public_code,
         unique=True,
+        editable=False,
+    )
+    legacy_public_code = models.CharField(
+        max_length=12,
+        unique=True,
+        null=True,
+        blank=True,
         editable=False,
     )
     response_status = models.CharField(
@@ -181,6 +188,26 @@ class RsvpRecipient(models.Model):
 
     def __str__(self):
         return f'{self.guest.full_name} — {self.get_response_status_display()}'
+
+
+def assign_unique_public_codes(recipients):
+    """Remove code collisions inside a bulk insert and against saved rows."""
+    recipients = list(recipients)
+    candidates = [recipient.public_code for recipient in recipients]
+    existing = set(
+        RsvpRecipient.objects.filter(public_code__in=candidates)
+        .values_list('public_code', flat=True)
+    )
+    assigned = set()
+    for recipient in recipients:
+        while recipient.public_code in existing or recipient.public_code in assigned:
+            recipient.public_code = generate_public_code()
+            if recipient.public_code not in assigned:
+                exists = RsvpRecipient.objects.filter(public_code=recipient.public_code).exists()
+                if exists:
+                    existing.add(recipient.public_code)
+        assigned.add(recipient.public_code)
+    return recipients
 
 
 class RsvpResponse(models.Model):

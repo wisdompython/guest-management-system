@@ -19,7 +19,7 @@ from accounts.permissions import ReadOnlyOrEventManager
 from guests.csv_utils import safe_csv_row
 from guests.models import Event, Guest
 
-from .models import RsvpRecipient, RsvpWorkflow
+from .models import RsvpRecipient, RsvpWorkflow, assign_unique_public_codes
 from .serializers import (
     PopulateRecipientsSerializer,
     RsvpRecipientSerializer,
@@ -85,7 +85,10 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             for guest in guests.iterator()
             if guest.id not in existing_ids
         ]
-        RsvpRecipient.objects.bulk_create(new_recipients, ignore_conflicts=True)
+        RsvpRecipient.objects.bulk_create(
+            assign_unique_public_codes(new_recipients),
+            ignore_conflicts=True,
+        )
 
         return Response({
             'added': len(new_recipients),
@@ -394,7 +397,9 @@ class PublicRsvpResponseView(APIView):
 
     def get_recipient(self, identifier):
         recipients = RsvpRecipient.objects.select_related('workflow__event', 'guest')
-        recipient = recipients.filter(public_code=identifier).first()
+        recipient = recipients.filter(
+            Q(public_code=identifier) | Q(legacy_public_code=identifier)
+        ).first()
         if recipient:
             return recipient
         try:

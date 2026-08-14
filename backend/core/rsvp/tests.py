@@ -16,7 +16,12 @@ from PIL import Image
 from accounts.models import User
 from guests.models import Event, Guest, WhatsAppTemplate
 
-from .models import RsvpRecipient, RsvpResponse, RsvpWorkflow
+from .models import (
+    RsvpRecipient,
+    RsvpResponse,
+    RsvpWorkflow,
+    assign_unique_public_codes,
+)
 from .services import pass_delivery_allowed, process_incoming_message, process_status_update
 from .whatsapp import build_callback_data, build_rsvp_url, send_invitation
 
@@ -621,6 +626,24 @@ class PublicRsvpPageApiTests(TestCase):
         )
         self.url = f'/api/rsvp/respond/{self.recipient.public_code}/'
         self.legacy_url = f'/api/rsvp/respond/{self.recipient.callback_token}/'
+
+    def test_public_code_is_six_characters(self):
+        self.assertEqual(len(self.recipient.public_code), 6)
+
+    def test_previous_short_code_remains_available(self):
+        self.recipient.legacy_public_code = 'A7kP4mQ9xB2c'
+        self.recipient.save(update_fields=['legacy_public_code'])
+        response = self.client.get('/api/rsvp/respond/A7kP4mQ9xB2c/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['guest_name'], 'Public Guest')
+
+    @patch('rsvp.models.generate_public_code', return_value='XYZ789')
+    def test_bulk_code_assignment_replaces_duplicates(self, mock_generate):
+        first = RsvpRecipient(workflow=self.workflow, guest=self.guest, public_code='ABC234')
+        second = RsvpRecipient(workflow=self.workflow, guest=self.guest, public_code='ABC234')
+        assigned = assign_unique_public_codes([first, second])
+        self.assertEqual([recipient.public_code for recipient in assigned], ['ABC234', 'XYZ789'])
+        mock_generate.assert_called_once()
 
     def test_public_details_are_available_without_authentication(self):
         self.event.rsvp_message = 'Join us for a beautiful milestone celebration.'

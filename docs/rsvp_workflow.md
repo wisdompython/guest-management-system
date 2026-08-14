@@ -15,7 +15,7 @@ Create two approved WhatsApp templates before configuring a workflow.
 - Keep the venue out of the RSVP invitation; guests receive it on the actual pass.
 - Must include `rsvp_link` in `body_params` at the position of the link placeholder.
 - Does not require WhatsApp quick-reply buttons.
-- The application replaces `rsvp_link` with a unique short URL for each recipient, for example `https://your-domain/r/A7kP4mQ9xB2c`.
+- The application replaces `rsvp_link` with a unique six-character URL for each recipient, for example `https://your-domain/r/A7kP4m`.
 - Add `rsvp_deadline` to `body_params` wherever the approved template has a deadline placeholder. It is replaced with the workflow deadline date; workflows using it must have a response deadline.
 - Previously issued `/rsvp/<uuid>` links remain valid for backward compatibility.
 - Guests select Yes or No on the linked RSVP page.

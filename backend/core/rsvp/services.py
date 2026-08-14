@@ -6,7 +6,12 @@ from django.utils import timezone
 
 from guests.whatsapp import _normalise_phone
 
-from .models import RsvpRecipient, RsvpResponse, RsvpWorkflow
+from .models import (
+    RsvpRecipient,
+    RsvpResponse,
+    RsvpWorkflow,
+    assign_unique_public_codes,
+)
 
 
 CALLBACK_PATTERN = re.compile(
@@ -36,10 +41,14 @@ def sync_guest_to_workflow(guest):
         if workflow.status == RsvpWorkflow.Status.ACTIVE and invitation_due
         else RsvpRecipient.InvitationStatus.NOT_SENT
     )
+    code_candidate = assign_unique_public_codes([
+        RsvpRecipient(workflow=workflow, guest=guest)
+    ])[0]
     recipient, created = RsvpRecipient.objects.get_or_create(
         workflow=workflow,
         guest=guest,
         defaults={
+            'public_code': code_candidate.public_code,
             'invitation_status': initial_status,
             # Dispatched directly below, so stamp it as in flight for the
             # send-budget accounting.
@@ -96,7 +105,7 @@ def bulk_sync_guests_to_workflow(event_id, guest_ids) -> int:
         if workflow.status == RsvpWorkflow.Status.ACTIVE and invitation_due
         else RsvpRecipient.InvitationStatus.NOT_SENT
     )
-    RsvpRecipient.objects.bulk_create(
+    new_recipients = assign_unique_public_codes(
         [
             RsvpRecipient(
                 workflow=workflow,
@@ -104,7 +113,10 @@ def bulk_sync_guests_to_workflow(event_id, guest_ids) -> int:
                 invitation_status=initial_status,
             )
             for guest_id in new_ids
-        ],
+        ]
+    )
+    RsvpRecipient.objects.bulk_create(
+        new_recipients,
         batch_size=500,
         ignore_conflicts=True,
     )

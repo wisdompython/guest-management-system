@@ -134,7 +134,7 @@ export default function AddRsvpWorkflowPage() {
       ticket_type: 'General',
       table_number: '12',
       seat_number: '4',
-      rsvp_link: 'https://guestpass.example/r/A7kP4mQ9xB2c',
+      rsvp_link: 'https://guestpass.example/r/A7kP4m',
       rsvp_deadline: deadline
         ? new Date(`${deadline}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         : 'Wednesday, 9 September 2026',
