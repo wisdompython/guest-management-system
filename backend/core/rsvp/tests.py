@@ -1159,6 +1159,113 @@ class RsvpSendBudgetTests(TestCase):
         mock_invitation.delay.assert_not_called()
 
 
+class RsvpAutoRetryTests(TestCase):
+    """Webhook-reported WhatsApp restrictions must be retried automatically."""
+
+    ECOSYSTEM_ERROR = (
+        'This message was not delivered to maintain healthy ecosystem engagement.'
+    )
+
+    def setUp(self):
+        self.event = make_event(name='Auto Retry Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        self.guest = Guest.objects.create(
+            event=self.event,
+            full_name='Restricted Guest',
+            phone_number='2348000000201',
+        )
+        self.recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.guest,
+        )
+
+    def _fail_pass(self, *, error, queued_ago_hours=2, retries=0):
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            invitation_status=RsvpRecipient.InvitationStatus.READ,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_queued_at=timezone.now() - timezone.timedelta(hours=queued_ago_hours),
+            pass_auto_retries=retries,
+            last_error=error,
+        )
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_ecosystem_failed_pass_is_auto_requeued(self, mock_pass):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(error=self.ECOSYSTEM_ERROR)
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 1)
+        mock_pass.delay.assert_called_once_with(self.recipient.id)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+        self.assertEqual(self.recipient.pass_auto_retries, 1)
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_recent_failure_waits_for_backoff(self, mock_pass):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(error=self.ECOSYSTEM_ERROR, queued_ago_hours=0)
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 0)
+        mock_pass.delay.assert_not_called()
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_permanent_failure_is_not_auto_retried(self, mock_pass):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(error='Invalid WhatsApp number.')
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 0)
+        mock_pass.delay.assert_not_called()
+
+    @patch('rsvp.tasks.send_confirmed_pass')
+    def test_auto_retry_stops_after_max_attempts(self, mock_pass):
+        from .tasks import FAILED_SEND_MAX_AUTO_RETRIES, dispatch_scheduled_rsvp_messages
+
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=48,
+            retries=FAILED_SEND_MAX_AUTO_RETRIES,
+        )
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 0)
+        mock_pass.delay.assert_not_called()
+
+    @patch('rsvp.tasks.send_rsvp_invitation')
+    def test_failed_invitation_is_auto_requeued(self, mock_invitation):
+        from .tasks import dispatch_scheduled_rsvp_messages
+
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_queued_at=timezone.now() - timezone.timedelta(hours=2),
+            last_error='Spam rate limit hit.',
+        )
+
+        result = dispatch_scheduled_rsvp_messages()
+
+        self.assertEqual(result['retried_failed'], 1)
+        mock_invitation.delay.assert_called_once_with(self.recipient.id)
+        self.recipient.refresh_from_db()
+        self.assertEqual(
+            self.recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        self.assertEqual(self.recipient.invitation_auto_retries, 1)
+
+
 class RsvpGuestSyncTests(TestCase):
     @patch('guests.views.guests.generate_guest_assets')
     def test_guest_added_after_event_setup_joins_the_draft_workflow(self, mock_assets):

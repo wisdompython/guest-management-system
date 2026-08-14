@@ -357,9 +357,12 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
             )
         recipient.invitation_status = RsvpRecipient.InvitationStatus.QUEUED
         recipient.invitation_queued_at = timezone.now()
+        # A manual retry re-arms the automatic retry cycle.
+        recipient.invitation_auto_retries = 0
         recipient.last_error = ''
         recipient.save(update_fields=[
-            'invitation_status', 'invitation_queued_at', 'last_error', 'updated_at',
+            'invitation_status', 'invitation_queued_at', 'invitation_auto_retries',
+            'last_error', 'updated_at',
         ])
         from .tasks import send_rsvp_invitation
         send_rsvp_invitation.delay(recipient.id)
@@ -380,8 +383,13 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
             )
         recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
         recipient.pass_queued_at = timezone.now()
+        # A manual retry re-arms the automatic retry cycle.
+        recipient.pass_auto_retries = 0
         recipient.last_error = ''
-        recipient.save(update_fields=['pass_status', 'pass_queued_at', 'last_error', 'updated_at'])
+        recipient.save(update_fields=[
+            'pass_status', 'pass_queued_at', 'pass_auto_retries',
+            'last_error', 'updated_at',
+        ])
         from .tasks import send_confirmed_pass
         send_confirmed_pass.delay(recipient.id)
         return Response({'queued': True})

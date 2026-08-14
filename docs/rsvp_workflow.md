@@ -120,6 +120,19 @@ Practical notes for large events:
 
 ## Failure recovery
 
+- Transient WhatsApp restrictions are retried automatically. Meta sometimes
+  accepts a send and later reports a failure through the status webhook —
+  for example "This message was not delivered to maintain healthy ecosystem
+  engagement" (a per-user marketing cap), spam or rate limits, or a generic
+  temporary error. The five-minute dispatcher re-queues those recipients up
+  to three times, waiting 1 hour, then 4 hours, then 12 hours after the
+  previous attempt, because Meta's per-user caps usually lift within a day.
+  Automatic retries spend the daily send budget like any other send.
+- Permanent errors (invalid number, missing template, bad parameters) are
+  never retried automatically and keep the Retry action in the recipient
+  table. A manual retry also resets the automatic retry cycle, so the
+  dispatcher takes over again if the manual attempt fails with a transient
+  error.
 - A failed invitation can be retried from the recipient table.
 - A failed pass can be retried only for a confirmed guest.
 - Pausing prevents queued invitation tasks from sending; resuming requeues eligible invitations.

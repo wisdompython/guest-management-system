@@ -171,6 +171,11 @@ class RsvpRecipient(models.Model):
     # send budget; the Beat dispatcher drains those as the window frees up.
     invitation_queued_at = models.DateTimeField(null=True, blank=True)
     pass_queued_at = models.DateTimeField(null=True, blank=True)
+    # Automatic retries consumed for delivery failures that Meta reported as
+    # transient (per-user marketing limits, spam/rate limits). Reset when a
+    # send succeeds or an operator retries manually.
+    invitation_auto_retries = models.PositiveIntegerField(default=0)
+    pass_auto_retries = models.PositiveIntegerField(default=0)
     reminder_count = models.PositiveIntegerField(default=0)
     last_reminded_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True)

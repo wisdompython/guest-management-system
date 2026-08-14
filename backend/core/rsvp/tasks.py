@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from celery import shared_task
 from django.db import transaction
@@ -11,6 +12,41 @@ logger = logging.getLogger(__name__)
 
 RSVP_MESSAGES_PER_MINUTE = 20
 RSVP_RATE_LIMIT = f'{RSVP_MESSAGES_PER_MINUTE}/m'
+
+# Meta can accept a template send and later report a delivery failure through
+# the status webhook (per-user marketing caps such as "healthy ecosystem
+# engagement", spam/rate limits). Those recipients land in FAILED without the
+# send task ever seeing an exception, so the Beat dispatcher retries them
+# automatically: up to this many attempts, waiting at least the matching
+# delay after the previous attempt. Meta's per-user caps usually lift within
+# 24 hours, so the delays escalate instead of hammering the same guest.
+FAILED_SEND_MAX_AUTO_RETRIES = 3
+FAILED_SEND_RETRY_DELAYS = (
+    timedelta(hours=1),
+    timedelta(hours=4),
+    timedelta(hours=12),
+)
+
+# Lower-cased substrings of Meta error messages that are worth retrying.
+# Anything else (invalid number, missing template, bad parameters) stays
+# FAILED for manual review.
+RETRYABLE_FAILURE_MARKERS = (
+    'healthy ecosystem engagement',
+    'rate limit',
+    'spam',
+    'throughput',
+    'temporarily',
+    'try again',
+    'service unavailable',
+    'something went wrong',
+    'experiment',
+    'generic error',
+)
+
+
+def is_retryable_failure(error_text: str) -> bool:
+    error_text = (error_text or '').lower()
+    return any(marker in error_text for marker in RETRYABLE_FAILURE_MARKERS)
 
 
 def _is_transient_whatsapp_error(exc):
@@ -78,6 +114,69 @@ def _claim_and_dispatch(candidates, limit, now, *, updates, stamp_field, send_ta
     )
     for recipient_id in claimed_ids:
         send_task.delay(recipient_id)
+    return len(claimed_ids)
+
+
+def _retry_failed_sends(
+    now, budget, *,
+    base_filters, status_field, failed_value, queued_value,
+    stamp_field, retries_field, send_task,
+):
+    """Re-queue transient delivery failures with escalating backoff.
+
+    Eligibility is checked in Python because it combines the stored error
+    text with a per-attempt delay; the claim itself is still an atomic
+    UPDATE guarded on the FAILED state, and each retry consumes budget.
+    """
+    from .models import RsvpRecipient
+
+    if budget <= 0:
+        return 0
+    rows = RsvpRecipient.objects.filter(
+        **base_filters,
+        **{
+            status_field: failed_value,
+            f'{retries_field}__lt': FAILED_SEND_MAX_AUTO_RETRIES,
+        },
+    ).values('id', 'last_error', retries_field, stamp_field)[:500]
+
+    eligible_ids = []
+    for row in rows:
+        if not is_retryable_failure(row['last_error']):
+            continue
+        attempts = row[retries_field]
+        delay = FAILED_SEND_RETRY_DELAYS[
+            min(attempts, len(FAILED_SEND_RETRY_DELAYS) - 1)
+        ]
+        last_attempt = row[stamp_field]
+        if last_attempt and now - last_attempt < delay:
+            continue
+        eligible_ids.append(row['id'])
+        if len(eligible_ids) >= budget:
+            break
+
+    if not eligible_ids:
+        return 0
+    RsvpRecipient.objects.filter(
+        pk__in=eligible_ids,
+        **{status_field: failed_value},
+    ).update(**{
+        status_field: queued_value,
+        stamp_field: now,
+        retries_field: F(retries_field) + 1,
+    })
+    claimed_ids = list(
+        RsvpRecipient.objects.filter(
+            pk__in=eligible_ids, **{stamp_field: now},
+        ).values_list('id', flat=True)
+    )
+    for recipient_id in claimed_ids:
+        send_task.delay(recipient_id)
+    if claimed_ids:
+        logger.info(
+            'Auto-retrying %s failed %s send(s) after WhatsApp restriction',
+            len(claimed_ids), status_field.replace('_status', ''),
+        )
     return len(claimed_ids)
 
 
@@ -181,6 +280,7 @@ def send_rsvp_invitation(self, recipient_id: int):
         'invitation_status': RsvpRecipient.InvitationStatus.SENT,
         'invitation_message_id': sent_update.id,
         'invitation_sent_at': timezone.now(),
+        'invitation_auto_retries': 0,
         'last_error': '',
     }
     if recipient.invitation_sent_at:
@@ -246,6 +346,7 @@ def send_confirmed_pass(self, recipient_id: int):
         RsvpRecipient.objects.filter(pk=recipient_id).update(
             pass_status=RsvpRecipient.PassStatus.SENT,
             pass_message_id=sent_update.id,
+            pass_auto_retries=0,
             last_error='',
         )
         Guest.objects.filter(pk=recipient.guest_id).update(
@@ -262,8 +363,10 @@ def dispatch_scheduled_rsvp_messages():
     Spends the remaining daily send budget in priority order:
       1. dispatched sends gone stale (lost worker / exhausted retries)
       2. scheduled passes now due (confirmed guests come first)
-      3. approved invitations deferred by an earlier budget check
-      4. scheduled invitations now due
+      3. transient pass failures eligible for an automatic retry
+      4. approved invitations deferred by an earlier budget check
+      5. scheduled invitations now due
+      6. transient invitation failures eligible for an automatic retry
     Whatever doesn't fit is picked up on a later tick as the trailing 24h
     window frees up.
     """
@@ -325,6 +428,21 @@ def dispatch_scheduled_rsvp_messages():
     )
     budget -= passes_queued
 
+    retried_passes = _retry_failed_sends(
+        now, budget,
+        base_filters={
+            'response_status': RsvpRecipient.ResponseStatus.CONFIRMED,
+            **live,
+        },
+        status_field='pass_status',
+        failed_value=RsvpRecipient.PassStatus.FAILED,
+        queued_value=RsvpRecipient.PassStatus.QUEUED,
+        stamp_field='pass_queued_at',
+        retries_field='pass_auto_retries',
+        send_task=send_confirmed_pass,
+    )
+    budget -= retried_passes
+
     deferred_invitations = RsvpRecipient.objects.filter(
         response_status=RsvpRecipient.ResponseStatus.AWAITING,
         invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
@@ -357,9 +475,25 @@ def dispatch_scheduled_rsvp_messages():
     )
     budget -= invitations_queued
 
+    retried_invitations = _retry_failed_sends(
+        now, budget,
+        base_filters={
+            'response_status': RsvpRecipient.ResponseStatus.AWAITING,
+            **live,
+        },
+        status_field='invitation_status',
+        failed_value=RsvpRecipient.InvitationStatus.FAILED,
+        queued_value=RsvpRecipient.InvitationStatus.QUEUED,
+        stamp_field='invitation_queued_at',
+        retries_field='invitation_auto_retries',
+        send_task=send_rsvp_invitation,
+    )
+    budget -= retried_invitations
+
     return {
         'invitations_queued': invitations_queued + deferred_dispatched,
         'passes_queued': passes_queued,
         'requeued_stale': requeued_passes + requeued_invitations,
+        'retried_failed': retried_passes + retried_invitations,
         'budget_left': budget,
     }
