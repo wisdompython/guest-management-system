@@ -21,6 +21,20 @@ const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }>
   },
 }
 
+function ordinalDate(value: string) {
+  const date = new Date(value)
+  const day = Number(date.toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric' }))
+  const suffix = day % 100 >= 11 && day % 100 <= 13
+    ? 'th'
+    : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] || 'th'
+  const monthAndYear = date.toLocaleDateString('en-GB', {
+    timeZone: 'Africa/Lagos',
+    month: 'long',
+    year: 'numeric',
+  })
+  return `${day}${suffix} ${monthAndYear}`
+}
+
 export default function PublicRsvpPage() {
   const params = useParams<{ token?: string; code?: string; guestCode?: string }>()
   const routeValue = params.token ?? params.code ?? params.guestCode ?? ''
@@ -113,8 +127,17 @@ export default function PublicRsvpPage() {
                   </div>
                 </div>
               )}
+              {details.response_deadline && (
+                <div className="flex items-start gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }} aria-hidden="true">⏳</div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>RSVP deadline</p>
+                    <p className="mt-1 text-lg font-bold leading-6" style={{ color: 'var(--ink)' }}>{ordinalDate(details.response_deadline)}</p>
+                    <p className="mt-1 text-xs leading-5" style={{ color: 'var(--muted)' }}>Kindly confirm your availability before the deadline.</p>
+                  </div>
+                </div>
+              )}
               <p>We look forward to celebrating this special milestone with you. Kindly RSVP to confirm your availability.</p>
-              {details.response_deadline && <p className="text-xs">Please respond by {new Date(details.response_deadline).toLocaleDateString('en-GB', { dateStyle: 'long' })}.</p>}
             </section>
 
             {details.can_respond ? (
