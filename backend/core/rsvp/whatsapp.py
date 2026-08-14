@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.utils.text import slugify
 
 from guests.whatsapp import (
     _build_pass_url,
@@ -20,7 +21,12 @@ def build_callback_data(recipient, answer: str) -> str:
 
 
 def build_rsvp_url(recipient) -> str:
-    return f"{settings.SITE_URL.rstrip('/')}/r/{recipient.public_code}"
+    event_slug = slugify(recipient.workflow.event.name)[:48] or 'event'
+    guest_slug = slugify(recipient.guest.full_name)[:40] or 'guest'
+    return (
+        f"{settings.SITE_URL.rstrip('/')}/{event_slug}/rsvp/"
+        f"{guest_slug}-{recipient.public_code}"
+    )
 
 
 def _build_invitation_image_url(recipient) -> str:

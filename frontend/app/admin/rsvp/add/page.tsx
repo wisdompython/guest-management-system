@@ -148,7 +148,7 @@ export default function AddRsvpWorkflowPage() {
       ticket_type: 'General',
       table_number: '12',
       seat_number: '4',
-      rsvp_link: 'https://guestpass.example/r/A7kP4m',
+      rsvp_link: 'https://guestpass.example/your-event/rsvp/aisha-bello-A7kP4m',
       rsvp_deadline: deadline
         ? ordinalDate(`${deadline}T12:00:00+01:00`)
         : '9th September 2026',

@@ -22,8 +22,11 @@ const RESPONSE_COPY: Record<RsvpResponseStatus, { title: string; body: string }>
 }
 
 export default function PublicRsvpPage() {
-  const params = useParams<{ token?: string; code?: string }>()
-  const token = params.token ?? params.code ?? ''
+  const params = useParams<{ token?: string; code?: string; guestCode?: string }>()
+  const routeValue = params.token ?? params.code ?? params.guestCode ?? ''
+  const token = params.guestCode
+    ? routeValue.slice(routeValue.lastIndexOf('-') + 1)
+    : routeValue
   const [details, setDetails] = useState<PublicRsvpDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState<'yes' | 'no' | null>(null)

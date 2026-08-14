@@ -717,7 +717,7 @@ class PublicRsvpPageApiTests(TestCase):
         with self.settings(SITE_URL='https://events.example.com'):
             self.assertEqual(
                 build_rsvp_url(self.recipient),
-                f'https://events.example.com/r/{self.recipient.public_code}',
+                f'https://events.example.com/public-rsvp-event/rsvp/public-guest-{self.recipient.public_code}',
             )
 
 
@@ -752,7 +752,10 @@ class RsvpInvitationLinkTests(TestCase):
 
         values = mock_client.return_value.send_template.call_args.kwargs['params'][0].positionals
         self.assertEqual(values[0], 'Deadline Guest')
-        self.assertEqual(values[1], f'https://events.example.com/r/{recipient.public_code}')
+        self.assertEqual(
+            values[1],
+            f'https://events.example.com/rsvp-test-event/rsvp/deadline-guest-{recipient.public_code}',
+        )
         self.assertEqual(values[2], '9th September 2026')
 
     @patch('rsvp.whatsapp._get_client')
@@ -792,7 +795,10 @@ class RsvpInvitationLinkTests(TestCase):
         self.assertEqual(values[0], 'Guest Name')
         self.assertEqual(values[1], 'Lady Otunba Osibogun @ 70')
         self.assertEqual(values[2], 'Lady Otunba Osibogun @ 70')
-        self.assertEqual(values[3], f'https://events.example.com/r/{recipient.public_code}')
+        self.assertEqual(
+            values[3],
+            f'https://events.example.com/lady-otunba-osibogun-70/rsvp/guest-name-{recipient.public_code}',
+        )
         self.assertEqual(values[4], '16th September 2026')
         self.assertEqual(values[5], '1:00 PM')
         self.assertEqual(values[6], event.venue)
@@ -829,7 +835,7 @@ class RsvpInvitationLinkTests(TestCase):
         self.assertEqual(params[0].positionals[0], 'Link Guest')
         self.assertEqual(
             params[0].positionals[1],
-            f'https://events.example.com/r/{recipient.public_code}',
+            f'https://events.example.com/rsvp-test-event/rsvp/link-guest-{recipient.public_code}',
         )
 
     @patch('rsvp.whatsapp._get_client')

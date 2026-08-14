@@ -17,7 +17,7 @@ const VAR_EXAMPLES: Record<string, string> = {
   ticket_type:  'VIP',
   table_number: 'Table 12',
   seat_number:  'Seat 4A',
-  rsvp_link:    'https://guestpass.example/r/A7kP4m',
+  rsvp_link:    'https://guestpass.example/funke-adeyoriju-60/rsvp/rita-aivoji-A7kP4m',
   rsvp_deadline: '9th September 2026',
 }
 
