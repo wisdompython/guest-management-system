@@ -6,6 +6,7 @@ import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
 const field = 'form-control'
 const label = 'form-label'
+const DEFAULT_RSVP_MESSAGE = 'Welcome. You are warmly invited to this special occasion. Please review the event details below and kindly confirm your availability.'
 
 function toLocalDateTimeValue(iso: string) {
   const d = new Date(iso)
@@ -110,9 +111,9 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className={label}>Guest message <span className="font-normal text-[var(--muted)]">(optional)</span></label>
-              <textarea name="rsvp_message" rows={5} defaultValue={event?.rsvp_message}
+              <textarea name="rsvp_message" rows={5} defaultValue={event?.rsvp_message || DEFAULT_RSVP_MESSAGE}
                 placeholder="Write the message guests should read before confirming their availability." className={field} />
-              <p className="form-hint">You can use multiple paragraphs. Leave blank to show a short neutral confirmation prompt.</p>
+              <p className="form-hint">This neutral message is provided by default. Edit it to suit the event, and use multiple paragraphs if needed.</p>
             </div>
             <div>
               <label className={label}>Colour of the day <span className="font-normal text-[var(--muted)]">(optional)</span></label>

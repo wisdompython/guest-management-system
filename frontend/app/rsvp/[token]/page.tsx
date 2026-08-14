@@ -116,7 +116,7 @@ export default function PublicRsvpPage() {
             </section>
 
             <section className="mt-6 text-sm leading-7" style={{ color: 'var(--muted)' }}>
-              <p className="whitespace-pre-line" style={{ color: 'var(--ink)' }}>{details.rsvp_message || 'Please review the event details and confirm your availability below.'}</p>
+              <p className="whitespace-pre-line" style={{ color: 'var(--ink)' }}>{details.rsvp_message || 'Welcome. You are warmly invited to this special occasion. Please review the event details below and kindly confirm your availability.'}</p>
               {details.color_of_day && (
                 <div className="mt-4 flex items-center gap-4 rounded-[14px] px-4 py-4 sm:px-5" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.45)', boxShadow: 'inset 3px 0 0 var(--brand)' }}>
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'rgba(184,150,62,0.18)', border: '1px solid rgba(184,150,62,0.35)' }} aria-hidden="true">🎨</div>
