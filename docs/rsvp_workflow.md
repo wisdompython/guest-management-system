@@ -136,5 +136,12 @@ Practical notes for large events:
   time when an operator tries too soon.
 - A failed invitation can be retried from the recipient table.
 - A failed pass can be retried only for a confirmed guest.
+- Several guests can be retried at once: tick the checkboxes on failed rows
+  (or the header checkbox for every failed delivery on the page) and use
+  **Retry invitations (n)** / **Retry passes (n)** in the selection bar.
+  The endpoint (`POST /api/rsvp/recipients/bulk-retry/`) applies the same
+  rules as the single retry: only failed sends are queued, and guests whose
+  retryable WhatsApp error is still cooling down are skipped and reported
+  back rather than blocking the rest of the selection.
 - Pausing prevents queued invitation tasks from sending; resuming requeues eligible invitations.
 - Completing the workflow does not delete RSVP history, guests, or the event.

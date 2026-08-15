@@ -28,14 +28,19 @@ from .serializers import (
 )
 
 
-def _retry_cooldown_response(error_text, last_attempt, attempts):
-    """Return a conflict response while a retryable WhatsApp error cools down."""
+def _retry_available_at(error_text, last_attempt, attempts):
+    """When a retryable WhatsApp failure may be attempted again (None = now)."""
     from .tasks import is_retryable_failure, retry_delay_for
 
     if not last_attempt or not is_retryable_failure(error_text):
         return None
-    retry_at = last_attempt + retry_delay_for(error_text, attempts)
-    if timezone.now() >= retry_at:
+    return last_attempt + retry_delay_for(error_text, attempts)
+
+
+def _retry_cooldown_response(error_text, last_attempt, attempts):
+    """Return a conflict response while a retryable WhatsApp error cools down."""
+    retry_at = _retry_available_at(error_text, last_attempt, attempts)
+    if not retry_at or timezone.now() >= retry_at:
         return None
     local_retry_at = timezone.localtime(retry_at)
     return Response(
@@ -408,6 +413,109 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         if search := self.request.query_params.get('search'):
             qs = qs.filter(guest__full_name__icontains=search)
         return qs
+
+    BULK_RETRY_MAX_SELECTION = 500
+
+    @action(detail=False, methods=['post'], url_path='bulk-retry')
+    def bulk_retry(self, request):
+        """Retry failed invitations or passes for an explicit selection.
+
+        Mirrors the single-recipient retry rules: only failed sends are
+        touched, and recipients whose retryable WhatsApp error is still in
+        its cooldown are skipped (reported back, not errored) so one cooling
+        guest doesn't block the rest of the selection.
+        """
+        from .tasks import send_confirmed_pass, send_rsvp_invitation
+
+        kind = request.data.get('kind')
+        recipient_ids = request.data.get('recipient_ids')
+        if kind not in {'invitation', 'pass'}:
+            return Response(
+                {'detail': "kind must be 'invitation' or 'pass'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(recipient_ids, list) or not recipient_ids:
+            return Response(
+                {'detail': 'Select at least one guest to retry.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        recipient_ids = recipient_ids[:self.BULK_RETRY_MAX_SELECTION]
+
+        now = timezone.now()
+        if kind == 'invitation':
+            rows = RsvpRecipient.objects.filter(
+                pk__in=recipient_ids,
+                workflow__status=RsvpWorkflow.Status.ACTIVE,
+                response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            ).values(
+                'id', 'invitation_error', 'last_error',
+                'invitation_queued_at', 'invitation_auto_retries',
+            )
+            error_field, stamp_field = 'invitation_error', 'invitation_queued_at'
+            retries_field = 'invitation_auto_retries'
+            claim_filters = {
+                'invitation_status': RsvpRecipient.InvitationStatus.FAILED,
+            }
+            claim_updates = {
+                'invitation_status': RsvpRecipient.InvitationStatus.QUEUED,
+                'invitation_queued_at': now,
+                'invitation_error': '',
+                'last_error': '',
+            }
+            send_task = send_rsvp_invitation
+        else:
+            rows = RsvpRecipient.objects.filter(
+                pk__in=recipient_ids,
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                pass_status=RsvpRecipient.PassStatus.FAILED,
+            ).values(
+                'id', 'pass_error', 'last_error',
+                'pass_queued_at', 'pass_auto_retries',
+            )
+            error_field, stamp_field = 'pass_error', 'pass_queued_at'
+            retries_field = 'pass_auto_retries'
+            claim_filters = {'pass_status': RsvpRecipient.PassStatus.FAILED}
+            claim_updates = {
+                'pass_status': RsvpRecipient.PassStatus.QUEUED,
+                'pass_queued_at': now,
+                'pass_error': '',
+                'last_error': '',
+            }
+            send_task = send_confirmed_pass
+
+        rows = list(rows)
+        eligible_ids, cooling = [], 0
+        for row in rows:
+            retry_at = _retry_available_at(
+                row[error_field] or row['last_error'],
+                row[stamp_field],
+                row[retries_field],
+            )
+            if retry_at and now < retry_at:
+                cooling += 1
+                continue
+            eligible_ids.append(row['id'])
+
+        queued = 0
+        if eligible_ids:
+            RsvpRecipient.objects.filter(
+                pk__in=eligible_ids, **claim_filters,
+            ).update(**claim_updates)
+            claimed_ids = list(
+                RsvpRecipient.objects.filter(
+                    pk__in=eligible_ids, **{stamp_field: now},
+                ).values_list('id', flat=True)
+            )
+            for recipient_id in claimed_ids:
+                send_task.delay(recipient_id)
+            queued = len(claimed_ids)
+
+        return Response({
+            'queued': queued,
+            'skipped_cooldown': cooling,
+            'skipped_ineligible': len(recipient_ids) - len(rows),
+        })
 
     @action(detail=True, methods=['post'], url_path='retry-invitation')
     def retry_invitation(self, request, pk=None):

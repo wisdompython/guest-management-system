@@ -85,6 +85,11 @@ export const rsvpApi = {
     request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-invitation/`, { method: 'POST' }),
   retryRsvpPass: (recipientId: number) =>
     request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST' }),
+  bulkRetryRsvpRecipients: (recipientIds: number[], kind: 'invitation' | 'pass') =>
+    request<{ queued: number; skipped_cooldown: number; skipped_ineligible: number }>(
+      '/rsvp/recipients/bulk-retry/',
+      { method: 'POST', body: JSON.stringify({ recipient_ids: recipientIds, kind }) },
+    ),
   getPublicRsvp: (token: string) =>
     request<PublicRsvpDetails>(`/rsvp/respond/${token}/`),
   submitPublicRsvp: (token: string, answer: 'yes' | 'no', asoEbiRequested = false, asoEbiQuantity = 0) =>

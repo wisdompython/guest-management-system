@@ -1586,6 +1586,117 @@ class RsvpChannelErrorTests(TestCase):
         self.assertIn('ecosystem engagement', self.recipient.pass_error)
 
 
+class RsvpBulkRetryTests(TestCase):
+    """Operators can retry an explicit selection of failed sends at once."""
+
+    ECOSYSTEM_ERROR = (
+        'This message was not delivered to maintain healthy ecosystem engagement.'
+    )
+
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'bulk-retry-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(name='Bulk Retry Event')
+        self.workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        old = timezone.now() - timezone.timedelta(hours=25)
+
+        self.pass_failed = self._recipient('2348000000301')
+        RsvpRecipient.objects.filter(pk=self.pass_failed.pk).update(
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            invitation_status=RsvpRecipient.InvitationStatus.READ,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_queued_at=old,
+            pass_error=self.ECOSYSTEM_ERROR,
+        )
+        self.invitation_failed = self._recipient('2348000000302')
+        RsvpRecipient.objects.filter(pk=self.invitation_failed.pk).update(
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_queued_at=old,
+            invitation_error='Invalid WhatsApp number.',
+        )
+        self.healthy = self._recipient('2348000000303')
+        RsvpRecipient.objects.filter(pk=self.healthy.pk).update(
+            invitation_status=RsvpRecipient.InvitationStatus.SENT,
+        )
+
+    def _recipient(self, phone):
+        return RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=Guest.objects.create(
+                event=self.event,
+                full_name=f'Bulk Guest {phone[-3:]}',
+                phone_number=phone,
+            ),
+        )
+
+    def _bulk_retry(self, ids, kind):
+        return self.client.post(
+            '/api/rsvp/recipients/bulk-retry/',
+            {'recipient_ids': ids, 'kind': kind},
+            format='json',
+        )
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_bulk_pass_retry_queues_only_eligible_rows(self, mock_delay):
+        response = self._bulk_retry(
+            [self.pass_failed.id, self.invitation_failed.id, self.healthy.id],
+            'pass',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['queued'], 1)
+        self.assertEqual(response.data['skipped_ineligible'], 2)
+        self.assertEqual(response.data['skipped_cooldown'], 0)
+        mock_delay.assert_called_once_with(self.pass_failed.id)
+        self.pass_failed.refresh_from_db()
+        self.assertEqual(self.pass_failed.pass_status, RsvpRecipient.PassStatus.QUEUED)
+        self.assertEqual(self.pass_failed.pass_error, '')
+
+    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    def test_bulk_invitation_retry_queues_only_eligible_rows(self, mock_delay):
+        response = self._bulk_retry(
+            [self.invitation_failed.id, self.healthy.id],
+            'invitation',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['queued'], 1)
+        self.assertEqual(response.data['skipped_ineligible'], 1)
+        mock_delay.assert_called_once_with(self.invitation_failed.id)
+        self.invitation_failed.refresh_from_db()
+        self.assertEqual(
+            self.invitation_failed.invitation_status,
+            RsvpRecipient.InvitationStatus.QUEUED,
+        )
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_bulk_retry_skips_rows_still_in_cooldown(self, mock_delay):
+        RsvpRecipient.objects.filter(pk=self.pass_failed.pk).update(
+            pass_queued_at=timezone.now(),
+        )
+
+        response = self._bulk_retry([self.pass_failed.id], 'pass')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['queued'], 0)
+        self.assertEqual(response.data['skipped_cooldown'], 1)
+        mock_delay.assert_not_called()
+        self.pass_failed.refresh_from_db()
+        self.assertEqual(self.pass_failed.pass_status, RsvpRecipient.PassStatus.FAILED)
+
+    def test_bulk_retry_validates_input(self):
+        self.assertEqual(self._bulk_retry([], 'pass').status_code, 400)
+        self.assertEqual(
+            self._bulk_retry([self.pass_failed.id], 'everything').status_code, 400,
+        )
+
+
 class RsvpGuestSyncTests(TestCase):
     @patch('guests.views.guests.generate_guest_assets')
     def test_guest_added_after_event_setup_joins_the_draft_workflow(self, mock_assets):
