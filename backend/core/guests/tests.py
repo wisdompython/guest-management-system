@@ -314,6 +314,54 @@ class BulkUploadTests(TestCase):
         self.assertEqual(r.data['failed'], 1)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
 
+    def test_add_upload_skips_phone_numbers_already_in_event(self, mock_task):
+        make_guest(
+            self.event,
+            full_name='Existing Guest',
+            phone_number='+234 800 000 0042',
+        )
+        rows = [
+            {'full_name': 'Same Guest Again', 'phone_number': '2348000000042'},
+            {'full_name': 'New Guest', 'phone_number': '2348000000043'},
+        ]
+
+        response, _ = self._upload(rows, mock_task)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['successful'], 1)
+        self.assertEqual(response.data['skipped'], 1)
+        self.assertEqual(response.data['failed'], 0)
+        self.assertEqual(response.data['skipped_items'][0]['row'], 2)
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
+
+    def test_add_upload_skips_repeated_phone_inside_same_csv(self, mock_task):
+        rows = [
+            {'full_name': 'First Entry', 'phone_number': '08000000042'},
+            {'full_name': 'Repeated Entry', 'phone_number': '2348000000042'},
+        ]
+
+        response, _ = self._upload(rows, mock_task)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['successful'], 1)
+        self.assertEqual(response.data['skipped'], 1)
+        self.assertIn('same CSV', response.data['skipped_items'][0]['reason'])
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 1)
+
+    def test_reuploading_large_list_skips_every_existing_phone(self, mock_task):
+        rows = [
+            {'full_name': f'Guest {index}', 'phone_number': f'23480{index:07d}'}
+            for index in range(1000)
+        ]
+        first, _ = self._upload(rows, mock_task)
+        second, _ = self._upload(rows, mock_task)
+
+        self.assertEqual(first.data['successful'], 1000)
+        self.assertEqual(second.data['successful'], 0)
+        self.assertEqual(second.data['skipped'], 1000)
+        self.assertEqual(second.data['failed'], 0)
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 1000)
+
     @patch('rsvp.tasks.queue_workflow_invitations.delay')
     def test_replace_list_removes_old_guests_and_syncs_new_rsvp_recipients(
         self, mock_invitation, mock_assets,

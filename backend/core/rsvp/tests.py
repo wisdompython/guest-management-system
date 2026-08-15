@@ -386,6 +386,7 @@ class RsvpWorkflowApiTests(TestCase):
         body = b''.join(response.streaming_content).decode('utf-8')
         self.assertIn('response_status', body)
         self.assertIn('invitation_status', body)
+        self.assertIn('phone_number', body)
         self.assertIn('Ada Guest', body)
 
     def test_export_escapes_spreadsheet_formulas(self):
@@ -398,6 +399,25 @@ class RsvpWorkflowApiTests(TestCase):
         body = b''.join(response.streaming_content).decode('utf-8')
 
         self.assertIn("'=HYPERLINK", body)
+
+    def test_export_can_include_only_confirmed_guests(self):
+        workflow = self.create_workflow()
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_b)
+
+        response = self.client.get(
+            f'/api/rsvp/workflows/{workflow.id}/export/',
+            {'response_status': 'confirmed'},
+        )
+        body = b''.join(response.streaming_content).decode('utf-8')
+
+        self.assertIn('Ada Guest', body)
+        self.assertNotIn('No Phone', body)
+        self.assertIn('rsvp_confirmed_', response['Content-Disposition'])
 
     @override_settings(RSVP_REMINDER_COOLDOWN_MINUTES=60, RSVP_MAX_REMINDERS=2)
     @patch('rsvp.tasks.queue_workflow_invitations.delay')
@@ -1465,6 +1485,10 @@ class RsvpRecipientSegmentTests(TestCase):
             invitation_status=RsvpRecipient.InvitationStatus.READ,
             pass_status=RsvpRecipient.PassStatus.FAILED,
         )
+        self.failed_invitation = recipient(
+            'Invite Failed', '2348000000305',
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+        )
 
     def _names(self, segment):
         response = self.client.get(
@@ -1483,12 +1507,19 @@ class RsvpRecipientSegmentTests(TestCase):
     def test_confirmed_no_pass_segment(self):
         self.assertEqual(self._names('confirmed_no_pass'), {'No Pass Yet'})
 
+    def test_delivery_failed_segment_includes_invitation_and_pass_failures(self):
+        self.assertEqual(
+            self._names('delivery_failed'),
+            {'Invite Failed', 'No Pass Yet'},
+        )
+
     def test_confirmed_no_pass_count_in_stats(self):
         from .serializers import build_workflow_stats
 
         stats = build_workflow_stats(self.workflow)
         self.assertEqual(stats['confirmed_no_pass'], 1)
         self.assertEqual(stats['passes_sent'], 1)
+        self.assertEqual(stats['delivery_failed'], 2)
 
 
 class RsvpChannelErrorTests(TestCase):

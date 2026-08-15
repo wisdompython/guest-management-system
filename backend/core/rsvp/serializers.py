@@ -14,6 +14,7 @@ class RsvpStatsSerializer(serializers.Serializer):
     invitation_failed = serializers.IntegerField()
     passes_sent = serializers.IntegerField()
     passes_failed = serializers.IntegerField()
+    delivery_failed = serializers.IntegerField()
     confirmed_no_pass = serializers.IntegerField()
     aso_ebi_requests = serializers.IntegerField()
     aso_ebi_quantity = serializers.IntegerField()
@@ -44,6 +45,14 @@ def build_workflow_stats(workflow):
             ]),
         ),
         passes_failed=Count('id', filter=Q(pass_status=RsvpRecipient.PassStatus.FAILED)),
+        delivery_failed=Count(
+            'id',
+            filter=(
+                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
+                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+            ),
+            distinct=True,
+        ),
         confirmed_no_pass=Count(
             'id',
             filter=Q(response_status=RsvpRecipient.ResponseStatus.CONFIRMED)

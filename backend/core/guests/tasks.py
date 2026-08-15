@@ -265,8 +265,9 @@ def _queue_asset_batches(upload_id: int, guest_ids, send_whatsapp: bool):
 def process_bulk_guest_upload(self, upload_id: int):
     """Validate and import a CSV outside the web request, safe for 5,000+ rows."""
     from rest_framework.exceptions import ValidationError as DrfValidationError
-    from .models import BulkUpload, Guest
+    from .models import BulkUpload, Event, Guest
     from .serializers.bulk import parse_guest_csv
+    from .whatsapp import _normalise_phone
     from rsvp.services import bulk_sync_guests_to_workflow
 
     try:
@@ -306,8 +307,48 @@ def process_bulk_guest_upload(self, upload_id: int):
             )
             return {'imported': 0, 'reason': message}
 
-        guest_objects = [Guest(**row) for row in valid_rows]
         with transaction.atomic():
+            # Serialise imports for the same event. This keeps two concurrent
+            # "add" uploads from both passing the duplicate check.
+            locked_event = Event.objects.select_for_update().get(pk=upload.event_id)
+            rows_to_create = []
+            skipped_report = []
+
+            if upload.replace_existing:
+                rows_to_create = [
+                    {key: value for key, value in row.items() if key != '_csv_row'}
+                    for row in valid_rows
+                ]
+            else:
+                existing_phone_keys = {
+                    _normalise_phone(phone)
+                    for phone in Guest.objects.filter(event=locked_event)
+                    .exclude(phone_number='')
+                    .values_list('phone_number', flat=True)
+                }
+                seen_phone_keys = set(existing_phone_keys)
+                for row in valid_rows:
+                    phone = row.get('phone_number', '')
+                    phone_key = _normalise_phone(phone) if phone else ''
+                    if phone_key and phone_key in seen_phone_keys:
+                        skipped_report.append({
+                            'row': row['_csv_row'],
+                            'full_name': row.get('full_name', ''),
+                            'phone_number': phone,
+                            'reason': (
+                                'A guest with this phone number is already in the event.'
+                                if phone_key in existing_phone_keys else
+                                'This phone number appeared earlier in the same CSV.'
+                            ),
+                        })
+                        continue
+                    if phone_key:
+                        seen_phone_keys.add(phone_key)
+                    rows_to_create.append({
+                        key: value for key, value in row.items() if key != '_csv_row'
+                    })
+
+            guest_objects = [Guest(**row) for row in rows_to_create]
             created_guests = []
             replaced = 0
             if upload.replace_existing:
@@ -334,10 +375,12 @@ def process_bulk_guest_upload(self, upload_id: int):
                 total_rows=total_rows,
                 successful_rows=len(guest_ids),
                 failed_rows=len(error_report),
+                skipped_rows=len(skipped_report),
                 replaced_rows=replaced,
                 recipients_created=recipients_created,
                 assets_total=asset_total,
                 error_report=error_report,
+                skipped_report=skipped_report,
                 completed_at=timezone.now() if not asset_total else None,
             )
 
@@ -363,6 +406,7 @@ def process_bulk_guest_upload(self, upload_id: int):
         return {
             'imported': len(guest_ids),
             'failed': len(error_report),
+            'skipped': len(skipped_report),
             'replaced': replaced,
             'recipients_created': recipients_created,
             'asset_batches': (asset_total + ASSET_BATCH_SIZE - 1) // ASSET_BATCH_SIZE,

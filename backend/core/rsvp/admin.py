@@ -21,7 +21,10 @@ class RsvpRecipientAdmin(admin.ModelAdmin):
         'workflow',
         'response_status',
         'invitation_status',
+        'invitation_auto_retries',
         'pass_status',
+        'pass_auto_retries',
+        'pass_queued_at',
         'responded_at',
     )
     list_filter = ('response_status', 'invitation_status', 'pass_status')

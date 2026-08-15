@@ -16,10 +16,15 @@ const SEGMENT_LABEL: Record<RsvpRecipientSegment, string> = {
   invited_awaiting: 'Invite delivered · awaiting reply',
   confirmed_with_pass: 'Confirmed · pass received',
   confirmed_no_pass: 'Confirmed · no pass yet',
+  delivery_failed: 'Failed deliveries',
 }
 
-function metric(label: string, value: number, note: string, color?: string) {
-  return <div className="rounded-[12px] p-4" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</p><p className="mt-2 text-3xl font-bold tabular-nums" style={{ color: color || 'var(--ink)' }}>{value}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{note}</p></div>
+function metric(label: string, value: number, note: string, color?: string, onClick?: () => void) {
+  const content = <><p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</p><p className="mt-2 text-3xl font-bold tabular-nums" style={{ color: color || 'var(--ink)' }}>{value}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{note}</p></>
+  const style = { background: 'var(--panel)', border: '1px solid var(--line)' }
+  return onClick
+    ? <button type="button" onClick={onClick} className="w-full rounded-[12px] p-4 text-left transition hover:-translate-y-0.5" style={style}>{content}</button>
+    : <div className="rounded-[12px] p-4" style={style}>{content}</div>
 }
 
 export default function RsvpWorkflowDetailPage() {
@@ -95,7 +100,8 @@ export default function RsvpWorkflowDetailPage() {
       <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{workflow.event_name}</h1><span className="rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize" style={{ background: workflow.status === 'active' ? 'var(--success-bg)' : 'var(--brand-soft)', color: workflow.status === 'active' ? 'var(--success)' : 'var(--brand)' }}>{workflow.status}</span></div><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{new Date(workflow.event_date).toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}{workflow.response_deadline ? ` · Replies close ${new Date(workflow.response_deadline).toLocaleDateString('en-GB')}` : ''}</p></div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { window.location.href = `${BASE_URL}/rsvp/workflows/${id}/export/` }} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Export CSV</button>
+          <button onClick={() => { window.location.href = `${BASE_URL}/rsvp/workflows/${id}/export/?response_status=confirmed` }} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>Export accepted</button>
+          <button onClick={() => { window.location.href = `${BASE_URL}/rsvp/workflows/${id}/export/` }} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Export all</button>
           <Link href={`/admin/rsvp/add?workflow=${id}`} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>Edit workflow</Link>
           {workflow.status === 'draft' && <button disabled={!!working} onClick={() => runAction('launch', () => api.launchRsvpWorkflow(id))} className="rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ background: 'var(--brand)' }}>{working === 'launch' ? 'Launching…' : workflow.invitation_send_at ? `Schedule for ${new Date(workflow.invitation_send_at).toLocaleString('en-GB')}` : `Launch to ${stats.invited} guests`}</button>}
           {workflow.status === 'active' && <><button disabled={!!working || stats.awaiting === 0} onClick={() => { if (confirm(`Send or retry RSVP invitations for eligible awaiting guests? Delivered invitations will respect the reminder cooldown.`)) runAction('remind', () => api.remindAwaitingRsvpGuests(id)) }} className="rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40" style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}>Send / remind awaiting</button><button disabled={!!working} onClick={() => runAction('pause', () => api.pauseRsvpWorkflow(id))} className="rounded-lg px-4 py-2 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Pause</button></>}
@@ -109,11 +115,12 @@ export default function RsvpWorkflowDetailPage() {
       {workflow.status === 'draft' && <div className="mt-5 rounded-[12px] px-4 py-3" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.25)' }}><p className="text-sm font-semibold">Ready for review</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>{stats.invited} eligible guests were added. {workflow.invitation_send_at ? `Launch now to activate invitation delivery for ${new Date(workflow.invitation_send_at).toLocaleString('en-GB')}.` : 'No messages have been sent. Launch when the Meta RSVP template is approved and ready.'}{workflow.auto_send_pass && workflow.pass_send_at ? ` Confirmed passes are scheduled for ${new Date(workflow.pass_send_at).toLocaleString('en-GB')}.` : ''}</p></div>}
       {workflow.status === 'active' && workflow.invitation_send_at && new Date(workflow.invitation_send_at) > new Date() && <div className="mt-5 rounded-[12px] px-4 py-3" style={{ background: 'var(--brand-soft)', border: '1px solid rgba(184,150,62,0.25)' }}><p className="text-sm font-semibold">Invitations scheduled</p><p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>RSVP requests will begin sending at {new Date(workflow.invitation_send_at).toLocaleString('en-GB')}.</p></div>}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {metric('Confirmed', stats.confirmed, `${stats.confirmation_rate}% of invitees`, 'var(--success)')}
         {metric('Declined', stats.declined, `${responded} total responses`)}
         {metric('Awaiting', stats.awaiting, 'Eligible for reminders')}
         {metric('Passes sent', stats.passes_sent, `${stats.confirmed_no_pass} confirmed awaiting pass${stats.passes_failed ? ` · ${stats.passes_failed} failed` : ''}`)}
+        {metric('Delivery failures', stats.delivery_failed, `${stats.invitation_failed} invite${stats.invitation_failed === 1 ? '' : 's'} · ${stats.passes_failed} pass${stats.passes_failed === 1 ? '' : 'es'}`, 'var(--danger)', () => { setSegmentFilter('delivery_failed'); setResponseFilter('all'); setPage(1) })}
         {metric('Aso Ebi yards', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}
       </div>
 

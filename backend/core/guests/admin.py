@@ -23,6 +23,6 @@ class GuestAdmin(admin.ModelAdmin):
 
 @admin.register(BulkUpload)
 class BulkUploadAdmin(admin.ModelAdmin):
-    list_display = ('event', 'status', 'total_rows', 'successful_rows', 'failed_rows', 'uploaded_at')
+    list_display = ('event', 'status', 'total_rows', 'successful_rows', 'skipped_rows', 'failed_rows', 'uploaded_at')
     list_filter = ('status', 'event')
-    readonly_fields = ('status', 'total_rows', 'successful_rows', 'failed_rows', 'error_report', 'uploaded_at')
+    readonly_fields = ('status', 'total_rows', 'successful_rows', 'skipped_rows', 'failed_rows', 'error_report', 'skipped_report', 'uploaded_at')

@@ -125,6 +125,17 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
     def export(self, request, pk=None):
         workflow = self.get_object()
         recipients = workflow.recipients.select_related('guest').order_by('guest__full_name')
+        response_status = request.query_params.get('response_status')
+        valid_response_statuses = {
+            value for value, _label in RsvpRecipient.ResponseStatus.choices
+        }
+        if response_status:
+            if response_status not in valid_response_statuses:
+                return Response(
+                    {'detail': 'Invalid response_status filter.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            recipients = recipients.filter(response_status=response_status)
 
         class Echo:
             def write(self, value):
@@ -134,13 +145,16 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
 
         def rows():
             yield writer.writerow([
-                'guest_name', 'ticket_type', 'table_number', 'response_status',
+                'guest_name', 'phone_number', 'email',
+                'ticket_type', 'table_number', 'response_status',
                 'aso_ebi_requested', 'aso_ebi_yards',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
             ])
             for recipient in recipients.iterator():
                 yield writer.writerow(safe_csv_row([
                     recipient.guest.full_name,
+                    recipient.guest.phone_number,
+                    recipient.guest.email,
                     recipient.guest.ticket_type,
                     recipient.guest.table_number,
                     recipient.response_status,
@@ -157,7 +171,10 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             for character in workflow.event.name
         ).strip('_')
         response = StreamingHttpResponse(rows(), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="rsvp_{safe_name or workflow.id}.csv"'
+        filter_suffix = f'_{response_status}' if response_status else ''
+        response['Content-Disposition'] = (
+            f'attachment; filename="rsvp{filter_suffix}_{safe_name or workflow.id}.csv"'
+        )
         return response
 
     @action(detail=True, methods=['post'])
@@ -371,8 +388,14 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         if workflow_id := self.request.query_params.get('workflow'):
             qs = qs.filter(workflow_id=workflow_id)
         if segment := self.request.query_params.get('segment'):
-            filters = self.SEGMENTS.get(segment)
-            if filters:
+            if segment == 'delivery_failed':
+                qs = qs.filter(
+                    Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
+                    | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+                )
+            else:
+                filters = self.SEGMENTS.get(segment)
+            if segment != 'delivery_failed' and filters:
                 qs = qs.filter(**filters)
                 if segment == 'confirmed_no_pass':
                     qs = qs.exclude(pass_status__in=self.DELIVERED_STATUSES)

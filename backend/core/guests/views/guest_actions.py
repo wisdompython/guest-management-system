@@ -81,8 +81,10 @@ class GuestBulkExportMixin:
             'upload_id': upload.id,
             'successful': upload.successful_rows,
             'failed': upload.failed_rows,
+            'skipped': upload.skipped_rows,
             'replaced': upload.replaced_rows,
             'errors': upload.error_report,
+            'skipped_items': upload.skipped_report,
             'asset_warnings': [],
         })
         return data

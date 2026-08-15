@@ -11,6 +11,7 @@ interface UploadResult {
   total_rows: number
   successful: number
   failed: number
+  skipped: number
   replaced: number
   recipients_created: number
   assets_total: number
@@ -19,6 +20,7 @@ interface UploadResult {
   error_message: string
   uploaded_at: string
   errors: { row: number; error?: string; errors?: string[] }[]
+  skipped_items: { row: number; full_name: string; phone_number: string; reason: string }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }
 

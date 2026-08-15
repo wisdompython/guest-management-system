@@ -96,6 +96,7 @@ def parse_guest_csv(event, csv_file):
             continue
 
         valid_rows.append({
+            '_csv_row': i,
             'event': event,
             'full_name': row.get('full_name', ''),
             'phone_number': row.get('phone_number', ''),
@@ -137,15 +138,17 @@ class BulkUploadSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'csv_file', 'status',
             'total_rows', 'successful_rows', 'failed_rows',
+            'skipped_rows',
             'replace_existing', 'replaced_rows', 'recipients_created',
             'assets_total', 'assets_processed', 'assets_failed',
-            'error_report', 'error_message', 'task_id',
+            'error_report', 'skipped_report', 'error_message', 'task_id',
             'started_at', 'completed_at', 'uploaded_at',
         )
         read_only_fields = (
             'id', 'status', 'total_rows', 'successful_rows',
             'failed_rows', 'replace_existing', 'replaced_rows',
+            'skipped_rows',
             'recipients_created', 'assets_total', 'assets_processed',
-            'assets_failed', 'error_report', 'error_message', 'task_id',
+            'assets_failed', 'error_report', 'skipped_report', 'error_message', 'task_id',
             'started_at', 'completed_at', 'uploaded_at',
         )

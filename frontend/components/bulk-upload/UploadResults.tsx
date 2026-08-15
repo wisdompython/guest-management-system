@@ -8,6 +8,7 @@ interface UploadResult {
   total_rows: number
   successful: number
   failed: number
+  skipped: number
   replaced: number
   recipients_created: number
   assets_total: number
@@ -16,11 +17,13 @@ interface UploadResult {
   error_message: string
   uploaded_at: string
   errors: { row: number; error?: string; errors?: string[] }[]
+  skipped_items: { row: number; full_name: string; phone_number: string; reason: string }[]
   asset_warnings: { guest_id: string; name: string; qr: boolean; pass: boolean }[]
 }
 
 export function UploadResults({ result }: { result: UploadResult }) {
   const [showErrors, setShowErrors] = useState(true)
+  const [showSkipped, setShowSkipped] = useState(false)
   const running = result.status === 'pending' || result.status === 'processing'
   const pendingTooLong = result.status === 'pending'
     && Date.now() - new Date(result.uploaded_at).getTime() > 60_000
@@ -58,6 +61,7 @@ export function UploadResults({ result }: { result: UploadResult }) {
         </div>
         <div className="ml-auto flex items-center gap-4 text-sm">
           {result.successful > 0 && <span className="font-semibold text-emerald-400">✓ {result.successful} imported</span>}
+          {result.skipped > 0 && <span className="font-semibold text-amber-400">↷ {result.skipped} duplicate{result.skipped === 1 ? '' : 's'} skipped</span>}
           {result.failed > 0 && <span className="font-semibold text-[var(--danger)]">× {result.failed} failed</span>}
         </div>
       </div>
@@ -89,6 +93,18 @@ export function UploadResults({ result }: { result: UploadResult }) {
           <table className="w-full text-xs">
             <thead><tr className="border-y border-[var(--line)] bg-red-500/5"><th className="w-16 px-5 py-2 text-left text-[var(--muted)]">Row</th><th className="px-5 py-2 text-left text-[var(--muted)]">Error</th></tr></thead>
             <tbody>{result.errors.map((error, index) => <tr key={index} className="border-b border-[var(--line)]"><td className="px-5 py-2 font-mono font-bold text-[var(--danger)]">{error.row}</td><td className="px-5 py-2 text-[var(--ink)]">{error.error ?? error.errors?.join(' ') ?? 'Invalid row'}</td></tr>)}</tbody>
+          </table>
+        </div>}
+      </div>}
+
+      {result.skipped_items.length > 0 && <div className="border-t border-[var(--line)]">
+        <button type="button" onClick={() => setShowSkipped((value) => !value)} className="flex w-full items-center justify-between px-5 py-3 text-xs font-semibold text-amber-400">
+          <span>Skipped duplicate phone numbers ({result.skipped_items.length})</span><span>{showSkipped ? '−' : '+'}</span>
+        </button>
+        {showSkipped && <div className="max-h-72 overflow-auto">
+          <table className="w-full text-xs">
+            <thead><tr className="border-y border-[var(--line)] bg-amber-500/5"><th className="w-16 px-5 py-2 text-left text-[var(--muted)]">Row</th><th className="px-5 py-2 text-left text-[var(--muted)]">Guest</th><th className="px-5 py-2 text-left text-[var(--muted)]">Phone</th><th className="px-5 py-2 text-left text-[var(--muted)]">Reason</th></tr></thead>
+            <tbody>{result.skipped_items.map((item, index) => <tr key={index} className="border-b border-[var(--line)]"><td className="px-5 py-2 font-mono font-bold text-amber-400">{item.row}</td><td className="px-5 py-2 text-[var(--ink)]">{item.full_name}</td><td className="px-5 py-2 font-mono text-[var(--ink)]">{item.phone_number}</td><td className="px-5 py-2 text-[var(--muted)]">{item.reason}</td></tr>)}</tbody>
           </table>
         </div>}
       </div>}
