@@ -535,12 +535,16 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Only failed invitations can be retried.'},
                 status=status.HTTP_409_CONFLICT,
             )
-        if cooldown := _retry_cooldown_response(
-            recipient.invitation_error or recipient.last_error,
-            recipient.invitation_queued_at,
-            recipient.invitation_auto_retries,
-        ):
-            return cooldown
+        # force=True is the operator's explicit "retry anyway" during a
+        # cooldown — e.g. the guest just messaged back, which lifts Meta's
+        # per-user block. Deliberately not offered on the bulk endpoint.
+        if not bool(request.data.get('force')):
+            if cooldown := _retry_cooldown_response(
+                recipient.invitation_error or recipient.last_error,
+                recipient.invitation_queued_at,
+                recipient.invitation_auto_retries,
+            ):
+                return cooldown
         recipient.invitation_status = RsvpRecipient.InvitationStatus.QUEUED
         recipient.invitation_queued_at = timezone.now()
         recipient.invitation_error = ''
@@ -566,12 +570,13 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Only failed pass deliveries can be retried.'},
                 status=status.HTTP_409_CONFLICT,
             )
-        if cooldown := _retry_cooldown_response(
-            recipient.pass_error or recipient.last_error,
-            recipient.pass_queued_at,
-            recipient.pass_auto_retries,
-        ):
-            return cooldown
+        if not bool(request.data.get('force')):
+            if cooldown := _retry_cooldown_response(
+                recipient.pass_error or recipient.last_error,
+                recipient.pass_queued_at,
+                recipient.pass_auto_retries,
+            ):
+                return cooldown
         recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
         recipient.pass_queued_at = timezone.now()
         recipient.pass_error = ''

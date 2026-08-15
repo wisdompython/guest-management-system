@@ -81,10 +81,10 @@ export const rsvpApi = {
     if (filters.segment) params.set('segment', filters.segment)
     return request<PaginatedRsvpRecipients>(`/rsvp/recipients/?${params}`)
   },
-  retryRsvpInvitation: (recipientId: number) =>
-    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-invitation/`, { method: 'POST' }),
-  retryRsvpPass: (recipientId: number) =>
-    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST' }),
+  retryRsvpInvitation: (recipientId: number, force = false) =>
+    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-invitation/`, { method: 'POST', body: JSON.stringify({ force }) }),
+  retryRsvpPass: (recipientId: number, force = false) =>
+    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST', body: JSON.stringify({ force }) }),
   bulkRetryRsvpRecipients: (recipientIds: number[], kind: 'invitation' | 'pass') =>
     request<{ queued: number; skipped_cooldown: number; skipped_ineligible: number }>(
       '/rsvp/recipients/bulk-retry/',

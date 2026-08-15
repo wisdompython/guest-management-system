@@ -136,6 +136,11 @@ Practical notes for large events:
   time when an operator tries too soon.
 - A failed invitation can be retried from the recipient table.
 - A failed pass can be retried only for a confirmed guest.
+- When a single retry is blocked by a cooldown, the dashboard offers
+  **Retry anyway** after a confirmation. Use it only when something has
+  changed — typically the guest just messaged the business, which opens a
+  service window and lifts Meta's per-user block. The override exists on
+  the single-guest retry only; bulk retry always respects cooldowns.
 - Several guests can be retried at once: tick the checkboxes on failed rows
   (or the header checkbox for every failed delivery on the page) and use
   **Retry invitations (n)** / **Retry passes (n)** in the selection bar.

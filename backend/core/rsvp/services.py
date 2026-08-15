@@ -372,4 +372,15 @@ def process_status_update(status_payload: dict) -> bool:
     elif wa_status == 'delivered':
         recipients = recipients.exclude(**{field: 'read'})
     recipients.update(**updates)
+
+    if wa_status == 'failed' and not is_invitation:
+        # The send task marked the guest "sent" when Meta accepted the API
+        # call; this webhook proves the pass never arrived. Flip the guest
+        # back so the direct WhatsApp page and its sent/pending counts agree
+        # with the RSVP dashboard, and so the guest is eligible for resend.
+        # whatsapp_sent_at is kept: the attempt stays counted against the
+        # daily send budget's trailing window.
+        from guests.models import Guest
+
+        Guest.objects.filter(pk=recipient.guest_id).update(whatsapp_sent=False)
     return True

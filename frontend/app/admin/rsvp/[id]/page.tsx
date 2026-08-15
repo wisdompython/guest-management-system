@@ -95,6 +95,35 @@ export default function RsvpWorkflowDetailPage() {
     }
   }
 
+  async function retrySingle(kind: 'invitation' | 'pass', recipientId: number) {
+    const call = (force: boolean) => kind === 'invitation'
+      ? api.retryRsvpInvitation(recipientId, force)
+      : api.retryRsvpPass(recipientId, force)
+    setWorking(`${kind}-${recipientId}`); setError(''); setNotice('')
+    try {
+      await call(false)
+      await Promise.all([loadWorkflow(), loadRecipients()])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'The retry could not be queued.'
+      if (message.includes('retry cooldown')) {
+        const proceed = confirm(`${message}\n\nRetry anyway? While Meta's block on this guest is still active the attempt will most likely fail again, and it spends one send from the daily budget. Retry now only if something changed — for example the guest just messaged you back.`)
+        if (proceed) {
+          try {
+            await call(true)
+            setNotice('Retry queued (cooldown overridden).')
+            await Promise.all([loadWorkflow(), loadRecipients()])
+          } catch (forceErr) {
+            setError(forceErr instanceof Error ? forceErr.message : 'The retry could not be queued.')
+          }
+        }
+      } else {
+        setError(message)
+      }
+    } finally {
+      setWorking('')
+    }
+  }
+
   function toggleSelected(recipientId: number) {
     setSelected((previous) => {
       const next = new Set(previous)
@@ -181,7 +210,7 @@ export default function RsvpWorkflowDetailPage() {
           <button disabled={!!working || passRetryIds.length === 0} onClick={() => bulkRetry('pass', passRetryIds)} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40" style={{ background: 'var(--brand)' }}>{working === 'bulk-pass' ? 'Queuing…' : `Retry passes (${passRetryIds.length})`}</button>
           <button disabled={!!working} onClick={() => setSelected(new Set())} className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>Clear selection</button>
         </div>}
-        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}><th className="w-10 px-4 py-3"><input type="checkbox" aria-label="Select all failed deliveries on this page" disabled={selectableRows.length === 0} checked={allSelectableSelected} onChange={() => setSelected(allSelectableSelected ? new Set() : new Set(selectableRows.map((recipient) => recipient.id)))} /></th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Guest</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Response</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Invitation</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Pass</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Responded</th><th className="px-4 py-3"></th></tr></thead><tbody>{recipients.length === 0 ? <tr><td colSpan={7} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted)' }}>No recipients match these filters.</td></tr> : recipients.map((recipient) => <RecipientRow key={recipient.id} recipient={recipient} working={working} selected={selected.has(recipient.id)} onToggle={() => toggleSelected(recipient.id)} retry={(kind) => runAction(`${kind}-${recipient.id}`, () => kind === 'invitation' ? api.retryRsvpInvitation(recipient.id) : api.retryRsvpPass(recipient.id))} />)}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr style={{ borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}><th className="w-10 px-4 py-3"><input type="checkbox" aria-label="Select all failed deliveries on this page" disabled={selectableRows.length === 0} checked={allSelectableSelected} onChange={() => setSelected(allSelectableSelected ? new Set() : new Set(selectableRows.map((recipient) => recipient.id)))} /></th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Guest</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Response</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Invitation</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Pass</th><th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider">Responded</th><th className="px-4 py-3"></th></tr></thead><tbody>{recipients.length === 0 ? <tr><td colSpan={7} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted)' }}>No recipients match these filters.</td></tr> : recipients.map((recipient) => <RecipientRow key={recipient.id} recipient={recipient} working={working} selected={selected.has(recipient.id)} onToggle={() => toggleSelected(recipient.id)} retry={(kind) => retrySingle(kind, recipient.id)} />)}</tbody></table></div>
         {totalPages > 1 && <div className="flex items-center justify-between px-4 py-3 text-xs" style={{ borderTop: '1px solid var(--line)', color: 'var(--muted)' }}><button disabled={page === 1} onClick={() => setPage((current) => current - 1)} className="rounded px-3 py-1.5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>← Previous</button><span>Page {page} of {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} className="rounded px-3 py-1.5 disabled:opacity-30" style={{ border: '1px solid var(--line)' }}>Next →</button></div>}
       </div>
     </div>

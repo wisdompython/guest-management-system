@@ -602,6 +602,47 @@ class RsvpResponseTests(TestCase):
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.invitation_status, RsvpRecipient.InvitationStatus.READ)
 
+    def test_failed_pass_webhook_reverts_guest_sent_flag(self):
+        """The direct WhatsApp page counts Guest.whatsapp_sent; a pass that
+        Meta accepted but later reported failed must not stay counted as sent."""
+        self.guest.whatsapp_sent = True
+        self.guest.whatsapp_sent_at = timezone.now()
+        self.guest.save(update_fields=['whatsapp_sent', 'whatsapp_sent_at'])
+        self.recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
+        self.recipient.pass_status = RsvpRecipient.PassStatus.SENT
+        self.recipient.pass_message_id = 'wamid.pass-blocked'
+        self.recipient.save(update_fields=['response_status', 'pass_status', 'pass_message_id'])
+
+        handled = process_status_update({
+            'id': 'wamid.pass-blocked',
+            'status': 'failed',
+            'errors': [{'title': 'This message was not delivered to maintain healthy ecosystem engagement.'}],
+        })
+
+        self.assertTrue(handled)
+        self.recipient.refresh_from_db()
+        self.guest.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
+        self.assertFalse(self.guest.whatsapp_sent)
+        # The attempt still counts against the daily send budget window.
+        self.assertIsNotNone(self.guest.whatsapp_sent_at)
+
+    def test_failed_invitation_webhook_leaves_guest_sent_flag_alone(self):
+        self.guest.whatsapp_sent = True
+        self.guest.save(update_fields=['whatsapp_sent'])
+        self.recipient.invitation_message_id = 'wamid.invite-blocked'
+        self.recipient.save(update_fields=['invitation_message_id'])
+
+        handled = process_status_update({
+            'id': 'wamid.invite-blocked',
+            'status': 'failed',
+            'errors': [{'title': 'Spam rate limit hit.'}],
+        })
+
+        self.assertTrue(handled)
+        self.guest.refresh_from_db()
+        self.assertTrue(self.guest.whatsapp_sent)
+
     def test_delivery_status_does_not_regress_when_webhooks_arrive_out_of_order(self):
         self.recipient.invitation_message_id = 'wamid.out-of-order'
         self.recipient.invitation_status = RsvpRecipient.InvitationStatus.READ
@@ -1372,6 +1413,47 @@ class RsvpAutoRetryTests(TestCase):
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.FAILED)
         self.assertEqual(self.recipient.pass_auto_retries, 1)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_forced_manual_retry_overrides_ecosystem_cooldown(self, mock_send):
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=1,
+            retries=1,
+        )
+
+        response = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-pass/',
+            {'force': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        mock_send.assert_called_once_with(self.recipient.id)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+
+    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    def test_forced_manual_retry_overrides_invitation_cooldown(self, mock_send):
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_queued_at=timezone.now() - timezone.timedelta(hours=1),
+            invitation_auto_retries=1,
+            invitation_error=self.ECOSYSTEM_ERROR,
+        )
+
+        blocked = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-invitation/',
+        )
+        self.assertEqual(blocked.status_code, 409, blocked.data)
+
+        forced = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-invitation/',
+            {'force': True},
+            format='json',
+        )
+        self.assertEqual(forced.status_code, 200, forced.data)
+        mock_send.assert_called_once_with(self.recipient.id)
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
     def test_manual_retry_after_cooldown_preserves_attempt_count(self, mock_send):
