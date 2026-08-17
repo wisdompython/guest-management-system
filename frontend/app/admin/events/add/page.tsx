@@ -28,6 +28,9 @@ export default function AddEventPage() {
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
   const [collectAsoEbi, setCollectAsoEbi] = useState(false)
   const [allowPlusOne, setAllowPlusOne] = useState(false)
+  const [preferencesEnabled, setPreferencesEnabled] = useState(false)
+  const [collectCelebrant, setCollectCelebrant] = useState(false)
+  const [celebrantOptions, setCelebrantOptions] = useState<string[]>([])
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
@@ -70,6 +73,9 @@ export default function AddEventPage() {
     fd.append('whatsapp_enabled', String(whatsappEnabled))
     fd.append('collect_aso_ebi', String(collectAsoEbi))
     fd.append('allow_plus_one', String(allowPlusOne))
+    fd.append('preferences_enabled', String(preferencesEnabled && !(whatsappEnabled && deliveryFlow === 'rsvp')))
+    fd.append('collect_celebrant', String(collectCelebrant))
+    fd.append('celebrant_options', JSON.stringify(celebrantOptions))
     if (whatsappTemplate) fd.append('whatsapp_template', String(whatsappTemplate))
     const usesRsvp = whatsappEnabled && deliveryFlow === 'rsvp'
     fd.append('create_rsvp_workflow', String(usesRsvp))
@@ -111,12 +117,15 @@ export default function AddEventPage() {
         </div>
 
         <div className={step === 2 ? 'block' : 'hidden'}>
-          <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} whatsappTemplate={whatsappTemplate} templates={waTemplates} onChange={({ ticketTypes: nextTypes, requiredFields: nextFields, whatsappEnabled: nextWhatsapp, collectAsoEbi: nextAsoEbi, allowPlusOne: nextPlusOne, whatsappTemplate: nextTemplate }) => {
+          <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} preferencesEnabled={preferencesEnabled} collectCelebrant={collectCelebrant} celebrantOptions={celebrantOptions} whatsappTemplate={whatsappTemplate} templates={waTemplates} onChange={({ ticketTypes: nextTypes, requiredFields: nextFields, whatsappEnabled: nextWhatsapp, collectAsoEbi: nextAsoEbi, allowPlusOne: nextPlusOne, preferencesEnabled: nextPreferences, collectCelebrant: nextCollectCelebrant, celebrantOptions: nextCelebrants, whatsappTemplate: nextTemplate }) => {
             if (nextTypes !== undefined) setTicketTypes(nextTypes)
             if (nextFields !== undefined) setRequiredFields(nextFields)
             if (nextWhatsapp !== undefined) setWhatsappEnabled(nextWhatsapp)
             if (nextAsoEbi !== undefined) setCollectAsoEbi(nextAsoEbi)
             if (nextPlusOne !== undefined) setAllowPlusOne(nextPlusOne)
+            if (nextPreferences !== undefined) setPreferencesEnabled(nextPreferences)
+            if (nextCollectCelebrant !== undefined) setCollectCelebrant(nextCollectCelebrant)
+            if (nextCelebrants !== undefined) setCelebrantOptions(nextCelebrants)
             if (nextTemplate !== undefined) setWhatsappTemplate(nextTemplate)
           }}/>
         </div>

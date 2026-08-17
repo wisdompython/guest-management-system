@@ -71,6 +71,19 @@ class Event(models.Model):
         default=False,
         help_text='Allow confirmed guests to indicate that they will bring one additional guest.',
     )
+    preferences_enabled = models.BooleanField(
+        default=False,
+        help_text='Collect guest preferences without requiring RSVP confirmation.',
+    )
+    collect_celebrant = models.BooleanField(
+        default=False,
+        help_text='Ask guests which celebrant they are attending for.',
+    )
+    celebrant_options = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Optional predetermined celebrant names. Guests enter a custom name when empty.',
+    )
     # When False, WhatsApp delivery is not expected and phone_number is not auto-required
     whatsapp_enabled = models.BooleanField(default=True)
     # RSVP is an event-level delivery decision. It intentionally survives deletion
@@ -115,6 +128,11 @@ class Guest(models.Model):
     aso_ebi_requested = models.BooleanField(default=False)
     aso_ebi_quantity = models.PositiveIntegerField(default=0)
     plus_one_attending = models.BooleanField(default=False)
+    celebrant_name = models.CharField(max_length=255, blank=True)
+    preference_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    preferences_submitted_at = models.DateTimeField(null=True, blank=True)
+    plus_one_checked_in = models.BooleanField(default=False)
+    plus_one_checked_in_at = models.DateTimeField(null=True, blank=True)
 
     # Generated assets — created automatically after registration
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
@@ -241,6 +259,7 @@ class WhatsAppTemplate(models.Model):
         ('table_number','Guest table number'),
         ('seat_number', 'Guest seat number'),
         ('rsvp_link',   'Guest-specific RSVP link'),
+        ('preferences_link', 'Guest preferences link'),
         ('rsvp_deadline', 'RSVP response deadline'),
     ]
 

@@ -241,7 +241,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             yield writer.writerow([
                 'guest_name', 'phone_number', 'email',
                 'ticket_type', 'table_number', 'response_status',
-                'aso_ebi_requested', 'aso_ebi_yards', 'plus_one_attending',
+                'aso_ebi_requested', 'aso_ebi_yards', 'plus_one_attending', 'celebrant',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
                 'invitation_error', 'pass_error',
                 'invitation_auto_retries', 'pass_auto_retries',
@@ -259,6 +259,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     'Yes' if recipient.guest.aso_ebi_requested else 'No',
                     recipient.guest.aso_ebi_quantity if recipient.guest.aso_ebi_requested else 0,
                     'Yes' if recipient.guest.plus_one_attending else 'No',
+                    recipient.guest.celebrant_name,
                     recipient.responded_at.isoformat() if recipient.responded_at else '',
                     recipient.invitation_status,
                     recipient.pass_status,
@@ -772,9 +773,12 @@ class PublicRsvpResponseView(APIView):
             'color_of_day': workflow.event.color_of_day,
             'collect_aso_ebi': workflow.event.collect_aso_ebi,
             'allow_plus_one': workflow.event.allow_plus_one,
+            'collect_celebrant': workflow.event.collect_celebrant,
+            'celebrant_options': workflow.event.celebrant_options or [],
             'aso_ebi_requested': recipient.guest.aso_ebi_requested,
             'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,
             'plus_one_attending': recipient.guest.plus_one_attending,
+            'celebrant_name': recipient.guest.celebrant_name,
             'invitation_image': (
                 request.build_absolute_uri(recipient.invitation_image.url)
                 if recipient.invitation_image else None
@@ -825,6 +829,20 @@ class PublicRsvpResponseView(APIView):
                 {'detail': 'Plus ones are not enabled for this event.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        celebrant_name = str(request.data.get('celebrant_name', '') or '').strip()
+        if answer == 'no':
+            celebrant_name = ''
+        if celebrant_name and not recipient.workflow.event.collect_celebrant:
+            return Response(
+                {'detail': 'Celebrant preferences are not enabled for this event.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        celebrant_options = recipient.workflow.event.celebrant_options or []
+        if celebrant_name and celebrant_options and celebrant_name not in celebrant_options:
+            return Response(
+                {'detail': 'Select one of the configured celebrants.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if aso_ebi_requested and not recipient.workflow.event.collect_aso_ebi:
             return Response(
                 {'detail': 'Aso Ebi requests are not enabled for this event.'},
@@ -852,10 +870,12 @@ class PublicRsvpResponseView(APIView):
                 'aso_ebi_requested': aso_ebi_requested,
                 'aso_ebi_quantity': aso_ebi_quantity if aso_ebi_requested else 0,
                 'plus_one_attending': plus_one_attending,
+                'celebrant_name': celebrant_name,
             },
             aso_ebi_requested=aso_ebi_requested,
             aso_ebi_quantity=aso_ebi_quantity if aso_ebi_requested else 0,
             plus_one_attending=plus_one_attending,
+            celebrant_name=celebrant_name,
         )
         reason = result.get('reason')
         if reason == 'not_found':

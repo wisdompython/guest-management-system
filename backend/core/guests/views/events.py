@@ -25,6 +25,9 @@ class EventViewSet(viewsets.ModelViewSet):
                 plus_one_count_ann=Count(
                     'guests', filter=Q(guests__plus_one_attending=True), distinct=True
                 ),
+                plus_one_checked_in_count_ann=Count(
+                    'guests', filter=Q(guests__plus_one_checked_in=True), distinct=True
+                ),
             )
             .order_by('-date')
         )

@@ -35,6 +35,8 @@ export function CheckedInScreen({ guest, onNext }: { guest: Guest; onNext: () =>
           <GuestInfoRow label="Table" value={`${guest.table_number}${guest.seat_number ? ` / Seat ${guest.seat_number}` : ''}`} />
         )}
         {guest.event_name && <GuestInfoRow label="Event" value={guest.event_name} />}
+        {guest.celebrant_name && <GuestInfoRow label="Celebrant" value={guest.celebrant_name} />}
+        {guest.plus_one_attending && <GuestInfoRow label="Party" value={`Guest: ${guest.status === 'checked_in' ? 'in' : 'pending'} · Plus-one: ${guest.plus_one_checked_in ? 'in' : 'pending'}`} />}
       </div>
       <button onClick={onNext}
         className="w-full max-w-sm font-semibold rounded-sm py-4 text-sm tracking-[0.06em] uppercase active:scale-95 transition-transform"

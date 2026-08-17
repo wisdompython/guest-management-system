@@ -116,6 +116,7 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
             <p className="mt-1 text-sm text-[var(--muted)]">{guest.event_name}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {guest.preferences_link && <a href={guest.preferences_link} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]">Open preferences form</a>}
             <button onClick={handleRegenerateAssets} disabled={regenerating}
               className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--ink)] transition hover:border-[var(--ink)] disabled:opacity-50">
               {regenerating ? 'Regenerating…' : 'Regenerate Assets'}

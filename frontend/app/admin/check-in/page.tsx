@@ -15,6 +15,10 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 type ScanState = 'idle' | 'scanning' | 'loading' | 'found' | 'checked_in' | 'duplicate' | 'invalid'
 
+function partyFullyCheckedIn(guest: Guest) {
+  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.plus_one_checked_in)
+}
+
 export default function CheckInPage() {
   const { isSuperAdmin, isScanner } = useAuth()
   const [token, setToken]           = useState('')
@@ -152,7 +156,7 @@ export default function CheckInPage() {
     try {
       const g = await api.scanGuest(raw.trim())
       setGuest(g)
-      setState(g.status === 'checked_in' ? 'duplicate' : 'found')
+      setState(partyFullyCheckedIn(g) ? 'duplicate' : 'found')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : ''
       if (!navigator.onLine || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
@@ -204,15 +208,19 @@ export default function CheckInPage() {
     if (nameTimerRef.current) clearTimeout(nameTimerRef.current)
   }
 
-  async function handleCheckIn() {
+  async function handleCheckIn(target: 'guest' | 'plus_one' | 'both') {
     if (!guest) return
     setCheckingIn(true)
     // Optimistic: show success immediately so door staff aren't blocked on slow connections
-    const optimisticGuest = { ...guest, status: 'checked_in' as const }
+    const optimisticGuest = {
+      ...guest,
+      status: target !== 'plus_one' ? 'checked_in' as const : guest.status,
+      plus_one_checked_in: target !== 'guest' ? true : guest.plus_one_checked_in,
+    }
     setGuest(optimisticGuest)
     setState('checked_in')
     try {
-      const updated = await api.checkIn(guest.id)
+      const updated = await api.checkIn(guest.id, target)
       setGuest(updated)
     } catch (err: unknown) {
       // Revert if server rejects

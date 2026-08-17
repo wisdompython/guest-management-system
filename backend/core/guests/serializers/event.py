@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from django.db.models import Count, Q, Sum
 from rest_framework import serializers
 from ..models import Event, Font
 
@@ -39,6 +40,13 @@ class EventSerializer(serializers.ModelSerializer):
     checked_in_count = serializers.SerializerMethodField()
     plus_one_count = serializers.SerializerMethodField()
     estimated_guest_count = serializers.SerializerMethodField()
+    confirmed_count = serializers.SerializerMethodField()
+    plus_one_checked_in_count = serializers.SerializerMethodField()
+    total_checked_in_count = serializers.SerializerMethodField()
+    aso_ebi_request_count = serializers.SerializerMethodField()
+    aso_ebi_quantity = serializers.SerializerMethodField()
+    preferences_submitted_count = serializers.SerializerMethodField()
+    celebrant_breakdown = serializers.SerializerMethodField()
     name_font_name = serializers.CharField(source='name_font.name', read_only=True)
     whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
     create_rsvp_workflow = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -56,11 +64,76 @@ class EventSerializer(serializers.ModelSerializer):
     def get_plus_one_count(self, obj):
         if not obj.allow_plus_one:
             return 0
-        ann = getattr(obj, 'plus_one_count_ann', None)
-        return ann if ann is not None else obj.guests.filter(plus_one_attending=True).count()
+        return self._planning_aggregate(obj)['plus_ones']
 
     def get_estimated_guest_count(self, obj):
-        return self.get_guest_count(obj) + self.get_plus_one_count(obj)
+        primary_guests = self.get_confirmed_count(obj) if obj.rsvp_enabled else self.get_guest_count(obj)
+        return primary_guests + self.get_plus_one_count(obj)
+
+    def _planning_guests(self, obj):
+        guests = obj.guests.all()
+        if obj.rsvp_enabled:
+            guests = guests.filter(
+                rsvp_recipients__workflow__event=obj,
+                rsvp_recipients__response_status='confirmed',
+            )
+        return guests
+
+    def _planning_aggregate(self, obj):
+        cached = getattr(obj, '_planning_aggregate_cache', None)
+        if cached is None:
+            cached = self._planning_guests(obj).aggregate(
+                primary=Count('id', distinct=True),
+                plus_ones=Count('id', filter=Q(plus_one_attending=True), distinct=True),
+                aso_ebi_requests=Count('id', filter=Q(aso_ebi_requested=True), distinct=True),
+                aso_ebi_quantity=Sum(
+                    'aso_ebi_quantity', filter=Q(aso_ebi_requested=True), default=0,
+                ),
+            )
+            obj._planning_aggregate_cache = cached
+        return cached
+
+    def get_confirmed_count(self, obj):
+        return self._planning_aggregate(obj)['primary'] if obj.rsvp_enabled else 0
+
+    def get_plus_one_checked_in_count(self, obj):
+        ann = getattr(obj, 'plus_one_checked_in_count_ann', None)
+        return ann if ann is not None else obj.guests.filter(plus_one_checked_in=True).count()
+
+    def get_total_checked_in_count(self, obj):
+        return self.get_checked_in_count(obj) + self.get_plus_one_checked_in_count(obj)
+
+    def get_aso_ebi_request_count(self, obj):
+        return self._planning_aggregate(obj)['aso_ebi_requests']
+
+    def get_aso_ebi_quantity(self, obj):
+        return self._planning_aggregate(obj)['aso_ebi_quantity']
+
+    def get_preferences_submitted_count(self, obj):
+        return obj.guests.filter(preferences_submitted_at__isnull=False).count()
+
+    def get_celebrant_breakdown(self, obj):
+        if not obj.collect_celebrant:
+            return []
+        rows = (
+            self._planning_guests(obj)
+            .exclude(celebrant_name='')
+            .values('celebrant_name')
+            .annotate(
+                guests=Count('id', distinct=True),
+                plus_ones=Count('id', filter=Q(plus_one_attending=True), distinct=True),
+            )
+            .order_by('-guests', 'celebrant_name')
+        )
+        return [
+            {
+                'name': row['celebrant_name'],
+                'guests': row['guests'],
+                'plus_ones': row['plus_ones'],
+                'estimated_guests': row['guests'] + row['plus_ones'],
+            }
+            for row in rows
+        ]
 
     def get_rsvp_workflow_id(self, obj):
         try:
@@ -77,12 +150,15 @@ class EventSerializer(serializers.ModelSerializer):
             'name_zone_x', 'name_zone_y', 'name_zone_w', 'name_zone_h',
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
-            'ticket_types', 'required_fields', 'collect_aso_ebi', 'allow_plus_one', 'whatsapp_enabled',
+            'ticket_types', 'required_fields', 'collect_aso_ebi', 'allow_plus_one',
+            'preferences_enabled', 'collect_celebrant', 'celebrant_options', 'whatsapp_enabled',
             'rsvp_enabled',
             'whatsapp_template', 'whatsapp_template_name',
             'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
-            'is_ended', 'guest_count', 'checked_in_count', 'plus_one_count',
-            'estimated_guest_count', 'created_at',
+            'is_ended', 'guest_count', 'confirmed_count', 'checked_in_count',
+            'plus_one_count', 'plus_one_checked_in_count', 'total_checked_in_count',
+            'estimated_guest_count', 'aso_ebi_request_count', 'aso_ebi_quantity',
+            'preferences_submitted_count', 'celebrant_breakdown', 'created_at',
         )
         read_only_fields = ('id', 'created_at', 'name_font_name', 'whatsapp_template_name')
 
@@ -108,6 +184,7 @@ class EventSerializer(serializers.ModelSerializer):
         create_rsvp_workflow = validated_data.pop('create_rsvp_workflow', False)
         if create_rsvp_workflow:
             validated_data['rsvp_enabled'] = True
+            validated_data['preferences_enabled'] = False
             validated_data['pass_send_at'] = None
         event = super().create(validated_data)
         if create_rsvp_workflow:
@@ -139,3 +216,16 @@ class EventSerializer(serializers.ModelSerializer):
                 f"Unknown field(s): {', '.join(invalid)}. Allowed: {', '.join(CONFIGURABLE_FIELDS)}"
             )
         return value
+
+    def validate_celebrant_options(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('celebrant_options must be a list.')
+        cleaned = []
+        seen = set()
+        for item in value:
+            name = str(item).strip()
+            key = name.casefold()
+            if name and key not in seen:
+                cleaned.append(name)
+                seen.add(key)
+        return cleaned

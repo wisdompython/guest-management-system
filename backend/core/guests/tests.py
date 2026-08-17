@@ -115,6 +115,33 @@ class EventDeliveryWorkflowTests(TestCase):
         self.assertEqual(response.data['plus_one_count'], 1)
         self.assertEqual(response.data['estimated_guest_count'], 3)
 
+    def test_rsvp_event_estimate_uses_only_confirmed_guests_and_their_plus_ones(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+        event = make_event(name='RSVP Estimate', allow_plus_one=True, rsvp_enabled=True)
+        confirmed = make_guest(event, full_name='Confirmed', plus_one_attending=True)
+        awaiting = make_guest(event, full_name='Awaiting')
+        declined = make_guest(event, full_name='Declined')
+        workflow = RsvpWorkflow.objects.create(event=event)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=confirmed,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=awaiting)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=declined,
+            response_status=RsvpRecipient.ResponseStatus.DECLINED,
+        )
+
+        response = self.client.get(f'/api/events/{event.id}/')
+
+        self.assertEqual(response.data['guest_count'], 3)
+        self.assertEqual(response.data['confirmed_count'], 1)
+        self.assertEqual(response.data['plus_one_count'], 1)
+        self.assertEqual(response.data['estimated_guest_count'], 2)
+
 
 class GuestListFilterTests(TestCase):
     def setUp(self):
@@ -919,6 +946,116 @@ class DispatchDueRemindersTimingTests(TestCase):
         self.assertEqual(result['queued'], 1)
         mock_send_reminder.delay.assert_called_once()
 
+    @patch('guests.tasks.send_reminder')
+    def test_rsvp_workflow_queues_only_confirmed_guests(self, mock_send_reminder):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+        from .tasks import dispatch_due_reminders
+
+        confirmed = self.guest
+        awaiting = make_guest(
+            self.event, full_name='Awaiting', phone_number='2348000000002',
+        )
+        declined = make_guest(
+            self.event, full_name='Declined', phone_number='2348000000003',
+        )
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.COMPLETED,
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=confirmed,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=awaiting)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=declined,
+            response_status=RsvpRecipient.ResponseStatus.DECLINED,
+        )
+
+        result = dispatch_due_reminders()
+
+        self.assertEqual(result['queued'], 1)
+        mock_send_reminder.delay.assert_called_once_with(
+            self.reminder.id, str(confirmed.id),
+        )
+
+    @patch('guests.tasks.send_reminder')
+    def test_no_workflow_queues_all_guests_even_if_rsvp_flag_remains(self, mock_send_reminder):
+        from .tasks import dispatch_due_reminders
+
+        self.event.rsvp_enabled = True
+        self.event.save(update_fields=['rsvp_enabled'])
+        second = make_guest(
+            self.event, full_name='Second', phone_number='2348000000002',
+        )
+
+        result = dispatch_due_reminders()
+
+        self.assertEqual(result['queued'], 2)
+        queued_guest_ids = {
+            call.args[1]
+            for call in mock_send_reminder.delay.call_args_list
+        }
+        self.assertEqual(queued_guest_ids, {str(self.guest.id), str(second.id)})
+
+
+class ReminderRsvpEligibilityTests(TestCase):
+    def setUp(self):
+        from .models import EventReminder
+
+        self.event = make_event(
+            date=timezone.now() + timezone.timedelta(days=1),
+            rsvp_enabled=True,
+        )
+        self.guest = make_guest(self.event, phone_number='2348000000001')
+        self.reminder = EventReminder.objects.create(
+            event=self.event, hours_before=24, template_name='reminder_tmpl',
+        )
+
+    def test_worker_skips_guest_who_is_not_confirmed(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+        from .models import ReminderLog
+        from .tasks import send_reminder
+
+        workflow = RsvpWorkflow.objects.create(event=self.event)
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest)
+        ReminderLog.objects.create(
+            reminder=self.reminder,
+            guest=self.guest,
+            queued_at=timezone.now(),
+        )
+
+        with patch('guests.whatsapp.send_reminder') as mock_send:
+            result = send_reminder(self.reminder.id, str(self.guest.id))
+
+        self.assertFalse(result['sent'])
+        self.assertEqual(result['reason'], 'not eligible for reminder')
+        mock_send.assert_not_called()
+        self.assertFalse(
+            ReminderLog.objects.filter(
+                reminder=self.reminder, guest=self.guest,
+            ).exists()
+        )
+
+    def test_worker_sends_to_confirmed_guest(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+        from .tasks import send_reminder
+
+        workflow = RsvpWorkflow.objects.create(event=self.event)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+
+        with patch('guests.whatsapp.send_reminder', return_value=True) as mock_send:
+            result = send_reminder(self.reminder.id, str(self.guest.id))
+
+        self.assertTrue(result['sent'])
+        mock_send.assert_called_once()
+
 
 class CheckInTests(TestCase):
     def setUp(self):
@@ -939,3 +1076,87 @@ class CheckInTests(TestCase):
         self.client.post(f'/api/guests/{self.guest.id}/check_in/')
         r = self.client.post(f'/api/guests/{self.guest.id}/check_in/')
         self.assertEqual(r.status_code, status.HTTP_409_CONFLICT)
+
+    def test_guest_and_plus_one_can_check_in_separately_with_same_qr(self):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        self.guest.plus_one_attending = True
+        self.guest.save(update_fields=['plus_one_attending'])
+
+        guest_response = self.client.post(
+            f'/api/guests/{self.guest.id}/check_in/',
+            {'target': 'guest'},
+            format='json',
+        )
+        plus_one_response = self.client.post(
+            f'/api/guests/{self.guest.id}/check_in/',
+            {'target': 'plus_one'},
+            format='json',
+        )
+
+        self.assertEqual(guest_response.status_code, 200)
+        self.assertEqual(plus_one_response.status_code, 200)
+        self.guest.refresh_from_db()
+        self.assertEqual(self.guest.status, Guest.Status.CHECKED_IN)
+        self.assertTrue(self.guest.plus_one_checked_in)
+        self.assertIsNotNone(self.guest.plus_one_checked_in_at)
+
+    def test_check_in_both_admits_the_whole_party(self):
+        self.guest.plus_one_attending = True
+        self.guest.save(update_fields=['plus_one_attending'])
+
+        response = self.client.post(
+            f'/api/guests/{self.guest.id}/check_in/',
+            {'target': 'both'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.guest.refresh_from_db()
+        self.assertEqual(self.guest.status, Guest.Status.CHECKED_IN)
+        self.assertTrue(self.guest.plus_one_checked_in)
+
+
+class GuestPreferencesTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.event = make_event(
+            preferences_enabled=True,
+            allow_plus_one=True,
+            collect_aso_ebi=True,
+            collect_celebrant=True,
+            celebrant_options=['Bride', 'Groom'],
+        )
+        self.guest = make_guest(self.event)
+        self.url = f'/api/guest-preferences/{self.guest.preference_token}/'
+
+    def test_preferences_are_available_without_authentication(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['celebrant_options'], ['Bride', 'Groom'])
+        self.assertTrue(response.data['can_respond'])
+
+    def test_preferences_form_saves_planning_choices_without_rsvp(self):
+        response = self.client.post(self.url, {
+            'plus_one_attending': True,
+            'aso_ebi_requested': True,
+            'aso_ebi_quantity': 4,
+            'celebrant_name': 'Bride',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.guest.refresh_from_db()
+        self.assertTrue(self.guest.plus_one_attending)
+        self.assertEqual(self.guest.aso_ebi_quantity, 4)
+        self.assertEqual(self.guest.celebrant_name, 'Bride')
+        self.assertIsNotNone(self.guest.preferences_submitted_at)
+
+    def test_unconfigured_celebrant_is_rejected_when_options_exist(self):
+        response = self.client.post(self.url, {
+            'plus_one_attending': False,
+            'aso_ebi_requested': False,
+            'celebrant_name': 'Someone else',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)

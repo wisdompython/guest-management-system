@@ -5,6 +5,8 @@ import { RequiredFieldsSection } from '@/components/event-config/RequiredFieldsS
 import { WhatsAppToggle } from '@/components/event-config/WhatsAppToggle'
 import { AsoEbiToggle } from '@/components/event-config/AsoEbiToggle'
 import { PlusOneToggle } from '@/components/event-config/PlusOneToggle'
+import { CelebrantPreferences } from '@/components/event-config/CelebrantPreferences'
+import { PreferencesOnlyToggle } from '@/components/event-config/PreferencesOnlyToggle'
 
 export interface TicketTypeDef {
   value: string
@@ -26,17 +28,24 @@ interface Props {
   whatsappEnabled: boolean
   collectAsoEbi: boolean
   allowPlusOne: boolean
+  preferencesEnabled: boolean
+  collectCelebrant: boolean
+  celebrantOptions: string[]
   onChange: (patch: {
     ticketTypes?:    TicketTypeDef[]
     requiredFields?: string[]
     whatsappEnabled?: boolean
     collectAsoEbi?: boolean
     allowPlusOne?: boolean
+    preferencesEnabled?: boolean
+    collectCelebrant?: boolean
+    celebrantOptions?: string[]
   }) => void
 }
 
 export default function EventConfigPanel({
-  ticketTypes, requiredFields, whatsappEnabled, collectAsoEbi, allowPlusOne, onChange,
+  ticketTypes, requiredFields, whatsappEnabled, collectAsoEbi, allowPlusOne,
+  preferencesEnabled, collectCelebrant, celebrantOptions, onChange,
 }: Props) {
   function toggleField(key: string) {
     const next = requiredFields.includes(key)
@@ -72,6 +81,8 @@ export default function EventConfigPanel({
             whatsappEnabled={whatsappEnabled}
             onChange={(enabled) => onChange({ whatsappEnabled: enabled })}
           />
+          <PreferencesOnlyToggle enabled={preferencesEnabled} onChange={(enabled) => onChange({ preferencesEnabled: enabled })} />
+          <CelebrantPreferences enabled={collectCelebrant} options={celebrantOptions} onChange={(patch) => onChange({ collectCelebrant: patch.enabled, celebrantOptions: patch.options })} />
         </div>
       </div>
     </div>

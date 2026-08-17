@@ -94,7 +94,7 @@ def build_workflow_stats(workflow):
         counts['plus_ones'] = 0
     counts['response_rate'] = round((responded / invited) * 100, 1) if invited else 0.0
     counts['confirmation_rate'] = round((counts['confirmed'] / invited) * 100, 1) if invited else 0.0
-    counts['estimated_guests'] = invited + counts['plus_ones']
+    counts['estimated_guests'] = counts['confirmed'] + counts['plus_ones']
     return counts
 
 
@@ -307,6 +307,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
     aso_ebi_requested = serializers.BooleanField(source='guest.aso_ebi_requested', read_only=True)
     aso_ebi_quantity = serializers.IntegerField(source='guest.aso_ebi_quantity', read_only=True)
     plus_one_attending = serializers.BooleanField(source='guest.plus_one_attending', read_only=True)
+    celebrant_name = serializers.CharField(source='guest.celebrant_name', read_only=True)
     has_phone = serializers.SerializerMethodField()
 
     class Meta:
@@ -322,6 +323,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'aso_ebi_requested',
             'aso_ebi_quantity',
             'plus_one_attending',
+            'celebrant_name',
             'has_phone',
             'response_status',
             'invitation_status',

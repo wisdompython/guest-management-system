@@ -12,6 +12,9 @@ interface Props {
   whatsappEnabled: boolean
   collectAsoEbi: boolean
   allowPlusOne: boolean
+  preferencesEnabled: boolean
+  collectCelebrant: boolean
+  celebrantOptions: string[]
   whatsappTemplate: number | null
   templates: WhatsAppTemplate[]
   step?: number
@@ -21,11 +24,14 @@ interface Props {
     whatsappEnabled?: boolean
     collectAsoEbi?: boolean
     allowPlusOne?: boolean
+    preferencesEnabled?: boolean
+    collectCelebrant?: boolean
+    celebrantOptions?: string[]
     whatsappTemplate?: number | null
   }) => void
 }
 
-export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, collectAsoEbi, allowPlusOne, whatsappTemplate, templates, step, onChange }: Props) {
+export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnabled, collectAsoEbi, allowPlusOne, preferencesEnabled, collectCelebrant, celebrantOptions, whatsappTemplate, templates, step, onChange }: Props) {
   const selectedTemplate = templates.find((t) => t.id === whatsappTemplate)
 
   return (
@@ -38,6 +44,9 @@ export function GuestConfigSection({ ticketTypes, requiredFields, whatsappEnable
           whatsappEnabled={whatsappEnabled}
           collectAsoEbi={collectAsoEbi}
           allowPlusOne={allowPlusOne}
+          preferencesEnabled={preferencesEnabled}
+          collectCelebrant={collectCelebrant}
+          celebrantOptions={celebrantOptions}
           onChange={onChange}
         />
 

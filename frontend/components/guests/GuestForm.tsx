@@ -34,10 +34,12 @@ export function GuestForm({
 }: Props) {
   const [asoEbiRequested, setAsoEbiRequested] = useState(false)
   const [asoEbiYards, setAsoEbiYards] = useState(2)
+  const [plusOneAttending, setPlusOneAttending] = useState(false)
 
   useEffect(() => {
     setAsoEbiRequested(false)
     setAsoEbiYards(2)
+    setPlusOneAttending(false)
   }, [selectedEvent?.id])
 
   return (
@@ -115,6 +117,20 @@ export function GuestForm({
           </div>
         )}
 
+        {selectedEvent?.allow_plus_one && (
+          <label className="sm:col-span-2 flex cursor-pointer items-start gap-3 rounded-[14px] border border-[var(--line)] bg-[var(--bg)] p-4">
+            <input name="plus_one_attending" type="checkbox" checked={plusOneAttending} onChange={(event) => setPlusOneAttending(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+            <span><span className="block text-sm font-semibold text-[var(--ink)]">Guest is bringing a plus one</span><span className="mt-1 block text-xs text-[var(--muted)]">Use this for preferences reported outside the guest form.</span></span>
+          </label>
+        )}
+
+        {selectedEvent?.collect_celebrant && (
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Which celebrant?</label>
+            {selectedEvent.celebrant_options.length ? <select name="celebrant_name" className={select}><option value="">Select a celebrant</option>{selectedEvent.celebrant_options.map((name) => <option key={name} value={name}>{name}</option>)}</select> : <input name="celebrant_name" placeholder="Enter celebrant name" className={field} />}
+          </div>
+        )}
+
         {selectedEvent?.whatsapp_enabled && (
           <div className="sm:col-span-2">
             <label className={labelCls}>
@@ -133,6 +149,8 @@ export function GuestForm({
           <span>·</span>
           <span>Ticket types: <b>{ticketOptions.map(t => t.label).join(', ')}</b></span>
           {selectedEvent.collect_aso_ebi && <><span>·</span><span>Aso Ebi requests: <b>On</b></span></>}
+          {selectedEvent.allow_plus_one && <><span>·</span><span>Plus-ones: <b>On</b></span></>}
+          {selectedEvent.collect_celebrant && <><span>·</span><span>Celebrant preference: <b>On</b></span></>}
         </div>
       )}
 

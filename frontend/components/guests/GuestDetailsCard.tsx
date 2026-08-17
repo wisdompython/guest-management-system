@@ -25,6 +25,9 @@ export function GuestDetailsCard({ guest, showPhone = false }: Props) {
             { label: 'Seat',        value: guest.seat_number || '—' },
             { label: 'Aso Ebi',     value: guest.aso_ebi_requested ? 'Requested' : 'Not requested' },
             guest.aso_ebi_requested ? { label: 'Aso Ebi amount', value: `${guest.aso_ebi_quantity} yards` } : null,
+            { label: 'Plus-one', value: guest.plus_one_attending ? (guest.plus_one_checked_in ? 'Attending · checked in' : 'Attending · pending') : 'None' },
+            guest.celebrant_name ? { label: 'Celebrant', value: guest.celebrant_name } : null,
+            { label: 'Preferences', value: guest.preferences_submitted_at ? `Submitted ${new Date(guest.preferences_submitted_at).toLocaleString()}` : 'Not submitted' },
             { label: 'Registered',  value: new Date(guest.registered_at).toLocaleString() },
             { label: 'Checked In',  value: guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : '—' },
           ] as ({ label: string; value: string } | null)[]).filter((r): r is { label: string; value: string } => r !== null).map(({ label, value }) => (

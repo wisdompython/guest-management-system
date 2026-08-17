@@ -13,6 +13,10 @@ const TICKET_COLORS: Record<string, { bg: string; color: string }> = {
   general: { bg: 'var(--chip)', color: 'var(--muted)' },
 }
 
+function partyFullyCheckedIn(guest: Guest) {
+  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.plus_one_checked_in)
+}
+
 export default function ScanGuestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, loading: authLoading } = useAuth()
@@ -35,7 +39,7 @@ export default function ScanGuestPage({ params }: { params: Promise<{ id: string
     api.scanGuest(id)
       .then((g) => {
         setGuest(g)
-        setState(g.status === 'checked_in' ? 'duplicate' : 'found')
+        setState(partyFullyCheckedIn(g) ? 'duplicate' : 'found')
       })
       .catch(() => {
         setErrorMsg('Guest not found. This QR code may be invalid.')
@@ -43,11 +47,11 @@ export default function ScanGuestPage({ params }: { params: Promise<{ id: string
       })
   }, [id, user, authLoading])
 
-  async function handleCheckIn() {
+  async function handleCheckIn(target: 'guest' | 'plus_one' | 'both') {
     if (!guest) return
     setState('checking_in')
     try {
-      const updated = await api.checkIn(guest.id)
+      const updated = await api.checkIn(guest.id, target)
       setGuest(updated)
       setState('checked_in')
     } catch {
@@ -137,13 +141,11 @@ export default function ScanGuestPage({ params }: { params: Promise<{ id: string
         Guest Found
       </p>
       {guest && <GuestInfoCard guest={guest} />}
-      <button
-        onClick={handleCheckIn}
-        disabled={state === 'checking_in'}
-        className="mt-6 w-full py-4 text-sm font-semibold text-white rounded-full transition disabled:opacity-60"
-        style={{ background: 'var(--brand)' }}>
-        {state === 'checking_in' ? 'Checking in…' : 'Confirm Check-In'}
-      </button>
+      <div className="mt-6 grid w-full gap-2">
+        {guest && guest.status !== 'checked_in' && <button onClick={() => handleCheckIn('guest')} disabled={state === 'checking_in'} className="w-full rounded-full bg-[var(--brand)] py-4 text-sm font-semibold text-white disabled:opacity-60">{state === 'checking_in' ? 'Checking in…' : 'Check in guest only'}</button>}
+        {guest?.plus_one_attending && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('plus_one')} disabled={state === 'checking_in'} className="w-full rounded-full border border-[var(--brand)] py-4 text-sm font-semibold text-[var(--brand)] disabled:opacity-60">Check in plus-one only</button>}
+        {guest && guest.status !== 'checked_in' && guest.plus_one_attending && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('both')} disabled={state === 'checking_in'} className="w-full rounded-full bg-[var(--ink)] py-4 text-sm font-semibold text-[var(--bg)] disabled:opacity-60">Check in both</button>}
+      </div>
       <button
         onClick={() => router.push('/admin/check-in')}
         className="mt-3 w-full py-3 text-sm font-semibold rounded-full transition"
@@ -207,6 +209,8 @@ function GuestInfoCard({ guest, highlight }: { guest: Guest; highlight?: boolean
         <InfoRow label="Phone" value={guest.phone_number || '—'} />
         {guest.table_number && <InfoRow label="Table" value={guest.table_number} />}
         {guest.seat_number  && <InfoRow label="Seat"  value={guest.seat_number}  />}
+        {guest.celebrant_name && <InfoRow label="Celebrant" value={guest.celebrant_name} />}
+        {guest.plus_one_attending && <InfoRow label="Party" value={`Admit 2 · plus-one ${guest.plus_one_checked_in ? 'in' : 'pending'}`} />}
       </div>
     </div>
   )

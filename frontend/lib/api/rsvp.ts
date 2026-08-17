@@ -98,6 +98,7 @@ export const rsvpApi = {
     asoEbiRequested = false,
     asoEbiQuantity = 0,
     plusOneAttending = false,
+    celebrantName = '',
   ) =>
     request<{
       accepted: boolean
@@ -111,6 +112,7 @@ export const rsvpApi = {
         aso_ebi_requested: answer === 'yes' && asoEbiRequested,
         aso_ebi_quantity: answer === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
         plus_one_attending: answer === 'yes' && plusOneAttending,
+        celebrant_name: answer === 'yes' ? celebrantName : '',
       }),
     }),
 }

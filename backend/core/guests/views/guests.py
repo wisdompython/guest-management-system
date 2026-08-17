@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Count, Q
 
 from ..models import Event, Guest
@@ -204,16 +205,53 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def check_in(self, request, pk=None):
-        guest = self.get_object()
-        if guest.status == Guest.Status.CHECKED_IN:
+        target = request.data.get('target', 'guest')
+        if target not in {'guest', 'plus_one', 'both'}:
             return Response(
-                {'detail': 'Guest already checked in.', 'checked_in_at': guest.checked_in_at},
-                status=status.HTTP_409_CONFLICT,
+                {'detail': 'target must be guest, plus_one, or both.'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        guest.status = Guest.Status.CHECKED_IN
-        guest.checked_in_at = timezone.now()
-        guest.save(update_fields=['status', 'checked_in_at'])
-        return Response(GuestSerializer(guest).data)
+        with transaction.atomic():
+            guest = Guest.objects.select_for_update().select_related('event').get(pk=pk)
+            now = timezone.now()
+            update_fields = []
+
+            if target in {'guest', 'both'} and guest.status != Guest.Status.CHECKED_IN:
+                guest.status = Guest.Status.CHECKED_IN
+                guest.checked_in_at = now
+                update_fields.extend(['status', 'checked_in_at'])
+            elif target == 'guest':
+                return Response(
+                    {'detail': 'Guest already checked in.', 'checked_in_at': guest.checked_in_at},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            if target in {'plus_one', 'both'}:
+                if not guest.plus_one_attending:
+                    return Response(
+                        {'detail': 'This guest does not have a plus-one.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if not guest.plus_one_checked_in:
+                    guest.plus_one_checked_in = True
+                    guest.plus_one_checked_in_at = now
+                    update_fields.extend(['plus_one_checked_in', 'plus_one_checked_in_at'])
+                elif target == 'plus_one':
+                    return Response(
+                        {
+                            'detail': 'Plus-one already checked in.',
+                            'plus_one_checked_in_at': guest.plus_one_checked_in_at,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+
+            if not update_fields:
+                return Response(
+                    {'detail': 'Guest and plus-one are already checked in.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            guest.save(update_fields=update_fields)
+        return Response(GuestSerializer(guest, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='send_message')
     def send_message(self, request, pk=None):

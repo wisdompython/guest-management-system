@@ -10,6 +10,7 @@ def _can_see_phone(request) -> bool:
 
 class GuestSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='event.name', read_only=True)
+    preferences_link = serializers.SerializerMethodField()
 
     class Meta:
         model = Guest
@@ -17,16 +18,23 @@ class GuestSerializer(serializers.ModelSerializer):
             'id', 'event', 'event_name', 'full_name', 'phone_number', 'email',
             'ticket_type', 'table_number', 'seat_number',
             'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
+            'celebrant_name', 'preferences_link', 'preferences_submitted_at',
             'qr_code', 'pass_image',
-            'status', 'checked_in_at',
+            'status', 'checked_in_at', 'plus_one_checked_in', 'plus_one_checked_in_at',
             'whatsapp_sent', 'whatsapp_sent_at', 'scheduled_send_at',
             'registered_at',
         )
         read_only_fields = (
             'id', 'event_name', 'qr_code', 'pass_image',
             'status', 'checked_in_at',
-            'whatsapp_sent', 'whatsapp_sent_at', 'plus_one_attending', 'registered_at',
+            'whatsapp_sent', 'whatsapp_sent_at', 'preferences_link',
+            'preferences_submitted_at', 'plus_one_checked_in', 'plus_one_checked_in_at',
+            'registered_at',
         )
+
+    def get_preferences_link(self, obj):
+        from ..whatsapp import build_preferences_url
+        return build_preferences_url(obj)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -91,6 +99,30 @@ class GuestSerializer(serializers.ModelSerializer):
         if not aso_ebi_requested:
             data['aso_ebi_quantity'] = 0
 
+        plus_one_attending = data.get(
+            'plus_one_attending',
+            self.instance.plus_one_attending if self.instance else False,
+        )
+        if plus_one_attending and not event.allow_plus_one:
+            raise serializers.ValidationError({
+                'plus_one_attending': 'Plus ones are not enabled for this event.',
+            })
+
+        celebrant_name = str(data.get(
+            'celebrant_name',
+            self.instance.celebrant_name if self.instance else '',
+        ) or '').strip()
+        if celebrant_name and not event.collect_celebrant:
+            raise serializers.ValidationError({
+                'celebrant_name': 'Celebrant preferences are not enabled for this event.',
+            })
+        options = event.celebrant_options or []
+        if celebrant_name and options and celebrant_name not in options:
+            raise serializers.ValidationError({
+                'celebrant_name': 'Select one of the configured celebrants.',
+            })
+        data['celebrant_name'] = celebrant_name
+
         return data
 
     def create(self, validated_data):
@@ -98,6 +130,14 @@ class GuestSerializer(serializers.ModelSerializer):
         if event and 'scheduled_send_at' not in validated_data and event.pass_send_at:
             validated_data['scheduled_send_at'] = event.pass_send_at
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        guest = super().update(instance, validated_data)
+        if not guest.plus_one_attending and (guest.plus_one_checked_in or guest.plus_one_checked_in_at):
+            guest.plus_one_checked_in = False
+            guest.plus_one_checked_in_at = None
+            guest.save(update_fields=['plus_one_checked_in', 'plus_one_checked_in_at'])
+        return guest
 
 
 class GuestListSerializer(serializers.ModelSerializer):
@@ -109,9 +149,11 @@ class GuestListSerializer(serializers.ModelSerializer):
             'id', 'event', 'event_name', 'full_name', 'phone_number',
             'email', 'ticket_type', 'table_number',
             'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
-            'status', 'whatsapp_sent', 'scheduled_send_at', 'registered_at',
+            'celebrant_name', 'preferences_submitted_at',
+            'status', 'checked_in_at', 'plus_one_checked_in', 'plus_one_checked_in_at',
+            'whatsapp_sent', 'scheduled_send_at', 'registered_at',
         )
-        read_only_fields = ('plus_one_attending',)
+        read_only_fields = fields
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

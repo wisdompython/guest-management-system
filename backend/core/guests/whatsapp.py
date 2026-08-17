@@ -1,8 +1,18 @@
 import logging
 from django.conf import settings
 from django.utils import timezone
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
+
+
+def build_preferences_url(guest) -> str:
+    event_slug = slugify(guest.event.name)[:48] if guest.event else 'event'
+    guest_slug = slugify(guest.full_name)[:40] or 'guest'
+    return (
+        f"{settings.SITE_URL.rstrip('/')}/preferences/"
+        f"{event_slug or 'event'}-{guest_slug}-{guest.preference_token}"
+    )
 
 # ---------------------------------------------------------------------------
 # Lazy client — only initialised when first used so the app starts fine even
@@ -126,6 +136,7 @@ def _resolve_template_params(guest, body_params: list) -> list:
         'ticket_type':  guest.get_ticket_type_display() if hasattr(guest, 'get_ticket_type_display') else (guest.ticket_type or ''),
         'table_number': guest.table_number or '',
         'seat_number':  guest.seat_number or '',
+        'preferences_link': build_preferences_url(guest),
     }
     return [var_map.get(key, '') for key in body_params]
 

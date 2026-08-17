@@ -379,7 +379,7 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(response.data['passes_sent'], 1)
         self.assertEqual(response.data['confirmation_rate'], 100.0)
 
-    def test_stats_add_plus_ones_to_invited_guest_estimate(self):
+    def test_stats_add_plus_ones_to_confirmed_guest_estimate(self):
         self.event.allow_plus_one = True
         self.event.save(update_fields=['allow_plus_one'])
         self.guest_a.plus_one_attending = True
@@ -397,7 +397,7 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['invited'], 2)
         self.assertEqual(response.data['plus_ones'], 1)
-        self.assertEqual(response.data['estimated_guests'], 3)
+        self.assertEqual(response.data['estimated_guests'], 2)
 
     def test_export_contains_response_and_delivery_columns(self):
         workflow = self.create_workflow()
@@ -929,6 +929,25 @@ class PublicRsvpPageApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.guest.refresh_from_db()
         self.assertFalse(self.guest.plus_one_attending)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_yes_response_records_configured_celebrant(self, mock_send):
+        self.event.collect_celebrant = True
+        self.event.celebrant_options = ['Bride', 'Groom']
+        self.event.save(update_fields=['collect_celebrant', 'celebrant_options'])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {'answer': 'yes', 'celebrant_name': 'Bride'},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.guest.refresh_from_db()
+        self.assertEqual(self.guest.celebrant_name, 'Bride')
+        self.assertIsNotNone(self.guest.preferences_submitted_at)
+        mock_send.assert_called_once_with(self.recipient.id)
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
     def test_no_response_declines_without_a_pass(self, mock_send):

@@ -113,6 +113,12 @@ export interface Guest {
   seat_number: string;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
+  plus_one_attending: boolean;
+  celebrant_name: string;
+  preferences_link: string;
+  preferences_submitted_at: string | null;
+  plus_one_checked_in: boolean;
+  plus_one_checked_in_at: string | null;
   qr_code: string | null;
   pass_image: string | null;
   status: GuestStatus;
@@ -140,7 +146,7 @@ export interface GuestList {
 
 export type CreateGuestPayload = Pick<
   Guest,
-  'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'aso_ebi_requested' | 'aso_ebi_quantity' | 'event'
+  'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'aso_ebi_requested' | 'aso_ebi_quantity' | 'plus_one_attending' | 'celebrant_name' | 'event'
 > & {
   scheduled_send_at?: string | null;
 };
@@ -176,6 +182,9 @@ export interface Event {
   required_fields: string[];
   collect_aso_ebi: boolean;
   allow_plus_one: boolean;
+  preferences_enabled: boolean;
+  collect_celebrant: boolean;
+  celebrant_options: string[];
   whatsapp_enabled: boolean;
   rsvp_enabled: boolean;
   whatsapp_template: number | null;
@@ -185,8 +194,20 @@ export interface Event {
   is_ended: boolean;
   guest_count: number;
   checked_in_count: number;
+  confirmed_count: number;
   plus_one_count: number;
+  plus_one_checked_in_count: number;
+  total_checked_in_count: number;
   estimated_guest_count: number;
+  aso_ebi_request_count: number;
+  aso_ebi_quantity: number;
+  preferences_submitted_count: number;
+  celebrant_breakdown: Array<{
+    name: string;
+    guests: number;
+    plus_ones: number;
+    estimated_guests: number;
+  }>;
   created_at: string;
 }
 
@@ -288,6 +309,7 @@ export interface RsvpRecipient {
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   plus_one_attending: boolean;
+  celebrant_name: string;
   has_phone: boolean;
   response_status: RsvpResponseStatus;
   invitation_status: RsvpInvitationStatus;
@@ -332,13 +354,33 @@ export interface PublicRsvpDetails {
   color_of_day: string;
   collect_aso_ebi: boolean;
   allow_plus_one: boolean;
+  collect_celebrant: boolean;
+  celebrant_options: string[];
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   plus_one_attending: boolean;
+  celebrant_name: string;
   invitation_image: string | null;
   response_deadline: string | null;
   response_status: RsvpResponseStatus;
   responded_at: string | null;
   can_respond: boolean;
   closed_reason: 'deadline_passed' | 'workflow_inactive' | 'already_responded' | null;
+}
+
+export interface GuestPreferencesDetails {
+  guest_name: string;
+  event_name: string;
+  event_date: string;
+  venue: string;
+  allow_plus_one: boolean;
+  collect_aso_ebi: boolean;
+  collect_celebrant: boolean;
+  celebrant_options: string[];
+  plus_one_attending: boolean;
+  aso_ebi_requested: boolean;
+  aso_ebi_quantity: number;
+  celebrant_name: string;
+  submitted_at: string | null;
+  can_respond: boolean;
 }

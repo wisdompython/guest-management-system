@@ -42,6 +42,7 @@ export default function AddGuestPage() {
       (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null)?.value ?? ''
     const scheduledSendAt = getValue('scheduled_send_at')
     const asoEbiRequested = (form.elements.namedItem('aso_ebi_requested') as HTMLInputElement | null)?.checked ?? false
+    const plusOneAttending = (form.elements.namedItem('plus_one_attending') as HTMLInputElement | null)?.checked ?? false
     const payload: CreateGuestPayload = {
       full_name:    getValue('full_name'),
       phone_number: getValue('phone_number'),
@@ -51,6 +52,8 @@ export default function AddGuestPage() {
       seat_number:  getValue('seat_number'),
       aso_ebi_requested: asoEbiRequested,
       aso_ebi_quantity: asoEbiRequested ? Number(getValue('aso_ebi_quantity')) : 0,
+      plus_one_attending: plusOneAttending,
+      celebrant_name: getValue('celebrant_name'),
       event:        selectedEvent ? selectedEvent.id : null,
       scheduled_send_at: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : null,
     }

@@ -164,6 +164,31 @@ def pass_delivery_allowed(guest_id, event_id) -> bool:
     return recipient.response_status == RsvpRecipient.ResponseStatus.CONFIRMED
 
 
+def confirmed_reminder_guest_ids(event_id):
+    """Return confirmed guest IDs, or ``None`` when the event has no RSVP workflow.
+
+    Reminder targeting intentionally follows the presence of a workflow rather
+    than the event-level RSVP flag: an existing workflow limits reminders to
+    confirmed recipients, while an event with no workflow sends to all guests.
+    """
+    workflow_id = (
+        RsvpWorkflow.objects
+        .filter(event_id=event_id)
+        .values_list('id', flat=True)
+        .first()
+    )
+    if workflow_id is None:
+        return None
+    return (
+        RsvpRecipient.objects
+        .filter(
+            workflow_id=workflow_id,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        .values_list('guest_id', flat=True)
+    )
+
+
 def extract_button_payload(message: dict):
     message_type = message.get('type')
     if message_type == 'button':
@@ -186,6 +211,7 @@ def record_response(
     aso_ebi_requested: bool = False,
     aso_ebi_quantity: int = 0,
     plus_one_attending: bool = False,
+    celebrant_name: str = '',
 ) -> dict:
     """Record the first valid response and queue a pass when appropriate."""
     if answer not in {RsvpResponse.Answer.YES, RsvpResponse.Answer.NO}:
@@ -224,6 +250,12 @@ def record_response(
             return {'accepted': False, 'reason': 'invalid_aso_ebi_quantity'}
         if plus_one_attending and not recipient.workflow.event.allow_plus_one:
             return {'accepted': False, 'reason': 'plus_one_not_enabled'}
+        celebrant_name = str(celebrant_name or '').strip()
+        if celebrant_name and not recipient.workflow.event.collect_celebrant:
+            return {'accepted': False, 'reason': 'celebrant_not_enabled'}
+        celebrant_options = recipient.workflow.event.celebrant_options or []
+        if celebrant_name and celebrant_options and celebrant_name not in celebrant_options:
+            return {'accepted': False, 'reason': 'invalid_celebrant'}
 
         _, created = RsvpResponse.objects.get_or_create(
             message_id=response_id,
@@ -248,8 +280,15 @@ def record_response(
             recipient.guest.aso_ebi_requested = aso_ebi_requested
             recipient.guest.aso_ebi_quantity = aso_ebi_quantity if aso_ebi_requested else 0
             recipient.guest.plus_one_attending = plus_one_attending
+            recipient.guest.celebrant_name = celebrant_name
+            recipient.guest.preferences_submitted_at = now
+            if not plus_one_attending:
+                recipient.guest.plus_one_checked_in = False
+                recipient.guest.plus_one_checked_in_at = None
             recipient.guest.save(update_fields=[
                 'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
+                'celebrant_name', 'plus_one_checked_in', 'plus_one_checked_in_at',
+                'preferences_submitted_at',
             ])
             if recipient.workflow.auto_send_pass and pass_due:
                 recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
@@ -260,8 +299,14 @@ def record_response(
             recipient.guest.aso_ebi_requested = False
             recipient.guest.aso_ebi_quantity = 0
             recipient.guest.plus_one_attending = False
+            recipient.guest.celebrant_name = ''
+            recipient.guest.preferences_submitted_at = None
+            recipient.guest.plus_one_checked_in = False
+            recipient.guest.plus_one_checked_in_at = None
             recipient.guest.save(update_fields=[
                 'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
+                'celebrant_name', 'plus_one_checked_in', 'plus_one_checked_in_at',
+                'preferences_submitted_at',
             ])
         recipient.responded_at = now
         recipient.save(update_fields=[

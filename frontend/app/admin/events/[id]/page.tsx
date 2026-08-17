@@ -58,7 +58,15 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
     { label: 'RSVP', detail: workflow ? `${workflow.stats.confirmed} confirmed` : event.rsvp_enabled ? 'Enabled; setup needed' : 'Not configured', href: event.rsvp_workflow_id ? `/admin/rsvp/${event.rsvp_workflow_id}` : `/admin/rsvp/add?event=${event.id}` },
     { label: 'Pass & settings', detail: event.design_template ? 'Design ready' : 'Design needed', href: `/admin/events/${event.id}/edit` },
     { label: 'Reminders', detail: `${reminders.length} configured`, href: `/admin/events/${event.id}/reminders` },
-    { label: 'Check-in', detail: `${event.checked_in_count} of ${event.guest_count}`, href: '/admin/check-in' },
+    { label: 'Check-in', detail: `${event.total_checked_in_count} of ${event.estimated_guest_count}`, href: '/admin/check-in' },
+  ]
+  const planningMetrics = [
+    { label: event.rsvp_enabled ? 'Confirmed' : 'Registered', value: event.rsvp_enabled ? event.confirmed_count : event.guest_count, detail: event.rsvp_enabled ? `${event.guest_count} invited` : 'Primary guests' },
+    { label: 'Plus-ones', value: event.plus_one_count, detail: event.allow_plus_one ? 'Additional guests declared' : 'Not enabled' },
+    { label: 'Estimated guests', value: event.estimated_guest_count, detail: event.rsvp_enabled ? 'Confirmed + plus-ones' : 'Registered + plus-ones' },
+    { label: 'Checked in', value: event.total_checked_in_count, detail: `${event.checked_in_count} guests · ${event.plus_one_checked_in_count} plus-ones` },
+    { label: 'Aso Ebi', value: event.aso_ebi_quantity, detail: `${event.aso_ebi_request_count} request${event.aso_ebi_request_count === 1 ? '' : 's'} · yards` },
+    { label: 'Preferences', value: event.preferences_submitted_count, detail: event.preferences_enabled ? 'Forms submitted' : event.rsvp_enabled ? 'Collected with RSVP' : 'Standalone form off' },
   ]
 
   return (
@@ -70,6 +78,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${event.is_ended ? 'bg-[var(--chip)] text-[var(--muted)]' : 'bg-emerald-500/10 text-emerald-700'}`}>{event.is_ended ? 'Ended' : 'Upcoming'}</span>
             {event.rsvp_enabled && <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]">RSVP {workflow?.status || 'setup needed'}</span>}
+            {event.preferences_enabled && <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]">Preferences only</span>}
           </div>
           <h1 className="mt-3 font-display text-3xl text-[var(--ink)] sm:text-4xl">{event.name}</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">{formatDate(event.date)}{event.venue ? ` · ${event.venue}` : ''}</p>
@@ -83,6 +92,12 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
       <nav aria-label="Event workspace" className="mt-5 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {workspaceLinks.map((item) => <Link key={item.label} href={item.href} className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-3 transition hover:-translate-y-0.5 hover:border-[rgba(184,150,62,0.45)]"><span className="block text-sm font-semibold text-[var(--ink)]">{item.label}</span><span className="mt-1 block text-xs text-[var(--muted)]">{item.detail}</span></Link>)}
       </nav>
+
+      <section className="mt-6">
+        <div className="mb-3 flex items-end justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand)]">Planning dashboard</p><h2 className="mt-1 text-xl font-bold text-[var(--ink)]">Expected attendance and preferences</h2></div></div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{planningMetrics.map((metric) => <div key={metric.label} className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{metric.label}</p><p className="mt-2 text-3xl font-bold tabular-nums text-[var(--ink)]">{metric.value}</p><p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">{metric.detail}</p></div>)}</div>
+        {event.collect_celebrant && <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5"><h3 className="text-sm font-semibold text-[var(--ink)]">Guests by celebrant</h3>{event.celebrant_breakdown.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{event.celebrant_breakdown.map((item) => <div key={item.name} className="rounded-lg bg-[var(--bg)] p-4"><p className="font-semibold text-[var(--ink)]">{item.name}</p><p className="mt-1 text-xs text-[var(--muted)]">{item.guests} guest{item.guests === 1 ? '' : 's'} · {item.plus_ones} plus-one{item.plus_ones === 1 ? '' : 's'}</p><p className="mt-2 text-lg font-bold text-[var(--brand)]">{item.estimated_guests} estimated</p></div>)}</div> : <p className="mt-3 text-sm text-[var(--muted)]">No celebrant preferences have been submitted yet.</p>}</div>}
+      </section>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
         <section className="form-card">
@@ -101,10 +116,10 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Guests</p>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div><p className="text-3xl font-bold text-[var(--ink)]">{event.guest_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Registered</p></div>
-              <div><p className="text-3xl font-bold text-[var(--ink)]">{event.checked_in_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Checked in</p></div>
+              <div><p className="text-3xl font-bold text-[var(--ink)]">{event.total_checked_in_count}</p><p className="mt-1 text-xs text-[var(--muted)]">People checked in</p></div>
               {event.allow_plus_one && <><div><p className="text-3xl font-bold text-[var(--brand)]">{event.plus_one_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Plus-ones</p></div><div><p className="text-3xl font-bold text-[var(--brand)]">{event.estimated_guest_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Estimated guests</p></div></>}
             </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--bg)]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${event.guest_count ? Math.round((event.checked_in_count / event.guest_count) * 100) : 0}%` }}/></div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--bg)]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${event.estimated_guest_count ? Math.min(100, Math.round((event.total_checked_in_count / event.estimated_guest_count) * 100)) : 0}%` }}/></div>
           </section>
 
           <section className="form-card p-5">

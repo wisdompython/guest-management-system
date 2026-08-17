@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import EventViewSet, GuestViewSet, FontViewSet, EventReminderViewSet, WhatsAppTemplateViewSet, TemplateCategoryViewSet, AvailableVarsView
 from .webhook import whatsapp_webhook
 from .views.test_views import whatsapp_test_send
+from .views.preferences import GuestPreferencesView
 
 router = DefaultRouter()
 router.register('events', EventViewSet)
@@ -17,5 +18,6 @@ urlpatterns = [
     path('whatsapp-templates/available-vars/', AvailableVarsView.as_view(), name='available-vars'),
     path('webhooks/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
     path('whatsapp/test-send/', whatsapp_test_send, name='whatsapp_test_send'),
+    path('guest-preferences/<uuid:token>/', GuestPreferencesView.as_view(), name='guest-preferences'),
     path('', include(router.urls)),
 ]

@@ -206,7 +206,7 @@ export default function RsvpWorkflowDetailPage() {
         {metric('Delivery failures', stats.delivery_failed, `${stats.invitation_failed} invite${stats.invitation_failed === 1 ? '' : 's'} · ${stats.passes_failed} pass${stats.passes_failed === 1 ? '' : 'es'}`, 'var(--danger)', () => { setSegmentFilter('delivery_failed'); setResponseFilter('all'); setPage(1) })}
         {metric('Aso Ebi yards', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}
         {metric('Plus-ones', stats.plus_ones, 'Additional attendees indicated', 'var(--brand)')}
-        {metric('Estimated guests', stats.estimated_guests, `${stats.invited} invitees + ${stats.plus_ones} plus-one${stats.plus_ones === 1 ? '' : 's'}`, 'var(--brand)')}
+        {metric('Estimated guests', stats.estimated_guests, `${stats.confirmed} confirmed + ${stats.plus_ones} plus-one${stats.plus_ones === 1 ? '' : 's'}`, 'var(--brand)')}
       </div>
 
       <div className="mt-5 rounded-[12px] p-5" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>

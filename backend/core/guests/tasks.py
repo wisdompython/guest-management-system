@@ -443,6 +443,25 @@ def send_reminder(reminder_id: int, guest_id: str):
     except (EventReminder.DoesNotExist, Guest.DoesNotExist):
         return {'sent': False, 'reason': 'not found'}
 
+    # Re-check eligibility at delivery time as RSVP responses can change after
+    # the dispatcher claims a reminder but before this worker runs.
+    from rsvp.services import confirmed_reminder_guest_ids
+    confirmed_guest_ids = confirmed_reminder_guest_ids(reminder.event_id)
+    is_same_event = guest.event_id == reminder.event_id
+    is_confirmed = (
+        confirmed_guest_ids is None or
+        confirmed_guest_ids.filter(guest_id=guest.id).exists()
+    )
+    if not is_same_event or not is_confirmed:
+        # Release an unsent dispatcher claim. If the guest confirms later,
+        # the reminder can then be picked up by a future due-reminder run.
+        ReminderLog.objects.filter(
+            reminder=reminder,
+            guest=guest,
+            success=False,
+        ).delete()
+        return {'sent': False, 'reason': 'not eligible for reminder'}
+
     # Avoid duplicate sends — only a successful prior send blocks a retry, so a
     # transient failure doesn't permanently suppress this reminder for the guest.
     if ReminderLog.objects.filter(reminder=reminder, guest=guest, success=True).exists():
@@ -538,6 +557,7 @@ def dispatch_due_reminders():
     Fire window: event_date - hours_before is within the next 30 minutes.
     """
     from .models import EventReminder, ReminderLog
+    from rsvp.services import confirmed_reminder_guest_ids
 
     now = timezone.now()
 
@@ -575,11 +595,17 @@ def dispatch_due_reminders():
             Q(success=True) | Q(queued_at__gte=claim_cutoff),
         ).values_list('guest_id', flat=True)
 
-        guest_ids = list(
+        eligible_guests = (
             reminder.event.guests
             .exclude(pk__in=blocked)
             .exclude(phone_number='')
-            .values_list('id', flat=True)[:budget]
+        )
+        confirmed_guest_ids = confirmed_reminder_guest_ids(reminder.event_id)
+        if confirmed_guest_ids is not None:
+            eligible_guests = eligible_guests.filter(pk__in=confirmed_guest_ids)
+
+        guest_ids = list(
+            eligible_guests.values_list('id', flat=True)[:budget]
         )
         if not guest_ids:
             continue

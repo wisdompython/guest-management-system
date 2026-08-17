@@ -39,6 +39,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [rsvpEnabled, setRsvpEnabled] = useState(false)
   const [collectAsoEbi, setCollectAsoEbi] = useState(false)
   const [allowPlusOne, setAllowPlusOne] = useState(false)
+  const [preferencesEnabled, setPreferencesEnabled] = useState(false)
+  const [collectCelebrant, setCollectCelebrant] = useState(false)
+  const [celebrantOptions, setCelebrantOptions] = useState<string[]>([])
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(true)
@@ -63,6 +66,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setRsvpEnabled(ev.rsvp_enabled ?? Boolean(ev.rsvp_workflow_id))
         setCollectAsoEbi(ev.collect_aso_ebi ?? false)
         setAllowPlusOne(ev.allow_plus_one ?? false)
+        setPreferencesEnabled(ev.preferences_enabled ?? false)
+        setCollectCelebrant(ev.collect_celebrant ?? false)
+        setCelebrantOptions(ev.celebrant_options ?? [])
         setWhatsappTemplate(ev.whatsapp_template ?? null)
         if (ev.pass_send_at) {
           setPassTiming('scheduled')
@@ -104,7 +110,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     if (qrTouched) { if (qrZone) { fd.append('qr_zone_x', String(qrZone.x)); fd.append('qr_zone_y', String(qrZone.y)); fd.append('qr_zone_w', String(qrZone.w)); fd.append('qr_zone_h', String(qrZone.h)) } else { fd.append('qr_zone_x', ''); fd.append('qr_zone_y', ''); fd.append('qr_zone_w', ''); fd.append('qr_zone_h', '') } }
     if (nameTouched) { if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) } else { fd.append('name_zone_x', ''); fd.append('name_zone_y', ''); fd.append('name_zone_w', ''); fd.append('name_zone_h', '') } }
     fd.append('name_font', selectedFont); fd.append('name_font_color', fontColor); fd.append('name_font_size_fraction', String(fontSizeFrac))
-    fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled)); fd.append('collect_aso_ebi', String(collectAsoEbi)); fd.append('allow_plus_one', String(allowPlusOne))
+    fd.append('qr_bg_color', qrBgColor); fd.append('ticket_types', JSON.stringify(ticketTypes)); fd.append('required_fields', JSON.stringify(requiredFields)); fd.append('whatsapp_enabled', String(whatsappEnabled)); fd.append('collect_aso_ebi', String(collectAsoEbi)); fd.append('allow_plus_one', String(allowPlusOne)); fd.append('preferences_enabled', String(preferencesEnabled && !rsvpEnabled)); fd.append('collect_celebrant', String(collectCelebrant)); fd.append('celebrant_options', JSON.stringify(celebrantOptions))
     fd.append('rsvp_enabled', String(rsvpEnabled))
     fd.append('whatsapp_template', whatsappTemplate ? String(whatsappTemplate) : '')
     if (!rsvpEnabled) fd.append('pass_send_at', passTiming === 'scheduled' && passSendAt ? new Date(passSendAt).toISOString() : '')
@@ -137,13 +143,16 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       <form onSubmit={handleSubmit} className="space-y-4">
         <EventDetailsForm step={1} event={event} onValidationChange={setDateValid} />
         <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields}
-          whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} whatsappTemplate={whatsappTemplate} templates={waTemplates}
-          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, collectAsoEbi: ae, allowPlusOne: po, whatsappTemplate: wt }) => {
+          whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} preferencesEnabled={preferencesEnabled} collectCelebrant={collectCelebrant} celebrantOptions={celebrantOptions} whatsappTemplate={whatsappTemplate} templates={waTemplates}
+          onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, collectAsoEbi: ae, allowPlusOne: po, preferencesEnabled: pe, collectCelebrant: cc, celebrantOptions: co, whatsappTemplate: wt }) => {
             if (tt !== undefined) setTicketTypes(tt)
             if (rf !== undefined) setRequiredFields(rf)
             if (wa !== undefined) setWhatsappEnabled(wa)
             if (ae !== undefined) setCollectAsoEbi(ae)
             if (po !== undefined) setAllowPlusOne(po)
+            if (pe !== undefined) setPreferencesEnabled(pe)
+            if (cc !== undefined) setCollectCelebrant(cc)
+            if (co !== undefined) setCelebrantOptions(co)
             if (wt !== undefined) setWhatsappTemplate(wt)
           }} />
         {whatsappEnabled && !event.rsvp_workflow_id && <div className="form-card">
