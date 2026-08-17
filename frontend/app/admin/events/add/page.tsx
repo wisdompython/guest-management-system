@@ -27,6 +27,7 @@ export default function AddEventPage() {
   const [requiredFields, setRequiredFields] = useState<string[]>(['phone_number'])
   const [whatsappEnabled, setWhatsappEnabled] = useState(true)
   const [collectAsoEbi, setCollectAsoEbi] = useState(false)
+  const [allowPlusOne, setAllowPlusOne] = useState(false)
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
@@ -68,6 +69,7 @@ export default function AddEventPage() {
     fd.append('required_fields', JSON.stringify(requiredFields))
     fd.append('whatsapp_enabled', String(whatsappEnabled))
     fd.append('collect_aso_ebi', String(collectAsoEbi))
+    fd.append('allow_plus_one', String(allowPlusOne))
     if (whatsappTemplate) fd.append('whatsapp_template', String(whatsappTemplate))
     const usesRsvp = whatsappEnabled && deliveryFlow === 'rsvp'
     fd.append('create_rsvp_workflow', String(usesRsvp))
@@ -109,11 +111,12 @@ export default function AddEventPage() {
         </div>
 
         <div className={step === 2 ? 'block' : 'hidden'}>
-          <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} whatsappTemplate={whatsappTemplate} templates={waTemplates} onChange={({ ticketTypes: nextTypes, requiredFields: nextFields, whatsappEnabled: nextWhatsapp, collectAsoEbi: nextAsoEbi, whatsappTemplate: nextTemplate }) => {
+          <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields} whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} whatsappTemplate={whatsappTemplate} templates={waTemplates} onChange={({ ticketTypes: nextTypes, requiredFields: nextFields, whatsappEnabled: nextWhatsapp, collectAsoEbi: nextAsoEbi, allowPlusOne: nextPlusOne, whatsappTemplate: nextTemplate }) => {
             if (nextTypes !== undefined) setTicketTypes(nextTypes)
             if (nextFields !== undefined) setRequiredFields(nextFields)
             if (nextWhatsapp !== undefined) setWhatsappEnabled(nextWhatsapp)
             if (nextAsoEbi !== undefined) setCollectAsoEbi(nextAsoEbi)
+            if (nextPlusOne !== undefined) setAllowPlusOne(nextPlusOne)
             if (nextTemplate !== undefined) setWhatsappTemplate(nextTemplate)
           }}/>
         </div>

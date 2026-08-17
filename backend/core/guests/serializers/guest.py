@@ -16,7 +16,7 @@ class GuestSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'event_name', 'full_name', 'phone_number', 'email',
             'ticket_type', 'table_number', 'seat_number',
-            'aso_ebi_requested', 'aso_ebi_quantity',
+            'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
             'qr_code', 'pass_image',
             'status', 'checked_in_at',
             'whatsapp_sent', 'whatsapp_sent_at', 'scheduled_send_at',
@@ -25,7 +25,7 @@ class GuestSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'event_name', 'qr_code', 'pass_image',
             'status', 'checked_in_at',
-            'whatsapp_sent', 'whatsapp_sent_at', 'registered_at',
+            'whatsapp_sent', 'whatsapp_sent_at', 'plus_one_attending', 'registered_at',
         )
 
     def to_representation(self, instance):
@@ -108,9 +108,10 @@ class GuestListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'event', 'event_name', 'full_name', 'phone_number',
             'email', 'ticket_type', 'table_number',
-            'aso_ebi_requested', 'aso_ebi_quantity',
+            'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
             'status', 'whatsapp_sent', 'scheduled_send_at', 'registered_at',
         )
+        read_only_fields = ('plus_one_attending',)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

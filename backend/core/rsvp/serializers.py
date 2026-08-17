@@ -19,6 +19,8 @@ class RsvpStatsSerializer(serializers.Serializer):
     confirmed_no_pass = serializers.IntegerField()
     aso_ebi_requests = serializers.IntegerField()
     aso_ebi_quantity = serializers.IntegerField()
+    plus_ones = serializers.IntegerField()
+    estimated_guests = serializers.IntegerField()
     response_rate = serializers.FloatField()
     confirmation_rate = serializers.FloatField()
 
@@ -78,11 +80,21 @@ def build_workflow_stats(workflow):
             ),
             default=0,
         ),
+        plus_ones=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                guest__plus_one_attending=True,
+            ),
+        ),
     )
     invited = counts['invited']
     responded = counts['confirmed'] + counts['declined']
+    if not workflow.event.allow_plus_one:
+        counts['plus_ones'] = 0
     counts['response_rate'] = round((responded / invited) * 100, 1) if invited else 0.0
     counts['confirmation_rate'] = round((counts['confirmed'] / invited) * 100, 1) if invited else 0.0
+    counts['estimated_guests'] = invited + counts['plus_ones']
     return counts
 
 
@@ -294,6 +306,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
     table_number = serializers.CharField(source='guest.table_number', read_only=True)
     aso_ebi_requested = serializers.BooleanField(source='guest.aso_ebi_requested', read_only=True)
     aso_ebi_quantity = serializers.IntegerField(source='guest.aso_ebi_quantity', read_only=True)
+    plus_one_attending = serializers.BooleanField(source='guest.plus_one_attending', read_only=True)
     has_phone = serializers.SerializerMethodField()
 
     class Meta:
@@ -308,6 +321,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'table_number',
             'aso_ebi_requested',
             'aso_ebi_quantity',
+            'plus_one_attending',
             'has_phone',
             'response_status',
             'invitation_status',

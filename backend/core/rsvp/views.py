@@ -241,7 +241,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             yield writer.writerow([
                 'guest_name', 'phone_number', 'email',
                 'ticket_type', 'table_number', 'response_status',
-                'aso_ebi_requested', 'aso_ebi_yards',
+                'aso_ebi_requested', 'aso_ebi_yards', 'plus_one_attending',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
                 'invitation_error', 'pass_error',
                 'invitation_auto_retries', 'pass_auto_retries',
@@ -258,6 +258,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     recipient.response_status,
                     'Yes' if recipient.guest.aso_ebi_requested else 'No',
                     recipient.guest.aso_ebi_quantity if recipient.guest.aso_ebi_requested else 0,
+                    'Yes' if recipient.guest.plus_one_attending else 'No',
                     recipient.responded_at.isoformat() if recipient.responded_at else '',
                     recipient.invitation_status,
                     recipient.pass_status,
@@ -770,8 +771,10 @@ class PublicRsvpResponseView(APIView):
             'rsvp_message': workflow.event.rsvp_message,
             'color_of_day': workflow.event.color_of_day,
             'collect_aso_ebi': workflow.event.collect_aso_ebi,
+            'allow_plus_one': workflow.event.allow_plus_one,
             'aso_ebi_requested': recipient.guest.aso_ebi_requested,
             'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,
+            'plus_one_attending': recipient.guest.plus_one_attending,
             'invitation_image': (
                 request.build_absolute_uri(recipient.invitation_image.url)
                 if recipient.invitation_image else None
@@ -809,6 +812,19 @@ class PublicRsvpResponseView(APIView):
             )
         if answer == 'no':
             aso_ebi_requested = False
+        plus_one_attending = request.data.get('plus_one_attending', False)
+        if not isinstance(plus_one_attending, bool):
+            return Response(
+                {'detail': 'plus_one_attending must be true or false.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if answer == 'no':
+            plus_one_attending = False
+        if plus_one_attending and not recipient.workflow.event.allow_plus_one:
+            return Response(
+                {'detail': 'Plus ones are not enabled for this event.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if aso_ebi_requested and not recipient.workflow.event.collect_aso_ebi:
             return Response(
                 {'detail': 'Aso Ebi requests are not enabled for this event.'},
@@ -835,9 +851,11 @@ class PublicRsvpResponseView(APIView):
                 'answer': answer,
                 'aso_ebi_requested': aso_ebi_requested,
                 'aso_ebi_quantity': aso_ebi_quantity if aso_ebi_requested else 0,
+                'plus_one_attending': plus_one_attending,
             },
             aso_ebi_requested=aso_ebi_requested,
             aso_ebi_quantity=aso_ebi_quantity if aso_ebi_requested else 0,
+            plus_one_attending=plus_one_attending,
         )
         reason = result.get('reason')
         if reason == 'not_found':

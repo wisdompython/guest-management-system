@@ -37,6 +37,8 @@ class FontSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     guest_count = serializers.SerializerMethodField()
     checked_in_count = serializers.SerializerMethodField()
+    plus_one_count = serializers.SerializerMethodField()
+    estimated_guest_count = serializers.SerializerMethodField()
     name_font_name = serializers.CharField(source='name_font.name', read_only=True)
     whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
     create_rsvp_workflow = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -50,6 +52,15 @@ class EventSerializer(serializers.ModelSerializer):
     def get_checked_in_count(self, obj):
         ann = getattr(obj, 'checked_in_count_ann', None)
         return ann if ann is not None else obj.guests.filter(status='checked_in').count()
+
+    def get_plus_one_count(self, obj):
+        if not obj.allow_plus_one:
+            return 0
+        ann = getattr(obj, 'plus_one_count_ann', None)
+        return ann if ann is not None else obj.guests.filter(plus_one_attending=True).count()
+
+    def get_estimated_guest_count(self, obj):
+        return self.get_guest_count(obj) + self.get_plus_one_count(obj)
 
     def get_rsvp_workflow_id(self, obj):
         try:
@@ -66,11 +77,12 @@ class EventSerializer(serializers.ModelSerializer):
             'name_zone_x', 'name_zone_y', 'name_zone_w', 'name_zone_h',
             'name_font', 'name_font_name', 'name_font_color', 'name_font_size_fraction',
             'qr_bg_color',
-            'ticket_types', 'required_fields', 'collect_aso_ebi', 'whatsapp_enabled',
+            'ticket_types', 'required_fields', 'collect_aso_ebi', 'allow_plus_one', 'whatsapp_enabled',
             'rsvp_enabled',
             'whatsapp_template', 'whatsapp_template_name',
             'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
-            'is_ended', 'guest_count', 'checked_in_count', 'created_at',
+            'is_ended', 'guest_count', 'checked_in_count', 'plus_one_count',
+            'estimated_guest_count', 'created_at',
         )
         read_only_fields = ('id', 'created_at', 'name_font_name', 'whatsapp_template_name')
 

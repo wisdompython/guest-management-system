@@ -99,7 +99,11 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
         <aside className="space-y-5">
           <section className="form-card p-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Guests</p>
-            <div className="mt-4 grid grid-cols-2 gap-3"><div><p className="text-3xl font-bold text-[var(--ink)]">{event.guest_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Registered</p></div><div><p className="text-3xl font-bold text-[var(--ink)]">{event.checked_in_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Checked in</p></div></div>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div><p className="text-3xl font-bold text-[var(--ink)]">{event.guest_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Registered</p></div>
+              <div><p className="text-3xl font-bold text-[var(--ink)]">{event.checked_in_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Checked in</p></div>
+              {event.allow_plus_one && <><div><p className="text-3xl font-bold text-[var(--brand)]">{event.plus_one_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Plus-ones</p></div><div><p className="text-3xl font-bold text-[var(--brand)]">{event.estimated_guest_count}</p><p className="mt-1 text-xs text-[var(--muted)]">Estimated guests</p></div></>}
+            </div>
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--bg)]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${event.guest_count ? Math.round((event.checked_in_count / event.guest_count) * 100) : 0}%` }}/></div>
           </section>
 

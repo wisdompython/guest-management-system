@@ -47,6 +47,7 @@ export default function PublicRsvpPage() {
   const [answer, setAnswer] = useState<'yes' | 'no' | null>(null)
   const [asoEbiRequested, setAsoEbiRequested] = useState(false)
   const [asoEbiQuantity, setAsoEbiQuantity] = useState(2)
+  const [plusOneAttending, setPlusOneAttending] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -64,7 +65,13 @@ export default function PublicRsvpPage() {
     setSubmitting(response)
     setError('')
     try {
-      const result = await api.submitPublicRsvp(token, response, asoEbiRequested, asoEbiQuantity)
+      const result = await api.submitPublicRsvp(
+        token,
+        response,
+        asoEbiRequested,
+        asoEbiQuantity,
+        plusOneAttending,
+      )
       setDetails((current) => current ? {
         ...current,
         response_status: result.response_status,
@@ -73,6 +80,7 @@ export default function PublicRsvpPage() {
         responded_at: new Date().toISOString(),
         aso_ebi_requested: response === 'yes' && asoEbiRequested,
         aso_ebi_quantity: response === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
+        plus_one_attending: response === 'yes' && plusOneAttending,
       } : current)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Your response could not be saved. Please try again.')
@@ -133,7 +141,7 @@ export default function PublicRsvpPage() {
                 <p className="mx-auto max-w-xl text-center text-base font-semibold leading-6 sm:text-lg">Hi {details.guest_name}, are you attending?</p>
                 <div className="mx-auto mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
                   <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’m Coming</button>
-                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false) }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
+                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false); setPlusOneAttending(false) }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
                 </div>
 
                 {details.response_deadline && (
@@ -150,6 +158,15 @@ export default function PublicRsvpPage() {
                       <span><span className="block text-sm font-semibold">I would like to request Aso Ebi</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Select this to include an Aso Ebi request with your RSVP.</span></span>
                     </label>
                     {asoEbiRequested && <div className="mt-4"><AsoEbiYardSelector value={asoEbiQuantity} onChange={setAsoEbiQuantity} /></div>}
+                  </div>
+                )}
+
+                {answer === 'yes' && details.allow_plus_one && (
+                  <div className="mx-auto mt-5 max-w-2xl rounded-[12px] p-4 sm:p-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input type="checkbox" checked={plusOneAttending} onChange={(event) => setPlusOneAttending(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+                      <span><span className="block text-sm font-semibold">I’m bringing a plus one</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Let the organiser know that one additional guest will attend with you.</span></span>
+                    </label>
                   </div>
                 )}
 
@@ -183,5 +200,5 @@ function ResponseCard({ details }: { details: PublicRsvpDetails }) {
       ? 'Please contact the event organiser if you need assistance.'
       : RESPONSE_COPY[details.response_status].body
 
-  return <div className="mt-8 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#ffffff' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{body}</p>{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity} yards</p>}</div>
+  return <div className="mt-8 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#ffffff' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{body}</p>{details.response_status === 'confirmed' && details.plus_one_attending && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Plus one included</p>}{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity} yards</p>}</div>
 }

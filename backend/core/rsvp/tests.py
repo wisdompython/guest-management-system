@@ -379,6 +379,26 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertEqual(response.data['passes_sent'], 1)
         self.assertEqual(response.data['confirmation_rate'], 100.0)
 
+    def test_stats_add_plus_ones_to_invited_guest_estimate(self):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        self.guest_a.plus_one_attending = True
+        self.guest_a.save(update_fields=['plus_one_attending'])
+        workflow = self.create_workflow()
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_b)
+
+        response = self.client.get(f'/api/rsvp/workflows/{workflow.id}/stats/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['invited'], 2)
+        self.assertEqual(response.data['plus_ones'], 1)
+        self.assertEqual(response.data['estimated_guests'], 3)
+
     def test_export_contains_response_and_delivery_columns(self):
         workflow = self.create_workflow()
         RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_a)
@@ -841,6 +861,15 @@ class PublicRsvpPageApiTests(TestCase):
         self.assertEqual(response.data['color_of_day'], 'Burgundy and gold')
         self.assertTrue(response.data['can_respond'])
 
+    def test_public_details_include_plus_one_configuration(self):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+
+        response = self.client.get(self.url)
+
+        self.assertTrue(response.data['allow_plus_one'])
+        self.assertFalse(response.data['plus_one_attending'])
+
     def test_legacy_uuid_link_remains_available(self):
         response = self.client.get(self.legacy_url)
         self.assertEqual(response.status_code, 200)
@@ -872,6 +901,34 @@ class PublicRsvpPageApiTests(TestCase):
         self.assertTrue(duplicate.data['already_responded'])
         self.assertEqual(RsvpResponse.objects.count(), 1)
         mock_send.assert_called_once_with(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_yes_response_can_include_one_plus_one(self, mock_send):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {'answer': 'yes', 'plus_one_attending': True},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.guest.refresh_from_db()
+        self.assertTrue(self.guest.plus_one_attending)
+        mock_send.assert_called_once_with(self.recipient.id)
+
+    def test_plus_one_is_rejected_when_event_does_not_allow_it(self):
+        response = self.client.post(
+            self.url,
+            {'answer': 'yes', 'plus_one_attending': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.guest.refresh_from_db()
+        self.assertFalse(self.guest.plus_one_attending)
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
     def test_no_response_declines_without_a_pass(self, mock_send):

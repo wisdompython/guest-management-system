@@ -34,7 +34,8 @@ export function EventsPanel({ events, loading }: Props) {
               </p>
             </div>
             <span className="text-[13px] font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
-              {ev.guest_count}
+              {ev.allow_plus_one ? ev.estimated_guest_count : ev.guest_count}
+              {ev.allow_plus_one && <span className="ml-1 text-[10px] font-normal" style={{ color: 'var(--muted)' }}>est.</span>}
             </span>
           </Link>
         ))}

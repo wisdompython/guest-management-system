@@ -185,6 +185,7 @@ def record_response(
     require_phone_match: bool = False,
     aso_ebi_requested: bool = False,
     aso_ebi_quantity: int = 0,
+    plus_one_attending: bool = False,
 ) -> dict:
     """Record the first valid response and queue a pass when appropriate."""
     if answer not in {RsvpResponse.Answer.YES, RsvpResponse.Answer.NO}:
@@ -221,6 +222,8 @@ def record_response(
             return {'accepted': False, 'reason': 'aso_ebi_not_enabled'}
         if aso_ebi_requested and aso_ebi_quantity < 1:
             return {'accepted': False, 'reason': 'invalid_aso_ebi_quantity'}
+        if plus_one_attending and not recipient.workflow.event.allow_plus_one:
+            return {'accepted': False, 'reason': 'plus_one_not_enabled'}
 
         _, created = RsvpResponse.objects.get_or_create(
             message_id=response_id,
@@ -244,7 +247,10 @@ def record_response(
             recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
             recipient.guest.aso_ebi_requested = aso_ebi_requested
             recipient.guest.aso_ebi_quantity = aso_ebi_quantity if aso_ebi_requested else 0
-            recipient.guest.save(update_fields=['aso_ebi_requested', 'aso_ebi_quantity'])
+            recipient.guest.plus_one_attending = plus_one_attending
+            recipient.guest.save(update_fields=[
+                'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
+            ])
             if recipient.workflow.auto_send_pass and pass_due:
                 recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
                 recipient.pass_queued_at = now
@@ -253,7 +259,10 @@ def record_response(
             recipient.pass_status = RsvpRecipient.PassStatus.NOT_ISSUED
             recipient.guest.aso_ebi_requested = False
             recipient.guest.aso_ebi_quantity = 0
-            recipient.guest.save(update_fields=['aso_ebi_requested', 'aso_ebi_quantity'])
+            recipient.guest.plus_one_attending = False
+            recipient.guest.save(update_fields=[
+                'aso_ebi_requested', 'aso_ebi_quantity', 'plus_one_attending',
+            ])
         recipient.responded_at = now
         recipient.save(update_fields=[
             'response_status',

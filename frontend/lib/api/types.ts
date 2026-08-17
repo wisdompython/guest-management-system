@@ -175,6 +175,7 @@ export interface Event {
   ticket_types: TicketTypeDef[];
   required_fields: string[];
   collect_aso_ebi: boolean;
+  allow_plus_one: boolean;
   whatsapp_enabled: boolean;
   rsvp_enabled: boolean;
   whatsapp_template: number | null;
@@ -184,6 +185,8 @@ export interface Event {
   is_ended: boolean;
   guest_count: number;
   checked_in_count: number;
+  plus_one_count: number;
+  estimated_guest_count: number;
   created_at: string;
 }
 
@@ -242,6 +245,8 @@ export interface RsvpStats {
   confirmed_no_pass: number;
   aso_ebi_requests: number;
   aso_ebi_quantity: number;
+  plus_ones: number;
+  estimated_guests: number;
   response_rate: number;
   confirmation_rate: number;
 }
@@ -282,6 +287,7 @@ export interface RsvpRecipient {
   table_number: string;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
+  plus_one_attending: boolean;
   has_phone: boolean;
   response_status: RsvpResponseStatus;
   invitation_status: RsvpInvitationStatus;
@@ -325,8 +331,10 @@ export interface PublicRsvpDetails {
   rsvp_message: string;
   color_of_day: string;
   collect_aso_ebi: boolean;
+  allow_plus_one: boolean;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
+  plus_one_attending: boolean;
   invitation_image: string | null;
   response_deadline: string | null;
   response_status: RsvpResponseStatus;

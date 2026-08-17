@@ -92,7 +92,13 @@ export const rsvpApi = {
     ),
   getPublicRsvp: (token: string) =>
     request<PublicRsvpDetails>(`/rsvp/respond/${token}/`),
-  submitPublicRsvp: (token: string, answer: 'yes' | 'no', asoEbiRequested = false, asoEbiQuantity = 0) =>
+  submitPublicRsvp: (
+    token: string,
+    answer: 'yes' | 'no',
+    asoEbiRequested = false,
+    asoEbiQuantity = 0,
+    plusOneAttending = false,
+  ) =>
     request<{
       accepted: boolean
       already_responded?: boolean
@@ -104,6 +110,7 @@ export const rsvpApi = {
         answer,
         aso_ebi_requested: answer === 'yes' && asoEbiRequested,
         aso_ebi_quantity: answer === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
+        plus_one_attending: answer === 'yes' && plusOneAttending,
       }),
     }),
 }

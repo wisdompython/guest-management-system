@@ -102,6 +102,19 @@ class EventDeliveryWorkflowTests(TestCase):
         self.assertIsNone(response.data['rsvp_workflow_id'])
         self.assertFalse(response.data['rsvp_enabled'])
 
+    def test_event_can_enable_plus_ones_and_reports_estimated_guests(self):
+        event = make_event(name='Plus One Event', allow_plus_one=True)
+        make_guest(event, full_name='Guest One', plus_one_attending=True)
+        make_guest(event, full_name='Guest Two')
+
+        response = self.client.get(f'/api/events/{event.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['allow_plus_one'])
+        self.assertEqual(response.data['guest_count'], 2)
+        self.assertEqual(response.data['plus_one_count'], 1)
+        self.assertEqual(response.data['estimated_guest_count'], 3)
+
 
 class GuestListFilterTests(TestCase):
     def setUp(self):
