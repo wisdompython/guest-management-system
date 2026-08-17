@@ -3,6 +3,7 @@ import { guestsApi } from './guests';
 import { eventsApi, fontsApi } from './events';
 import { remindersApi } from './reminders';
 import { rsvpApi } from './rsvp';
+import { operationsApi } from './operations';
 
 export const api = {
   ...authApi,
@@ -11,6 +12,7 @@ export const api = {
   ...fontsApi,
   ...remindersApi,
   ...rsvpApi,
+  ...operationsApi,
 };
 
 export type {
@@ -18,4 +20,5 @@ export type {
   Event, CreateGuestPayload, RsvpWorkflow, RsvpWorkflowStatus, RsvpStats, RsvpRecipient,
   RsvpRecipientSegment, RsvpResponseStatus, RsvpInvitationStatus, RsvpPassStatus,
   PaginatedRsvpRecipients, PublicRsvpDetails,
+  QueueMonitorSnapshot,
 } from './types';

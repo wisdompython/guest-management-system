@@ -55,17 +55,111 @@ def _retry_cooldown_response(error_text, last_attempt, attempts):
     )
 
 
+def _template_changed(last_template_name, configured_template_name):
+    """Whether a manual retry will use a different (or newly tracked) template.
+
+    Blank legacy values are treated as changed once so recipients that failed
+    before template tracking was deployed are not trapped behind stale
+    cooldown data.
+    """
+    return bool(configured_template_name) and (
+        not last_template_name
+        or last_template_name != configured_template_name
+    )
+
+
+RECIPIENT_DELIVERED_STATUSES = [
+    RsvpRecipient.InvitationStatus.SENT,
+    RsvpRecipient.InvitationStatus.DELIVERED,
+    RsvpRecipient.InvitationStatus.READ,
+]
+RECIPIENT_SEGMENTS = {
+    'invited_awaiting': dict(
+        response_status=RsvpRecipient.ResponseStatus.AWAITING,
+        invitation_status__in=RECIPIENT_DELIVERED_STATUSES,
+    ),
+    'confirmed_with_pass': dict(
+        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        pass_status__in=RECIPIENT_DELIVERED_STATUSES,
+    ),
+    'confirmed_no_pass': dict(
+        response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+    ),
+}
+
+
+def _apply_recipient_filters(recipients, query_params):
+    """Apply the dashboard's complete filter set to a recipient queryset."""
+    errors = {}
+    segment = query_params.get('segment')
+    if segment:
+        if segment == 'delivery_failed':
+            recipients = recipients.filter(
+                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
+                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+            )
+        elif segment in RECIPIENT_SEGMENTS:
+            recipients = recipients.filter(**RECIPIENT_SEGMENTS[segment])
+            if segment == 'confirmed_no_pass':
+                recipients = recipients.exclude(
+                    pass_status__in=RECIPIENT_DELIVERED_STATUSES,
+                )
+        else:
+            errors['segment'] = 'Invalid segment filter.'
+
+    filter_choices = {
+        'response_status': {
+            value for value, _label in RsvpRecipient.ResponseStatus.choices
+        },
+        'invitation_status': {
+            value for value, _label in RsvpRecipient.InvitationStatus.choices
+        },
+        'pass_status': {
+            value for value, _label in RsvpRecipient.PassStatus.choices
+        },
+    }
+    for field, choices in filter_choices.items():
+        if value := query_params.get(field):
+            if value in choices:
+                recipients = recipients.filter(**{field: value})
+            else:
+                errors[field] = f'Invalid {field} filter.'
+
+    if delivery_status := query_params.get('delivery_status'):
+        if delivery_status == 'failed':
+            recipients = recipients.filter(
+                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
+                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+            )
+        else:
+            errors['delivery_status'] = 'Invalid delivery_status filter.'
+
+    if search := query_params.get('search'):
+        recipients = recipients.filter(guest__full_name__icontains=search)
+    return recipients, errors
+
+
 class RsvpWorkflowViewSet(viewsets.ModelViewSet):
     serializer_class = RsvpWorkflowSerializer
     permission_classes = [ReadOnlyOrEventManager]
     queryset = (
         RsvpWorkflow.objects
-        .select_related('event', 'invitation_template', 'pass_template', 'created_by')
+        .select_related(
+            'event__whatsapp_template',
+            'invitation_template',
+            'pass_template',
+            'created_by',
+        )
         .all()
     )
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # Collection filters must not hide a detail action's workflow. Export
+        # reuses `search` for guest names, while the workflow list uses it for
+        # event names.
+        if getattr(self, 'action', None) != 'list':
+            return qs
         if event_id := self.request.query_params.get('event'):
             qs = qs.filter(event_id=event_id)
         if workflow_status := self.request.query_params.get('status'):
@@ -130,17 +224,12 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
     def export(self, request, pk=None):
         workflow = self.get_object()
         recipients = workflow.recipients.select_related('guest').order_by('guest__full_name')
-        response_status = request.query_params.get('response_status')
-        valid_response_statuses = {
-            value for value, _label in RsvpRecipient.ResponseStatus.choices
-        }
-        if response_status:
-            if response_status not in valid_response_statuses:
-                return Response(
-                    {'detail': 'Invalid response_status filter.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            recipients = recipients.filter(response_status=response_status)
+        recipients, filter_errors = _apply_recipient_filters(
+            recipients,
+            request.query_params,
+        )
+        if filter_errors:
+            return Response(filter_errors, status=status.HTTP_400_BAD_REQUEST)
 
         class Echo:
             def write(self, value):
@@ -154,6 +243,10 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                 'ticket_type', 'table_number', 'response_status',
                 'aso_ebi_requested', 'aso_ebi_yards',
                 'responded_at', 'invitation_status', 'pass_status', 'reminder_count',
+                'invitation_error', 'pass_error',
+                'invitation_auto_retries', 'pass_auto_retries',
+                'invitation_last_template', 'pass_last_template',
+                'invitation_last_attempt_at', 'pass_last_attempt_at',
             ])
             for recipient in recipients.iterator():
                 yield writer.writerow(safe_csv_row([
@@ -169,6 +262,14 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                     recipient.invitation_status,
                     recipient.pass_status,
                     recipient.reminder_count,
+                    recipient.invitation_error,
+                    recipient.pass_error,
+                    recipient.invitation_auto_retries,
+                    recipient.pass_auto_retries,
+                    recipient.invitation_last_template_name,
+                    recipient.pass_last_template_name,
+                    recipient.invitation_queued_at.isoformat() if recipient.invitation_queued_at else '',
+                    recipient.pass_queued_at.isoformat() if recipient.pass_queued_at else '',
                 ]))
 
         safe_name = ''.join(
@@ -176,7 +277,17 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             for character in workflow.event.name
         ).strip('_')
         response = StreamingHttpResponse(rows(), content_type='text/csv')
-        filter_suffix = f'_{response_status}' if response_status else ''
+        suffixes = [
+            request.query_params.get(name)
+            for name in (
+                'response_status', 'segment', 'invitation_status',
+                'pass_status', 'delivery_status',
+            )
+            if request.query_params.get(name)
+        ]
+        if request.query_params.get('search'):
+            suffixes.append('search')
+        filter_suffix = f"_{'_'.join(suffixes)}" if suffixes else ''
         response['Content-Disposition'] = (
             f'attachment; filename="rsvp{filter_suffix}_{safe_name or workflow.id}.csv"'
         )
@@ -308,16 +419,47 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        now = timezone.now()
         cooldown_minutes = settings.RSVP_REMINDER_COOLDOWN_MINUTES
-        reminder_cutoff = timezone.now() - timedelta(minutes=cooldown_minutes)
+        reminder_cutoff = now - timedelta(minutes=cooldown_minutes)
         awaiting = workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
             reminder_count__lt=settings.RSVP_MAX_REMINDERS,
         )
+
+        # Failed sends follow the same rules as the single and bulk retry
+        # endpoints: a retryable WhatsApp error must be past its cooldown
+        # unless the configured template has changed since the failure.
+        configured_template = (
+            workflow.invitation_template.name
+            if workflow.invitation_template_id else ''
+        )
+        failed_ids, skipped_cooldown = [], 0
+        failed_rows = awaiting.filter(
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+        ).values(
+            'id', 'invitation_last_template_name', 'invitation_error',
+            'last_error', 'invitation_queued_at', 'invitation_auto_retries',
+        )
+        for row in failed_rows:
+            if not _template_changed(
+                row['invitation_last_template_name'], configured_template,
+            ):
+                retry_at = _retry_available_at(
+                    row['invitation_error'] or row['last_error'],
+                    row['invitation_queued_at'],
+                    row['invitation_auto_retries'],
+                )
+                if retry_at and now < retry_at:
+                    skipped_cooldown += 1
+                    continue
+            failed_ids.append(row['id'])
+
         eligible = awaiting.filter(
-            Q(invitation_status__in=[
-                RsvpRecipient.InvitationStatus.FAILED,
-            ])
+            Q(
+                pk__in=failed_ids,
+                invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            )
             | Q(
                 invitation_status__in=[
                     RsvpRecipient.InvitationStatus.SENT,
@@ -332,6 +474,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         queued = eligible.update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
             invitation_queued_at=None,
+            invitation_error='',
             last_error='',
         )
         if queued:
@@ -339,6 +482,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             queue_workflow_invitations.delay(workflow.id)
         return Response({
             'queued': queued,
+            'skipped_cooldown': skipped_cooldown,
             'cooldown_minutes': cooldown_minutes,
             'max_reminders': settings.RSVP_MAX_REMINDERS,
         })
@@ -363,56 +507,21 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [ReadOnlyOrEventManager]
     queryset = (
         RsvpRecipient.objects
-        .select_related('workflow__event', 'guest')
+        .select_related(
+            'workflow__event__whatsapp_template',
+            'workflow__invitation_template',
+            'workflow__pass_template',
+            'guest__event__whatsapp_template',
+        )
         .all()
     )
-
-    # Delivery-progress segments for the workflow dashboard. "Received" means
-    # Meta reported the message at least sent (sent/delivered/read).
-    DELIVERED_STATUSES = [
-        RsvpRecipient.InvitationStatus.SENT,
-        RsvpRecipient.InvitationStatus.DELIVERED,
-        RsvpRecipient.InvitationStatus.READ,
-    ]
-    SEGMENTS = {
-        'invited_awaiting': dict(
-            response_status=RsvpRecipient.ResponseStatus.AWAITING,
-            invitation_status__in=DELIVERED_STATUSES,
-        ),
-        'confirmed_with_pass': dict(
-            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
-            pass_status__in=DELIVERED_STATUSES,
-        ),
-        'confirmed_no_pass': dict(
-            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
-        ),
-    }
 
     def get_queryset(self):
         qs = super().get_queryset()
         if workflow_id := self.request.query_params.get('workflow'):
             qs = qs.filter(workflow_id=workflow_id)
-        if segment := self.request.query_params.get('segment'):
-            if segment == 'delivery_failed':
-                qs = qs.filter(
-                    Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
-                    | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
-                )
-            else:
-                filters = self.SEGMENTS.get(segment)
-            if segment != 'delivery_failed' and filters:
-                qs = qs.filter(**filters)
-                if segment == 'confirmed_no_pass':
-                    qs = qs.exclude(pass_status__in=self.DELIVERED_STATUSES)
-        if response_status := self.request.query_params.get('response_status'):
-            qs = qs.filter(response_status=response_status)
-        if invitation_status := self.request.query_params.get('invitation_status'):
-            qs = qs.filter(invitation_status=invitation_status)
-        if pass_status := self.request.query_params.get('pass_status'):
-            qs = qs.filter(pass_status=pass_status)
-        if search := self.request.query_params.get('search'):
-            qs = qs.filter(guest__full_name__icontains=search)
-        return qs
+        qs, filter_errors = _apply_recipient_filters(qs, self.request.query_params)
+        return qs.none() if filter_errors else qs
 
     BULK_RETRY_MAX_SELECTION = 500
 
@@ -426,6 +535,10 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         guest doesn't block the rest of the selection.
         """
         from .tasks import send_confirmed_pass, send_rsvp_invitation
+        from .whatsapp import (
+            configured_invitation_template_name,
+            configured_pass_template_name,
+        )
 
         kind = request.data.get('kind')
         recipient_ids = request.data.get('recipient_ids')
@@ -443,17 +556,18 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
 
         now = timezone.now()
         if kind == 'invitation':
-            rows = RsvpRecipient.objects.filter(
+            rows = RsvpRecipient.objects.select_related(
+                'workflow__invitation_template',
+            ).filter(
                 pk__in=recipient_ids,
                 workflow__status=RsvpWorkflow.Status.ACTIVE,
                 response_status=RsvpRecipient.ResponseStatus.AWAITING,
                 invitation_status=RsvpRecipient.InvitationStatus.FAILED,
-            ).values(
-                'id', 'invitation_error', 'last_error',
-                'invitation_queued_at', 'invitation_auto_retries',
             )
             error_field, stamp_field = 'invitation_error', 'invitation_queued_at'
             retries_field = 'invitation_auto_retries'
+            template_field = 'invitation_last_template_name'
+            configured_template = configured_invitation_template_name
             claim_filters = {
                 'invitation_status': RsvpRecipient.InvitationStatus.FAILED,
             }
@@ -465,16 +579,18 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
             }
             send_task = send_rsvp_invitation
         else:
-            rows = RsvpRecipient.objects.filter(
+            rows = RsvpRecipient.objects.select_related(
+                'workflow__pass_template',
+                'guest__event__whatsapp_template',
+            ).filter(
                 pk__in=recipient_ids,
                 response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
                 pass_status=RsvpRecipient.PassStatus.FAILED,
-            ).values(
-                'id', 'pass_error', 'last_error',
-                'pass_queued_at', 'pass_auto_retries',
             )
             error_field, stamp_field = 'pass_error', 'pass_queued_at'
             retries_field = 'pass_auto_retries'
+            template_field = 'pass_last_template_name'
+            configured_template = configured_pass_template_name
             claim_filters = {'pass_status': RsvpRecipient.PassStatus.FAILED}
             claim_updates = {
                 'pass_status': RsvpRecipient.PassStatus.QUEUED,
@@ -487,15 +603,21 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         rows = list(rows)
         eligible_ids, cooling = [], 0
         for row in rows:
+            if _template_changed(
+                getattr(row, template_field),
+                configured_template(row),
+            ):
+                eligible_ids.append(row.id)
+                continue
             retry_at = _retry_available_at(
-                row[error_field] or row['last_error'],
-                row[stamp_field],
-                row[retries_field],
+                getattr(row, error_field) or row.last_error,
+                getattr(row, stamp_field),
+                getattr(row, retries_field),
             )
             if retry_at and now < retry_at:
                 cooling += 1
                 continue
-            eligible_ids.append(row['id'])
+            eligible_ids.append(row.id)
 
         queued = 0
         if eligible_ids:
@@ -538,7 +660,14 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         # force=True is the operator's explicit "retry anyway" during a
         # cooldown — e.g. the guest just messaged back, which lifts Meta's
         # per-user block. Deliberately not offered on the bulk endpoint.
-        if not bool(request.data.get('force')):
+        from .whatsapp import configured_invitation_template_name
+
+        configured_template = configured_invitation_template_name(recipient)
+        template_changed = _template_changed(
+            recipient.invitation_last_template_name,
+            configured_template,
+        )
+        if not bool(request.data.get('force')) and not template_changed:
             if cooldown := _retry_cooldown_response(
                 recipient.invitation_error or recipient.last_error,
                 recipient.invitation_queued_at,
@@ -555,7 +684,11 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         ])
         from .tasks import send_rsvp_invitation
         send_rsvp_invitation.delay(recipient.id)
-        return Response({'queued': True})
+        return Response({
+            'queued': True,
+            'template': configured_template,
+            'template_changed': template_changed,
+        })
 
     @action(detail=True, methods=['post'], url_path='retry-pass')
     def retry_pass(self, request, pk=None):
@@ -570,7 +703,14 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Only failed pass deliveries can be retried.'},
                 status=status.HTTP_409_CONFLICT,
             )
-        if not bool(request.data.get('force')):
+        from .whatsapp import configured_pass_template_name
+
+        configured_template = configured_pass_template_name(recipient)
+        template_changed = _template_changed(
+            recipient.pass_last_template_name,
+            configured_template,
+        )
+        if not bool(request.data.get('force')) and not template_changed:
             if cooldown := _retry_cooldown_response(
                 recipient.pass_error or recipient.last_error,
                 recipient.pass_queued_at,
@@ -587,7 +727,11 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         ])
         from .tasks import send_confirmed_pass
         send_confirmed_pass.delay(recipient.id)
-        return Response({'queued': True})
+        return Response({
+            'queued': True,
+            'template': configured_template,
+            'template_changed': template_changed,
+        })
 
 
 class PublicRsvpResponseView(APIView):

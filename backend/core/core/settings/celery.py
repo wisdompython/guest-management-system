@@ -12,6 +12,10 @@ CELERY_TASK_SERIALIZER    = 'json'
 CELERY_RESULT_SERIALIZER  = 'json'
 CELERY_TIMEZONE           = os.environ.get('APP_TIME_ZONE', 'Africa/Lagos')
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Persist task names, worker identity, and STARTED timestamps for the protected
+# queue monitor. The API deliberately never returns stored task args/kwargs.
+CELERY_RESULT_EXTENDED = True
+CELERY_TASK_TRACK_STARTED = True
 
 # Keep CPU-heavy rendering away from imports and rate-limited WhatsApp sends.
 # This prevents a 5,000-guest upload from starving live RSVP delivery.

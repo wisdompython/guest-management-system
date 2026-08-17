@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
@@ -92,7 +93,7 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
         source='invitation_template.display_name',
         read_only=True,
     )
-    pass_template_name = serializers.CharField(source='pass_template.display_name', read_only=True)
+    pass_template_name = serializers.SerializerMethodField()
     stats = serializers.SerializerMethodField()
 
     class Meta:
@@ -133,6 +134,10 @@ class RsvpWorkflowSerializer(serializers.ModelSerializer):
 
     def get_stats(self, obj):
         return build_workflow_stats(obj)
+
+    def get_pass_template_name(self, obj):
+        template = obj.pass_template or obj.event.whatsapp_template
+        return template.display_name if template else settings.WHATSAPP_PASS_TEMPLATE
 
     def validate_invitation_design(self, value):
         if value.size > 5 * 1024 * 1024:
@@ -309,6 +314,7 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'invitation_image',
             'pass_status',
             'invitation_sent_at',
+            'invitation_queued_at',
             'responded_at',
             'pass_queued_at',
             'reminder_count',
@@ -318,6 +324,8 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'pass_error',
             'invitation_auto_retries',
             'pass_auto_retries',
+            'invitation_last_template_name',
+            'pass_last_template_name',
             'created_at',
             'updated_at',
         )

@@ -267,7 +267,7 @@ def queue_workflow_invitations(workflow_id: int):
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, rate_limit=RSVP_RATE_LIMIT)
 def send_rsvp_invitation(self, recipient_id: int):
     from .models import RsvpRecipient, RsvpWorkflow
-    from .whatsapp import send_invitation
+    from .whatsapp import configured_invitation_template_name, send_invitation
 
     try:
         recipient = (
@@ -292,7 +292,10 @@ def send_rsvp_invitation(self, recipient_id: int):
     claimed = RsvpRecipient.objects.filter(
         pk=recipient_id,
         invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
-    ).update(invitation_status=RsvpRecipient.InvitationStatus.SENDING)
+    ).update(
+        invitation_status=RsvpRecipient.InvitationStatus.SENDING,
+        invitation_last_template_name=configured_invitation_template_name(recipient),
+    )
     if not claimed:
         return {'sent': False, 'reason': 'invitation already claimed'}
 
@@ -333,7 +336,7 @@ def send_confirmed_pass(self, recipient_id: int):
     from guests.models import Guest
 
     from .models import RsvpRecipient
-    from .whatsapp import send_configured_pass
+    from .whatsapp import configured_pass_template_name, send_configured_pass
 
     try:
         recipient = (
@@ -357,7 +360,10 @@ def send_confirmed_pass(self, recipient_id: int):
     claimed = RsvpRecipient.objects.filter(
         pk=recipient_id,
         pass_status=RsvpRecipient.PassStatus.QUEUED,
-    ).update(pass_status=RsvpRecipient.PassStatus.SENDING)
+    ).update(
+        pass_status=RsvpRecipient.PassStatus.SENDING,
+        pass_last_template_name=configured_pass_template_name(recipient),
+    )
     if not claimed:
         return {'sent': False, 'reason': 'pass already claimed'}
 

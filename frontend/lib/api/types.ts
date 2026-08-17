@@ -22,6 +22,82 @@ export interface CreateUserPayload {
   password: string;
 }
 
+export interface QueueMonitorSnapshot {
+  generated_at: string;
+  broker: {
+    available: boolean;
+    error: string;
+    queues: Array<{ name: string; pending: number | null }>;
+  };
+  workers: {
+    available: boolean;
+    error: string;
+    workers: Array<{
+      name: string;
+      online: boolean;
+      queues: string[];
+      concurrency: number | null;
+      active: number;
+      reserved: number;
+      scheduled: number;
+    }>;
+    tasks: Array<{
+      id: string;
+      name: string;
+      worker: string;
+      state: 'active' | 'reserved' | 'scheduled';
+      queue: string;
+      time_start: number | null;
+      eta: string | null;
+    }>;
+  };
+  periodic_dispatchers: Array<{
+    name: string;
+    task: string;
+    enabled: boolean;
+    last_run_at: string | null;
+    seconds_since_last_run: number | null;
+    overdue_seconds: number | null;
+    total_runs: number;
+    healthy: boolean;
+  }>;
+  recent_tasks: Array<{
+    id: string;
+    name: string;
+    status: string;
+    worker: string;
+    created_at: string;
+    started_at: string | null;
+    finished_at: string;
+    runtime_ms: number | null;
+    error: string;
+  }>;
+  deliveries: Array<{
+    recipient_id: number;
+    workflow_id: number;
+    event: string;
+    guest: string;
+    phone: string;
+    channel: 'invitation' | 'pass';
+    status: 'queued' | 'sending' | 'failed';
+    template: string;
+    queued_at: string | null;
+    retries: number;
+    error: string;
+    updated_at: string;
+  }>;
+  message_rate: {
+    configured_per_worker_per_minute: number;
+    workers_consuming_messages: number;
+    estimated_global_ceiling_per_minute: number;
+  };
+  send_budget: {
+    daily_limit: number;
+    remaining: number;
+    window_hours: number;
+  };
+}
+
 export type TicketType = string;
 export type GuestStatus = 'registered' | 'checked_in';
 
@@ -212,6 +288,7 @@ export interface RsvpRecipient {
   invitation_image: string | null;
   pass_status: RsvpPassStatus;
   invitation_sent_at: string | null;
+  invitation_queued_at: string | null;
   responded_at: string | null;
   pass_queued_at: string | null;
   reminder_count: number;
@@ -221,6 +298,8 @@ export interface RsvpRecipient {
   pass_error: string;
   invitation_auto_retries: number;
   pass_auto_retries: number;
+  invitation_last_template_name: string;
+  pass_last_template_name: string;
   created_at: string;
   updated_at: string;
 }

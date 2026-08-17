@@ -7,6 +7,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -419,6 +420,79 @@ class RsvpWorkflowApiTests(TestCase):
         self.assertNotIn('No Phone', body)
         self.assertIn('rsvp_confirmed_', response['Content-Disposition'])
 
+    def test_export_can_include_only_failed_deliveries_with_diagnostics(self):
+        workflow = self.create_workflow()
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_error='WhatsApp error 131049: Meta chose not to deliver',
+            pass_auto_retries=2,
+            pass_last_template_name='new_utility_pass',
+            pass_queued_at=timezone.now(),
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.guest_b)
+
+        response = self.client.get(
+            f'/api/rsvp/workflows/{workflow.id}/export/',
+            {'delivery_status': 'failed'},
+        )
+        body = b''.join(response.streaming_content).decode('utf-8')
+
+        self.assertIn('Ada Guest', body)
+        self.assertNotIn('No Phone', body)
+        self.assertIn('pass_error', body)
+        self.assertIn('131049', body)
+        self.assertIn('new_utility_pass', body)
+        self.assertIn('rsvp_failed_', response['Content-Disposition'])
+
+    def test_export_combines_the_same_filters_as_the_recipient_table(self):
+        workflow = self.create_workflow()
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_error='Failed Ada pass',
+        )
+        other_guest = Guest.objects.create(
+            event=self.event,
+            full_name='Other Confirmed Guest',
+            phone_number='2348000000099',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=other_guest,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            pass_status=RsvpRecipient.PassStatus.FAILED,
+            pass_error='Failed other pass',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_b,
+            response_status=RsvpRecipient.ResponseStatus.DECLINED,
+        )
+
+        response = self.client.get(
+            f'/api/rsvp/workflows/{workflow.id}/export/',
+            {
+                'response_status': 'confirmed',
+                'segment': 'delivery_failed',
+                'search': 'Ada',
+            },
+        )
+        self.assertEqual(response.status_code, 200, getattr(response, 'data', None))
+        body = b''.join(response.streaming_content).decode('utf-8')
+
+        self.assertIn('Ada Guest', body)
+        self.assertNotIn('Other Confirmed Guest', body)
+        self.assertNotIn('No Phone', body)
+        self.assertIn(
+            'rsvp_confirmed_delivery_failed_search_',
+            response['Content-Disposition'],
+        )
+
     @override_settings(RSVP_REMINDER_COOLDOWN_MINUTES=60, RSVP_MAX_REMINDERS=2)
     @patch('rsvp.tasks.queue_workflow_invitations.delay')
     def test_reminders_respect_cooldown_and_cap(self, mock_queue):
@@ -469,6 +543,54 @@ class RsvpWorkflowApiTests(TestCase):
         recipient.refresh_from_db()
         self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
         self.assertEqual(recipient.last_error, '')
+        mock_queue.assert_called_once_with(workflow.id)
+
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_remind_awaiting_respects_failed_retry_cooldown(self, mock_queue):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+        cooling = RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_error='(131049) Meta chose not to deliver',
+            invitation_queued_at=timezone.now() - timezone.timedelta(hours=1),
+            invitation_last_template_name='rsvp_invitation',
+        )
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/remind-awaiting/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['queued'], 0)
+        self.assertEqual(response.data['skipped_cooldown'], 1)
+        cooling.refresh_from_db()
+        self.assertEqual(cooling.invitation_status, RsvpRecipient.InvitationStatus.FAILED)
+        self.assertEqual(cooling.invitation_error, '(131049) Meta chose not to deliver')
+        mock_queue.assert_not_called()
+
+    @patch('rsvp.tasks.queue_workflow_invitations.delay')
+    def test_remind_awaiting_ignores_cooldown_after_template_change(self, mock_queue):
+        workflow = self.create_workflow()
+        workflow.status = RsvpWorkflow.Status.ACTIVE
+        workflow.save(update_fields=['status'])
+        recipient = RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.guest_a,
+            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            invitation_error='(131049) Meta chose not to deliver',
+            invitation_queued_at=timezone.now() - timezone.timedelta(hours=1),
+            invitation_last_template_name='old_rsvp_invitation',
+        )
+
+        response = self.client.post(f'/api/rsvp/workflows/{workflow.id}/remind-awaiting/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['queued'], 1)
+        self.assertEqual(response.data['skipped_cooldown'], 0)
+        recipient.refresh_from_db()
+        self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
+        self.assertEqual(recipient.invitation_error, '')
         mock_queue.assert_called_once_with(workflow.id)
 
 
@@ -1256,6 +1378,7 @@ class RsvpAutoRetryTests(TestCase):
             pass_status=RsvpRecipient.PassStatus.FAILED,
             pass_queued_at=timezone.now() - timezone.timedelta(hours=queued_ago_hours),
             pass_auto_retries=retries,
+            pass_last_template_name=settings.WHATSAPP_PASS_TEMPLATE,
             pass_error=error,
             last_error=error,
         )
@@ -1361,6 +1484,10 @@ class RsvpAutoRetryTests(TestCase):
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.SENT)
         self.assertEqual(self.recipient.pass_auto_retries, 2)
+        self.assertEqual(
+            self.recipient.pass_last_template_name,
+            settings.WHATSAPP_PASS_TEMPLATE,
+        )
 
         process_status_update({
             'id': 'wamid.retry-lifecycle',
@@ -1432,6 +1559,45 @@ class RsvpAutoRetryTests(TestCase):
         mock_send.assert_called_once_with(self.recipient.id)
         self.recipient.refresh_from_db()
         self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_changed_pass_template_bypasses_old_template_cooldown(self, mock_send):
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=1,
+            retries=1,
+        )
+        new_template = make_template('new_utility_pass', header=True)
+        self.workflow.pass_template = new_template
+        self.workflow.save(update_fields=['pass_template'])
+
+        response = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-pass/',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data['template_changed'])
+        self.assertEqual(response.data['template'], 'new_utility_pass')
+        mock_send.assert_called_once_with(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_legacy_failure_without_template_tracking_gets_one_retry(self, mock_send):
+        self._fail_pass(
+            error=self.ECOSYSTEM_ERROR,
+            queued_ago_hours=1,
+            retries=1,
+        )
+        RsvpRecipient.objects.filter(pk=self.recipient.pk).update(
+            pass_last_template_name='',
+        )
+
+        response = self.client.post(
+            f'/api/rsvp/recipients/{self.recipient.id}/retry-pass/',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data['template_changed'])
+        mock_send.assert_called_once_with(self.recipient.id)
 
     @patch('rsvp.tasks.send_rsvp_invitation.delay')
     def test_forced_manual_retry_overrides_invitation_cooldown(self, mock_send):
@@ -1694,6 +1860,7 @@ class RsvpBulkRetryTests(TestCase):
             invitation_status=RsvpRecipient.InvitationStatus.READ,
             pass_status=RsvpRecipient.PassStatus.FAILED,
             pass_queued_at=old,
+            pass_last_template_name=settings.WHATSAPP_PASS_TEMPLATE,
             pass_error=self.ECOSYSTEM_ERROR,
         )
         self.invitation_failed = self._recipient('2348000000302')

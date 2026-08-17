@@ -54,6 +54,22 @@ def _resolve_invitation_params(recipient) -> list:
     return values
 
 
+def configured_invitation_template_name(recipient) -> str:
+    """Return the Meta template that a new invitation attempt will use."""
+    template = recipient.workflow.invitation_template
+    return template.name if template else ''
+
+
+def configured_pass_template_name(recipient) -> str:
+    """Return the Meta template that a new pass attempt will use."""
+    workflow = recipient.workflow
+    event = recipient.guest.event
+    template = workflow.pass_template or (
+        event.whatsapp_template if event and event.whatsapp_template_id else None
+    )
+    return template.name if template else settings.WHATSAPP_PASS_TEMPLATE
+
+
 def send_invitation(recipient):
     """Send the configured RSVP template and return PyWa's sent update."""
     workflow = recipient.workflow
@@ -126,7 +142,7 @@ def send_configured_pass(recipient):
         has_header_image = template.has_header_image
     else:
         # Global default — image header + guest_name + event_name
-        template_name = settings.WHATSAPP_PASS_TEMPLATE
+        template_name = configured_pass_template_name(recipient)
         body_values = [guest.full_name, event.name if event else 'the event']
         has_header_image = True
 

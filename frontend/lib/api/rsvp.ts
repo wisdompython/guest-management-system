@@ -69,7 +69,7 @@ export const rsvpApi = {
   completeRsvpWorkflow: (id: number) =>
     request<RsvpWorkflow>(`/rsvp/workflows/${id}/complete/`, { method: 'POST' }),
   remindAwaitingRsvpGuests: (id: number) =>
-    request<{ queued: number }>(`/rsvp/workflows/${id}/remind-awaiting/`, { method: 'POST' }),
+    request<{ queued: number; skipped_cooldown: number }>(`/rsvp/workflows/${id}/remind-awaiting/`, { method: 'POST' }),
   getRsvpStats: (id: number) => request<RsvpStats>(`/rsvp/workflows/${id}/stats/`),
   getRsvpRecipients: (filters: RsvpRecipientFilters) => {
     const params = new URLSearchParams({ workflow: String(filters.workflow) })
@@ -82,9 +82,9 @@ export const rsvpApi = {
     return request<PaginatedRsvpRecipients>(`/rsvp/recipients/?${params}`)
   },
   retryRsvpInvitation: (recipientId: number, force = false) =>
-    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-invitation/`, { method: 'POST', body: JSON.stringify({ force }) }),
+    request<{ queued: boolean; template: string; template_changed: boolean }>(`/rsvp/recipients/${recipientId}/retry-invitation/`, { method: 'POST', body: JSON.stringify({ force }) }),
   retryRsvpPass: (recipientId: number, force = false) =>
-    request<{ queued: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST', body: JSON.stringify({ force }) }),
+    request<{ queued: boolean; template: string; template_changed: boolean }>(`/rsvp/recipients/${recipientId}/retry-pass/`, { method: 'POST', body: JSON.stringify({ force }) }),
   bulkRetryRsvpRecipients: (recipientIds: number[], kind: 'invitation' | 'pass') =>
     request<{ queued: number; skipped_cooldown: number; skipped_ineligible: number }>(
       '/rsvp/recipients/bulk-retry/',

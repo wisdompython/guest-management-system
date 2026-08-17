@@ -120,6 +120,12 @@ Practical notes for large events:
 
 ## Failure recovery
 
+Super administrators can open **Admin → Queue monitor** for a read-only view
+of Redis queue depth, live Celery workers and tasks, periodic dispatcher
+health, recent task results, the rolling WhatsApp send budget, and queued or
+failed RSVP deliveries. The page refreshes every 15 seconds, masks phone
+numbers, and never exposes task arguments or raw payloads.
+
 - Transient WhatsApp restrictions are retried automatically. Meta sometimes
   accepts a send and later reports a failure through the status webhook.
   The five-minute dispatcher re-queues those recipients up to three times,
@@ -140,7 +146,16 @@ Practical notes for large events:
   **Retry anyway** after a confirmation. Use it only when something has
   changed — typically the guest just messaged the business, which opens a
   service window and lifts Meta's per-user block. The override exists on
-  the single-guest retry only; bulk retry always respects cooldowns.
+  the single-guest retry only; bulk retry and **Send / remind awaiting**
+  respect cooldowns unless the
+  configured template has changed since the failed attempt. The remind
+  response reports how many failed sends were skipped because their retry
+  cooldown is still active.
+- Every delivery attempt records the exact Meta template name. Selecting a
+  different template makes failed recipients immediately eligible for a
+  manual or bulk retry because the previous template's cooldown does not
+  apply to the replacement. Failed rows show the last attempted template and
+  time so operators can verify that the worker used the intended template.
 - Several guests can be retried at once: tick the checkboxes on failed rows
   (or the header checkbox for every failed delivery on the page) and use
   **Retry invitations (n)** / **Retry passes (n)** in the selection bar.
@@ -148,5 +163,11 @@ Practical notes for large events:
   rules as the single retry: only failed sends are queued, and guests whose
   retryable WhatsApp error is still cooling down are skipped and reported
   back rather than blocking the rest of the selection.
+- **Export failed** downloads only recipients whose invitation or pass failed,
+  including channel-specific errors, retry counts, last template names, and
+  attempt timestamps.
+- **Export filtered** applies the current response class, delivery-state, and
+  guest-name search to the CSV and exports every matching recipient across all
+  result pages.
 - Pausing prevents queued invitation tasks from sending; resuming requeues eligible invitations.
 - Completing the workflow does not delete RSVP history, guests, or the event.

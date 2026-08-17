@@ -75,3 +75,14 @@ class UserViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().destroy(request, *args, **kwargs)
+
+
+class QueueMonitorView(APIView):
+    """Super-admin-only, read-only Celery and delivery diagnostics."""
+
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        from .operations import build_queue_monitor_snapshot
+
+        return Response(build_queue_monitor_snapshot())

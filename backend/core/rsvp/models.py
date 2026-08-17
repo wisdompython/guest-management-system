@@ -158,12 +158,18 @@ class RsvpRecipient(models.Model):
         db_index=True,
     )
     invitation_message_id = models.CharField(max_length=255, blank=True, db_index=True)
+    # The exact Meta template selected when the most recent delivery task was
+    # claimed.  Keeping this on the recipient lets retries distinguish a new
+    # template from another attempt with the template that produced the
+    # current failure.
+    invitation_last_template_name = models.CharField(max_length=512, blank=True)
     invitation_image = models.ImageField(
         upload_to='rsvp_invitations/',
         blank=True,
         null=True,
     )
     pass_message_id = models.CharField(max_length=255, blank=True, db_index=True)
+    pass_last_template_name = models.CharField(max_length=512, blank=True)
     invitation_sent_at = models.DateTimeField(null=True, blank=True)
     responded_at = models.DateTimeField(null=True, blank=True)
     # Set when the invitation send task is handed to the broker. A QUEUED

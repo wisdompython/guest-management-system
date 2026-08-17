@@ -22,8 +22,10 @@ class RsvpRecipientAdmin(admin.ModelAdmin):
         'response_status',
         'invitation_status',
         'invitation_auto_retries',
+        'invitation_last_template_name',
         'pass_status',
         'pass_auto_retries',
+        'pass_last_template_name',
         'pass_queued_at',
         'responded_at',
     )
