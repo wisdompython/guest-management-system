@@ -68,10 +68,10 @@ function PreviewBubble({ bodyText, bodyParams, hasHeaderImage }: {
         </p>
       )}
       <div className="inline-block max-w-sm rounded-[16px] rounded-tl-[4px] px-4 py-3 text-sm leading-relaxed"
-        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+        style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
         {hasHeaderImage && (
           <div className="mb-2 flex items-center gap-1.5 rounded-[8px] px-3 py-2 text-xs"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>
+            style={{ background: 'var(--chip)', color: 'var(--muted)' }}>
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
@@ -227,7 +227,7 @@ function TemplateForm({
         <button type="button"
           onClick={() => setForm((f) => ({ ...f, has_header_image: !f.has_header_image }))}
           className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: form.has_header_image ? 'var(--brand)' : 'rgba(255,255,255,0.15)' }}>
+          style={{ background: form.has_header_image ? 'var(--brand)' : 'rgba(23,26,33,0.18)' }}>
           <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform"
             style={{ left: form.has_header_image ? '18px' : '2px' }} />
         </button>
@@ -249,7 +249,7 @@ function TemplateForm({
             <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[10px] font-bold text-white"
               style={{ background: 'var(--brand)' }}>{i + 1}</span>
             <span className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold"
-              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}>
+              style={{ background: 'var(--chip)', color: 'var(--ink)', border: '1px solid var(--line)' }}>
               {varLabel(key)}
               <span className="ml-1.5 font-normal font-mono" style={{ color: 'var(--muted)' }}>({key})</span>
             </span>
@@ -467,7 +467,7 @@ export default function TemplatesPage() {
                 <input required autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="Category name"
                   className="flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+                  style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
                 <button type="submit" disabled={catSubmitting}
                   className="rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                   style={{ background: 'var(--brand)' }}>
@@ -480,7 +480,7 @@ export default function TemplatesPage() {
                 onClick={() => setCategoryFilter('')}
                 className="rounded-full px-2.5 py-1 text-xs font-semibold transition"
                 style={{
-                  background: !categoryFilter ? 'var(--brand)' : 'rgba(255,255,255,0.06)',
+                  background: !categoryFilter ? 'var(--brand)' : 'var(--chip)',
                   color: !categoryFilter ? '#fff' : 'var(--muted)',
                   border: `1px solid ${!categoryFilter ? 'var(--brand)' : 'var(--line)'}`,
                 }}>
@@ -489,7 +489,7 @@ export default function TemplatesPage() {
               {categories.map((cat) => (
                 <span key={cat.id} className="flex items-center gap-1 rounded-full pl-2.5 pr-1 py-1"
                   style={{
-                    background: categoryFilter === String(cat.id) ? 'var(--brand-soft)' : 'rgba(255,255,255,0.06)',
+                    background: categoryFilter === String(cat.id) ? 'var(--brand-soft)' : 'var(--chip)',
                     border: `1px solid ${categoryFilter === String(cat.id) ? 'var(--brand)' : 'var(--line)'}`,
                   }}>
                   <button
@@ -539,7 +539,7 @@ export default function TemplatesPage() {
                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             {t.category_name && (
                               <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded-full"
-                                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                                style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
                                 {t.category_name}
                               </span>
                             )}
@@ -613,7 +613,7 @@ export default function TemplatesPage() {
                   </button>
                 )}
                 <button onClick={closePanel}
-                  className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-[rgba(255,255,255,0.06)]"
+                  className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-[var(--chip)]"
                   style={{ color: 'var(--muted)' }}>✕</button>
               </div>
             </div>
@@ -622,8 +622,8 @@ export default function TemplatesPage() {
             {selectedId === 'new' && (
               <div className="flex-shrink-0 px-6 py-3 text-xs" style={{ background: 'rgba(184,150,62,0.07)', borderBottom: '1px solid var(--line)', color: 'var(--muted)' }}>
                 Meta templates use numbered placeholders like{' '}
-                <code className="px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{1}}'}</code>,{' '}
-                <code className="px-1 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>{'{{2}}'}</code>.
+                <code className="px-1 rounded" style={{ background: 'var(--chip)' }}>{'{{1}}'}</code>,{' '}
+                <code className="px-1 rounded" style={{ background: 'var(--chip)' }}>{'{{2}}'}</code>.
                 Paste the body text exactly as approved, then map each placeholder to a guest variable below.
               </div>
             )}

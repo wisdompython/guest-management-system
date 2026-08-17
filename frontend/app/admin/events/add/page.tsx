@@ -96,7 +96,7 @@ export default function AddEventPage() {
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           {['Event details', 'Guest setup', 'Delivery plan'].map((label, index) => {
             const number = index + 1
-            return <button type="button" key={label} disabled={number > step} onClick={() => setStep(number)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition disabled:cursor-default ${number === step ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--ink)]' : 'border-[var(--line)] bg-[var(--panel)] text-[var(--muted)]'}`}><span className="font-semibold text-[var(--brand)]">{number}</span><span>{label}</span>{number < step && <span className="ml-auto text-emerald-400">✓</span>}</button>
+            return <button type="button" key={label} disabled={number > step} onClick={() => setStep(number)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition disabled:cursor-default ${number === step ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--ink)]' : 'border-[var(--line)] bg-[var(--panel)] text-[var(--muted)]'}`}><span className="font-semibold text-[var(--brand)]">{number}</span><span>{label}</span>{number < step && <span className="ml-auto text-emerald-700">✓</span>}</button>
           })}
         </div>
       </div>

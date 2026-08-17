@@ -141,7 +141,7 @@ export function RemindersSection({ eventId }: Props) {
                 <input type="number" min="1" value={customHours} onChange={(e) => setCustomHours(e.target.value)}
                   placeholder="e.g. 48"
                   className="w-24 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+                  style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
                 <span className="text-sm" style={{ color: 'var(--muted)' }}>hours before</span>
               </div>
             )}
@@ -179,7 +179,7 @@ export function RemindersSection({ eventId }: Props) {
               <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="e.g. event_reminder_1day"
                 className="w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
+                style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
             )}
             <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
               Must match an approved template in your Meta WhatsApp Business account.
@@ -212,7 +212,7 @@ export function RemindersSection({ eventId }: Props) {
                   {hoursLabel(r.hours_before)}
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded"
-                  style={{ background: r.is_active ? 'var(--brand-soft)' : 'rgba(255,255,255,0.06)', color: r.is_active ? 'var(--brand)' : 'var(--muted)' }}>
+                  style={{ background: r.is_active ? 'var(--brand-soft)' : 'var(--chip)', color: r.is_active ? 'var(--brand)' : 'var(--muted)' }}>
                   {r.is_active ? 'Active' : 'Paused'}
                 </span>
                 {r.logs_sent > 0 && (

@@ -6,8 +6,8 @@ import { Event } from '@/lib/api'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import AsoEbiYardSelector from '@/components/rsvp/AsoEbiYardSelector'
 
-const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.06)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
-const select = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+const field = 'w-full rounded-[12px] border border-[var(--line)] bg-[var(--chip)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] placeholder:text-[var(--muted-2)]'
+const select = 'w-full rounded-[12px] border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 const labelCls = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
 const OPTIONAL_FIELDS = [
@@ -41,7 +41,7 @@ export function GuestForm({
   }, [selectedEvent?.id])
 
   return (
-    <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
+    <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--chip)]">
       <div className="border-b border-[var(--line)] px-6 py-4">
         <h2 data-tour="guest-form-header" className="text-sm font-semibold text-[var(--ink)]">Guest information</h2>
         <p className="mt-0.5 text-xs text-[var(--muted)]">Fields marked * are required.</p>

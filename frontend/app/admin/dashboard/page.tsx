@@ -79,7 +79,7 @@ export default function DashboardPage() {
                 value={activeEvent?.id ?? ''}
                 onChange={(e) => setActiveEvent(events.find((ev) => ev.id === Number(e.target.value)) ?? null)}
                 className="w-full max-w-[200px] text-sm font-semibold focus:outline-none px-2 py-1"
-                style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+                style={{ background: 'var(--field)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
                 {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
               </select>
             ) : (

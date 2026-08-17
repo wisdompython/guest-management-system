@@ -24,7 +24,7 @@ export function EventsPanel({ events, loading }: Props) {
         ) : events.length === 0 ? (
           <div className="py-8 text-center text-xs" style={{ color: 'var(--muted)' }}>No events yet.</div>
         ) : events.slice(0, 4).map((ev) => (
-          <Link href={`/admin/events/${ev.id}`} key={ev.id} className="flex items-center justify-between px-5 py-3 transition hover:bg-white/[0.02]"
+          <Link href={`/admin/events/${ev.id}`} key={ev.id} className="flex items-center justify-between px-5 py-3 transition hover:bg-[var(--chip)]"
             style={{ borderBottom: '1px solid var(--line)' }}>
             <div>
               <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{ev.name}</p>

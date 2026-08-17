@@ -80,8 +80,8 @@ export function SearchableSelect({
         aria-expanded={open}
         className="w-full flex items-center justify-between gap-2 rounded-[12px] px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         style={{
-          border: '1px solid rgba(255,255,255,0.1)',
-          background: '#1a2030',
+          border: '1px solid var(--line)',
+          background: 'var(--field)',
           color: selected ? 'var(--ink)' : 'var(--muted-2)',
           ...style,
         }}
@@ -97,12 +97,12 @@ export function SearchableSelect({
       {open && (
         <div className={`${inlineMenu ? 'relative mt-2' : 'absolute z-50'} w-full overflow-hidden rounded-[12px] shadow-xl`}
           style={{
-            background: '#1a2030',
-            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--field)',
+            border: '1px solid var(--line)',
             ...(!inlineMenu && (dropUp ? { bottom: 'calc(100% + 4px)' } : { top: 'calc(100% + 4px)' })),
           }}>
           <div className="flex items-center gap-2 px-3 py-2"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ borderBottom: '1px solid var(--line-2)' }}>
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
               style={{ color: 'var(--muted)', flexShrink: 0 }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -129,10 +129,10 @@ export function SearchableSelect({
               <button key={opt.value} type="button" role="option" aria-selected={opt.value === value} onClick={() => select(opt.value)}
                 className="w-full px-4 py-2.5 text-left text-sm transition"
                 style={{
-                  background: opt.value === value ? 'rgba(255,255,255,0.06)' : undefined,
+                  background: opt.value === value ? 'var(--chip)' : undefined,
                   color: opt.value === value ? 'var(--brand)' : 'var(--ink)',
                 }}
-                onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget as HTMLElement).style.background = 'var(--chip)' }}
                 onMouseLeave={(e) => { if (opt.value !== value) (e.currentTarget as HTMLElement).style.background = '' }}>
                 <span className="block font-medium truncate">{opt.label}</span>
                 {opt.sublabel && (

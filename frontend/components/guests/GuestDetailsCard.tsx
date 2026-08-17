@@ -10,7 +10,7 @@ interface Props {
 export function GuestDetailsCard({ guest, showPhone = false }: Props) {
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-[20px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
+      <div className="overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--chip)]">
         <div className="border-b border-[var(--line)] px-6 py-4">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Guest Details</h2>
         </div>
@@ -37,13 +37,13 @@ export function GuestDetailsCard({ guest, showPhone = false }: Props) {
       </div>
 
       <div className={`rounded-[20px] border p-4 flex items-center gap-4 ${
-        guest.whatsapp_sent ? 'border-emerald-800 bg-emerald-900/20' : 'border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]'
+        guest.whatsapp_sent ? 'border-emerald-600/40 bg-emerald-500/10' : 'border-[var(--line)] bg-[var(--chip)]'
       }`}>
         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0 ${
-          guest.whatsapp_sent ? 'bg-emerald-900/40' : 'bg-[var(--bg)]'
+          guest.whatsapp_sent ? 'bg-emerald-500/15' : 'bg-[var(--bg)]'
         }`}>💬</div>
         <div>
-          <p className={`text-sm font-semibold ${guest.whatsapp_sent ? 'text-emerald-400' : 'text-[var(--muted)]'}`}>
+          <p className={`text-sm font-semibold ${guest.whatsapp_sent ? 'text-emerald-700' : 'text-[var(--muted)]'}`}>
             {guest.whatsapp_sent ? 'Pass sent via WhatsApp' : 'WhatsApp pass not sent yet'}
           </p>
           {guest.whatsapp_sent_at && (

@@ -57,7 +57,7 @@ export function GuestAssetsCard({ guest, passUrl, qrUrl }: Props) {
       )}
 
       <div className="space-y-4">
-        <div className="overflow-hidden rounded-[20px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
+        <div className="overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--chip)]">
           <div className="flex items-center justify-between border-b border-[var(--line)] px-6 py-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Personalised Pass</h2>
             {passUrl && (
@@ -99,7 +99,7 @@ export function GuestAssetsCard({ guest, passUrl, qrUrl }: Props) {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[20px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
+        <div className="overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--chip)]">
           <div className="flex items-center justify-between border-b border-[var(--line)] px-6 py-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">QR Code</h2>
             {qrUrl && (

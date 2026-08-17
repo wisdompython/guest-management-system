@@ -5,7 +5,7 @@ import { Guest } from '@/lib/api'
 const TICKET_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   vvip:    { bg: 'rgba(168,85,247,0.15)',  color: '#c084fc', border: 'rgba(168,85,247,0.3)' },
   vip:     { bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-  general: { bg: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: 'rgba(255,255,255,0.1)' },
+  general: { bg: 'var(--chip)', color: 'var(--muted)', border: 'var(--line)' },
 }
 
 export function GuestFoundScreen({
@@ -30,7 +30,7 @@ export function GuestFoundScreen({
           <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Confirm to check in</p>
         </div>
       </div>
-      <div className="bg-[rgba(255,255,255,0.04)] overflow-hidden mb-6" style={{ border: '1px solid var(--line)', borderRadius: '2px' }}>
+      <div className="bg-[var(--chip)] overflow-hidden mb-6" style={{ border: '1px solid var(--line)', borderRadius: '2px' }}>
         <div className="px-6 py-6 border-b" style={{ borderColor: 'var(--line)' }}>
           <div className="flex items-start justify-between gap-3">
             <div>

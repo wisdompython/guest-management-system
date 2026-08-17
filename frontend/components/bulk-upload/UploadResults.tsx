@@ -60,7 +60,7 @@ export function UploadResults({ result }: { result: UploadResult }) {
           <span className="text-sm font-semibold text-[var(--ink)]">{title}</span>
         </div>
         <div className="ml-auto flex items-center gap-4 text-sm">
-          {result.successful > 0 && <span className="font-semibold text-emerald-400">✓ {result.successful} imported</span>}
+          {result.successful > 0 && <span className="font-semibold text-emerald-700">✓ {result.successful} imported</span>}
           {result.skipped > 0 && <span className="font-semibold text-amber-400">↷ {result.skipped} duplicate{result.skipped === 1 ? '' : 's'} skipped</span>}
           {result.failed > 0 && <span className="font-semibold text-[var(--danger)]">× {result.failed} failed</span>}
         </div>

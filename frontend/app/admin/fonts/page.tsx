@@ -83,7 +83,7 @@ export default function FontsPage() {
             value={ev?.id ?? ''}
             onChange={(e) => setActiveEvent(events.find((ev) => ev.id === Number(e.target.value)) ?? null)}
             className="text-xs px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-            style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+            style={{ background: 'var(--field)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
             {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
           </select>
         )}
@@ -145,7 +145,7 @@ export default function FontsPage() {
                 onChange={(e) => setFontName(e.target.value)}
                 required
                 className="w-full px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}
+                style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }}
               />
 
               <button data-tour="fonts-upload-button" type="submit" disabled={uploading || !selectedFile}
@@ -183,7 +183,7 @@ export default function FontsPage() {
                         <p className="text-[12px] font-semibold truncate" style={{ color: 'var(--ink)' }}>{f.name}</p>
                         {isActive && (
                           <span className="flex-shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-                            style={{ background: 'var(--brand)', color: '#0d1016' }}>Active</span>
+                            style={{ background: 'var(--brand)', color: '#ffffff' }}>Active</span>
                         )}
                       </div>
                       <p className="mt-2 text-[18px] leading-snug" style={{ fontFamily: `'${f.name}', serif`, color: 'var(--ink-2)' }}>

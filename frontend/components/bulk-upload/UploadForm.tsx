@@ -2,7 +2,7 @@
 
 import { Event } from '@/lib/api'
 
-const field = 'w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+const field = 'w-full rounded-[12px] border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 const label = 'block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-1.5'
 
 interface Props {
@@ -23,7 +23,7 @@ export function UploadForm({
   replaceExisting, onReplaceExistingChange, onSubmit, onEventChange,
 }: Props) {
   return (
-    <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
+    <form onSubmit={onSubmit} className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--chip)]">
       <div className="border-b border-[var(--line)] px-6 py-4">
         <h2 data-tour="bulk-upload-header" className="text-sm font-semibold text-[var(--ink)]">Upload details</h2>
       </div>
@@ -34,7 +34,7 @@ export function UploadForm({
             <label className={`form-choice ${!replaceExisting ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="upload_action" checked={!replaceExisting} onChange={() => onReplaceExistingChange(false)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Add to existing list</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Import new guests. Existing and repeated phone numbers are skipped automatically.</span></span></span></label>
             <label className={`form-choice ${replaceExisting ? 'form-choice--selected' : ''}`}><span className="flex items-start gap-3"><input type="radio" name="upload_action" checked={replaceExisting} onChange={() => onReplaceExistingChange(true)} className="mt-1 accent-[var(--brand)]"/><span><span className="block text-sm font-semibold text-[var(--ink)]">Replace entire list</span><span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Validate the new CSV, then remove the old guests and RSVP records.</span></span></span></label>
           </div>
-          {replaceExisting && <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">The current list stays untouched if the CSV has any validation errors. After a successful replacement, active RSVP workflows automatically receive the new guests.</p>}
+          {replaceExisting && <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-800">The current list stays untouched if the CSV has any validation errors. After a successful replacement, active RSVP workflows automatically receive the new guests.</p>}
         </div>
         <div>
           <label className={label}>Event *</label>

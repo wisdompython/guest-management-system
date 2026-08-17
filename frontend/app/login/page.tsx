@@ -45,7 +45,7 @@ function LoginForm() {
         <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Sign in to your account</p>
       </div>
 
-      <div style={{ background: 'var(--panel)', border: '1px solid rgba(255,255,255,0.07)' }} className="p-8">
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)' }} className="p-8">
         {sessionExpired && !error && (
           <div className="mb-5 px-4 py-3 text-sm" style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
             Your session expired. Please sign in again.
@@ -70,7 +70,7 @@ function LoginForm() {
               autoComplete="username"
               autoFocus
               className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}
+              style={{ background: 'var(--chip)', color: 'var(--ink)', border: '1px solid var(--line)' }}
             />
           </div>
 
@@ -85,7 +85,7 @@ function LoginForm() {
               required
               autoComplete="current-password"
               className="w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--ink)', border: '1px solid var(--line)' }}
+              style={{ background: 'var(--chip)', color: 'var(--ink)', border: '1px solid var(--line)' }}
             />
           </div>
 

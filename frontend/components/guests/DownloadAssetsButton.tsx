@@ -52,7 +52,7 @@ export function DownloadAssetsButton({ eventId, eventName }: Props) {
 
       {open && (
         <div className="absolute right-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-[14px] shadow-xl"
-          style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'var(--panel)' }}>
+          style={{ border: '1px solid var(--line)', background: 'var(--panel)' }}>
           <div className="border-b px-4 py-3.5" style={{ borderColor: 'var(--line)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Download Assets</p>
             <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>

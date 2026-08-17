@@ -255,7 +255,7 @@ export default function AddRsvpWorkflowPage() {
       <div className="my-6 grid grid-cols-3 gap-3">
         {['Choose event', 'Messages & timing', 'Review'].map((label, index) => {
           const number = index + 1
-          return <div key={label} className="flex items-center gap-2 text-xs" style={{ color: number <= step ? 'var(--brand)' : 'var(--muted-2)' }}><span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: number <= step ? 'var(--brand)' : 'var(--panel)', color: number <= step ? '#0d1016' : 'var(--muted)', border: '1px solid var(--line)' }}>{number}</span><span className="hidden sm:inline">{label}</span></div>
+          return <div key={label} className="flex items-center gap-2 text-xs" style={{ color: number <= step ? 'var(--brand)' : 'var(--muted-2)' }}><span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: number <= step ? 'var(--brand)' : 'var(--panel)', color: number <= step ? '#ffffff' : 'var(--muted)', border: '1px solid var(--line)' }}>{number}</span><span className="hidden sm:inline">{label}</span></div>
         })}
       </div>
 

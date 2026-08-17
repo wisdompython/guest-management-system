@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useAuth, useRequireAuth } from '@/lib/auth'
 
 const input = 'w-full px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]'
-const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }
+const inputStyle = { background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }
 const label = 'block text-xs font-semibold uppercase tracking-[0.16em] mb-1.5'
 
 export default function ProfilePage() {

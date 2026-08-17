@@ -66,7 +66,7 @@ function MessageModal({ guest, onClose }: { guest: Guest; onClose: () => void })
             rows={4}
             placeholder="Type your message…"
             className="w-full rounded-[12px] px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--ink)' }}
+            style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }}
           />
         </div>
         <div className="flex gap-3 px-5 pb-5">
@@ -203,7 +203,7 @@ function GuestRow({ guest, onSend, onMessage, sending, polling }: {
         <ResendModal guest={guest} onClose={() => setShowResend(false)}
           onConfirm={() => { setShowResend(false); onSend(guest) }} />
       )}
-      <div className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-[rgba(255,255,255,0.03)]"
+      <div className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-[var(--chip)]"
         style={{ borderBottom: '1px solid var(--line)' }}>
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
           style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
@@ -240,7 +240,7 @@ function GuestRow({ guest, onSend, onMessage, sending, polling }: {
             {sending === guest.id ? '…' : guest.whatsapp_sent ? 'Resend' : 'Send Pass'}
           </button>
           <button onClick={() => onMessage(guest)} title="Send message"
-            className="rounded-full p-1.5 transition hover:bg-[rgba(255,255,255,0.06)]"
+            className="rounded-full p-1.5 transition hover:bg-[var(--chip)]"
             style={{ color: 'var(--muted)' }}>
             <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>

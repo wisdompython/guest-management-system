@@ -76,7 +76,7 @@ function PassPreview({
           value={previewName}
           onChange={(e) => setPreviewName(e.target.value)}
           className="flex-1 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--ink)' }}
+          style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }}
           placeholder="Type a name to preview..."
         />
       </div>

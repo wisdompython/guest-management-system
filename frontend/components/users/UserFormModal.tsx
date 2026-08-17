@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { UserRole, CreateUserPayload } from '@/lib/api'
 import { ROLES } from './roleConstants'
 
-const field = 'w-full bg-[#1a2030] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+const field = 'w-full bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 const fieldStyle = { border: '1px solid var(--line)', color: 'var(--ink)' }
 const labelCls = 'block text-xs font-semibold uppercase tracking-[0.16em] mb-1.5'
 
@@ -16,7 +16,7 @@ function RoleSelect({ value, onChange }: { value: UserRole; onChange: (r: UserRo
       <button type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full px-4 py-2.5 text-sm text-left flex items-center justify-between"
-        style={{ background: '#1a2030', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+        style={{ background: 'var(--field)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
         <span>{current?.label ?? value}</span>
         <span style={{ color: 'var(--muted)' }}>▾</span>
       </button>
@@ -26,7 +26,7 @@ function RoleSelect({ value, onChange }: { value: UserRole; onChange: (r: UserRo
           {ROLES.map((r) => (
             <button key={r.value} type="button"
               onClick={() => { onChange(r.value as UserRole); setOpen(false) }}
-              className="w-full px-4 py-2.5 text-sm text-left transition hover:bg-[rgba(255,255,255,0.06)]"
+              className="w-full px-4 py-2.5 text-sm text-left transition hover:bg-[var(--chip)]"
               style={{ color: r.value === value ? 'var(--brand)' : 'var(--ink)' }}>
               {r.label}
             </button>

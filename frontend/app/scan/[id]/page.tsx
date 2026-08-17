@@ -10,7 +10,7 @@ type State = 'loading' | 'found' | 'checking_in' | 'checked_in' | 'duplicate' | 
 const TICKET_COLORS: Record<string, { bg: string; color: string }> = {
   vvip:    { bg: 'rgba(168,85,247,0.15)', color: '#c084fc' },
   vip:     { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-  general: { bg: 'rgba(255,255,255,0.06)', color: '#94a3b8' },
+  general: { bg: 'var(--chip)', color: 'var(--muted)' },
 }
 
 export default function ScanGuestPage({ params }: { params: Promise<{ id: string }> }) {

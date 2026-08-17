@@ -31,7 +31,7 @@ interface Props {
 }
 
 const input = 'w-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]'
-const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }
+const inputStyle = { background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }
 const label = 'block text-[10px] font-semibold uppercase tracking-[0.14em] mb-1'
 
 function RoleSelect({ value, disabled, onChange }: { value: UserRole; disabled?: boolean; onChange: (r: UserRole) => void }) {
@@ -42,7 +42,7 @@ function RoleSelect({ value, disabled, onChange }: { value: UserRole; disabled?:
       <button type="button" disabled={disabled}
         onClick={() => setOpen((v) => !v)}
         className="w-full px-3 py-2 text-sm text-left flex items-center justify-between disabled:opacity-50"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+        style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
         <span>{current?.label ?? value}</span>
         <span style={{ color: 'var(--muted)' }}>▾</span>
       </button>
@@ -52,7 +52,7 @@ function RoleSelect({ value, disabled, onChange }: { value: UserRole; disabled?:
           {ROLES.map((r) => (
             <button key={r.value} type="button"
               onClick={() => { onChange(r.value as UserRole); setOpen(false) }}
-              className="w-full px-3 py-2 text-sm text-left transition hover:bg-[rgba(255,255,255,0.06)]"
+              className="w-full px-3 py-2 text-sm text-left transition hover:bg-[var(--chip)]"
               style={{ color: r.value === value ? 'var(--brand)' : 'var(--ink)' }}>
               {r.label}
             </button>

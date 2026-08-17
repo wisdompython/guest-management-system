@@ -10,7 +10,7 @@ import { GuestAssetsCard } from '@/components/guests/GuestAssetsCard'
 const TICKET_COLORS: Record<string, { bg: string; color: string }> = {
   vvip:    { bg: 'rgba(168,85,247,0.15)',  color: '#c084fc' },
   vip:     { bg: 'rgba(245,158,11,0.15)',  color: 'var(--warn)' },
-  general: { bg: 'rgba(255,255,255,0.06)', color: 'var(--muted)' },
+  general: { bg: 'var(--chip)', color: 'var(--muted)' },
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'
@@ -109,7 +109,7 @@ export default function GuestDetailPage({ params }: { params: Promise<{ id: stri
                 </span>
               )})()}
               <span className="px-2.5 py-0.5 text-xs font-semibold"
-                style={{ background: checkedIn ? 'var(--brand-soft)' : 'rgba(255,255,255,0.06)', color: checkedIn ? 'var(--brand)' : 'var(--muted)' }}>
+                style={{ background: checkedIn ? 'var(--brand-soft)' : 'var(--chip)', color: checkedIn ? 'var(--brand)' : 'var(--muted)' }}>
                 {checkedIn ? 'Checked In' : 'Registered'}
               </span>
             </div>

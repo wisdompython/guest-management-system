@@ -47,7 +47,7 @@ export function DeliveryStats({
           value={selectedEvent}
           onChange={(e) => onEventChange(e.target.value === '' ? '' : Number(e.target.value))}
           className="mb-2 w-full rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-          style={{ background: '#1a2030', color: 'var(--ink)', border: '1px solid var(--line)' }}>
+          style={{ background: 'var(--field)', color: 'var(--ink)', border: '1px solid var(--line)' }}>
           <option value="">Select event…</option>
           {events.map((ev) => (
             <option key={ev.id} value={ev.id}>{ev.name}</option>

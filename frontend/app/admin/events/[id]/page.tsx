@@ -68,7 +68,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
       <header className="mt-4 flex flex-col gap-5 border-b border-[var(--line)] pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${event.is_ended ? 'bg-white/5 text-[var(--muted)]' : 'bg-emerald-500/10 text-emerald-400'}`}>{event.is_ended ? 'Ended' : 'Upcoming'}</span>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${event.is_ended ? 'bg-[var(--chip)] text-[var(--muted)]' : 'bg-emerald-500/10 text-emerald-700'}`}>{event.is_ended ? 'Ended' : 'Upcoming'}</span>
             {event.rsvp_enabled && <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--brand)]">RSVP {workflow?.status || 'setup needed'}</span>}
           </div>
           <h1 className="mt-3 font-display text-3xl text-[var(--ink)] sm:text-4xl">{event.name}</h1>
@@ -91,7 +91,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--bg)]"><div className="h-full rounded-full bg-[var(--brand)] transition-all" style={{ width: `${progress}%` }}/></div>
           </div>
           <div className="divide-y divide-[var(--line)]">
-            {checks.map((item) => <Link key={item.label} href={item.href} className="flex items-center gap-3 px-5 py-4 transition hover:bg-white/[0.02] sm:px-6"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{item.done ? '✓' : '!'}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--ink)]">{item.label}</span><span className="mt-0.5 block text-xs text-[var(--muted)]">{item.detail}</span></span><span className="text-[var(--muted)]">&rarr;</span></Link>)}
+            {checks.map((item) => <Link key={item.label} href={item.href} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[var(--chip)] sm:px-6"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? 'bg-emerald-500/15 text-emerald-700' : 'bg-amber-500/10 text-amber-700'}`}>{item.done ? '✓' : '!'}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--ink)]">{item.label}</span><span className="mt-0.5 block text-xs text-[var(--muted)]">{item.detail}</span></span><span className="text-[var(--muted)]">&rarr;</span></Link>)}
           </div>
           {nextAction && <div className="border-t border-[var(--line)] bg-[var(--brand-soft)] p-5 sm:px-6"><p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand)]">Recommended next step</p><div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-[var(--ink)]">Finish {nextAction.label.toLowerCase()} to keep this event moving.</p><Link href={nextAction.href} className="shrink-0 rounded-full bg-[var(--brand)] px-4 py-2 text-xs font-semibold text-white">Continue</Link></div></div>}
         </section>

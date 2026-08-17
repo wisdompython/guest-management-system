@@ -54,7 +54,7 @@ export function PassDesignSection({
             {isEdit ? (newFileChosen ? 'New Design File' : 'Replace Design (PNG / JPG)') : 'Design Template (PNG / JPG)'}
           </label>
           <input data-tour="event-design-upload" ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={onFileChange}
-            className="w-full rounded-xl border border-dashed border-[rgba(255,255,255,0.16)] bg-[var(--bg)] p-3 text-sm text-[var(--muted)] file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-[rgba(184,150,62,0.55)] hover:file:bg-[var(--brand-strong)]" />
+            className="w-full rounded-xl border border-dashed border-[var(--line-strong)] bg-[var(--bg)] p-3 text-sm text-[var(--muted)] file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-[rgba(184,150,62,0.55)] hover:file:bg-[var(--brand-strong)]" />
           <p className="form-hint">PNG or JPG, up to 5 MB. A landscape design works best.</p>
         </div>
         {previewUrl && (

@@ -80,7 +80,7 @@ export function MobileNav({ user, logout, open, onClose }: Props) {
           style={{ borderBottom: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded text-[11px] font-bold"
-              style={{ background: 'var(--brand)', color: '#0d1016' }}>T</div>
+              style={{ background: 'var(--brand)', color: '#ffffff' }}>T</div>
             <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>TWS E-GuestPass</p>
           </div>
           <button onClick={onClose} style={{ color: 'var(--muted)' }}>
