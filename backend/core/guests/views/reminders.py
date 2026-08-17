@@ -9,14 +9,25 @@ from accounts.permissions import IsEventManagerOrAbove
 
 class EventReminderSerializer(serializers.ModelSerializer):
     logs_sent = serializers.SerializerMethodField()
+    includes_event_pass = serializers.SerializerMethodField()
 
     class Meta:
         model = EventReminder
-        fields = ['id', 'event', 'hours_before', 'template_name', 'is_active', 'created_at', 'logs_sent']
-        read_only_fields = ['id', 'created_at', 'logs_sent']
+        fields = [
+            'id', 'event', 'hours_before', 'template_name', 'is_active',
+            'created_at', 'logs_sent', 'includes_event_pass',
+        ]
+        read_only_fields = ['id', 'created_at', 'logs_sent', 'includes_event_pass']
 
     def get_logs_sent(self, obj):
         return sum(1 for log in obj.logs.all() if log.success)
+
+    def get_includes_event_pass(self, obj):
+        return WhatsAppTemplate.objects.filter(
+            name=obj.template_name,
+            is_active=True,
+            has_header_image=True,
+        ).exists()
 
 
 class EventReminderViewSet(viewsets.ModelViewSet):
@@ -34,6 +45,7 @@ class EventReminderViewSet(viewsets.ModelViewSet):
     def send_now(self, request, pk=None):
         """Manually trigger a reminder for all eligible guests immediately."""
         from ..tasks import send_reminder
+        from rsvp.services import confirmed_reminder_guest_ids
         reminder = self.get_object()
 
         already_sent = ReminderLog.objects.filter(
@@ -45,11 +57,13 @@ class EventReminderViewSet(viewsets.ModelViewSet):
             reminder.event.guests
             .exclude(pk__in=already_sent)
             .exclude(phone_number='')
-            .values_list('id', flat=True)
         )
+        confirmed_guest_ids = confirmed_reminder_guest_ids(reminder.event_id)
+        if confirmed_guest_ids is not None:
+            guests = guests.filter(pk__in=confirmed_guest_ids)
 
         queued = 0
-        for guest_id in guests:
+        for guest_id in guests.values_list('id', flat=True):
             send_reminder.delay(reminder.id, str(guest_id))
             queued += 1
 

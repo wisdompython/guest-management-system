@@ -890,6 +890,116 @@ class ReminderRetryTests(TestCase):
         )
 
 
+@override_settings(
+    WHATSAPP_PHONE_ID='phone-id',
+    WHATSAPP_TOKEN='token',
+    WHATSAPP_MEDIA_BASE_URL='https://media.example.com',
+)
+class ReminderMediaTemplateTests(TestCase):
+    def setUp(self):
+        from .models import WhatsAppTemplate
+
+        self.event = make_event()
+        self.guest = make_guest(self.event)
+        self.image_template = WhatsAppTemplate.objects.create(
+            name='reminder_with_pass',
+            has_header_image=True,
+        )
+        self.text_template = WhatsAppTemplate.objects.create(
+            name='reminder_message_only',
+            has_header_image=False,
+        )
+
+    def test_image_header_reminder_resends_event_pass(self):
+        from .whatsapp import send_reminder
+
+        self.guest.pass_image = 'passes/reminder-pass.png'
+        self.guest.save(update_fields=['pass_image'])
+
+        with patch('guests.whatsapp._get_client') as mock_client:
+            sent = send_reminder(self.guest, self.image_template.name)
+
+        self.assertTrue(sent)
+        mock_client.return_value.send_template.assert_called_once()
+        params = mock_client.return_value.send_template.call_args.kwargs['params']
+        self.assertEqual(len(params), 1)
+
+    def test_image_header_reminder_is_not_sent_without_event_pass(self):
+        from .whatsapp import send_reminder
+
+        with patch('guests.whatsapp._get_client') as mock_client:
+            sent = send_reminder(self.guest, self.image_template.name)
+
+        self.assertFalse(sent)
+        mock_client.return_value.send_template.assert_not_called()
+
+    def test_message_only_reminder_does_not_require_event_pass(self):
+        from .whatsapp import send_reminder
+
+        with patch('guests.whatsapp._get_client') as mock_client:
+            sent = send_reminder(self.guest, self.text_template.name)
+
+        self.assertTrue(sent)
+        params = mock_client.return_value.send_template.call_args.kwargs['params']
+        self.assertEqual(params, [])
+
+
+class ReminderApiBehaviorTests(TestCase):
+    def setUp(self):
+        from .models import EventReminder, WhatsAppTemplate
+
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'reminder-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(rsvp_enabled=True)
+        self.confirmed = make_guest(
+            self.event, full_name='Confirmed', phone_number='2348000000001',
+        )
+        self.awaiting = make_guest(
+            self.event, full_name='Awaiting', phone_number='2348000000002',
+        )
+        WhatsAppTemplate.objects.create(
+            name='image_reminder',
+            has_header_image=True,
+        )
+        self.reminder = EventReminder.objects.create(
+            event=self.event,
+            hours_before=24,
+            template_name='image_reminder',
+        )
+
+    def test_reminder_api_identifies_templates_that_include_event_pass(self):
+        response = self.client.get(f'/api/reminders/{self.reminder.id}/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['includes_event_pass'])
+
+    @patch('guests.tasks.send_reminder')
+    def test_send_now_also_targets_only_confirmed_rsvp_guests(self, mock_send_reminder):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+        workflow = RsvpWorkflow.objects.create(event=self.event)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=self.confirmed,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=self.awaiting)
+
+        response = self.client.post(
+            f'/api/reminders/{self.reminder.id}/send_now/',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['queued'], 1)
+        mock_send_reminder.delay.assert_called_once_with(
+            self.reminder.id,
+            str(self.confirmed.id),
+        )
+
+
 class DispatchDueRemindersTimingTests(TestCase):
     """A Beat tick that lands after fire_at (delay/downtime) must still catch the reminder (P1 fix)."""
 

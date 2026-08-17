@@ -226,6 +226,7 @@ export interface EventReminder {
   is_active: boolean;
   created_at: string;
   logs_sent: number;
+  includes_event_pass: boolean;
 }
 
 export interface TemplateCategory {

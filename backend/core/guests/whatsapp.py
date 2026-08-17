@@ -181,9 +181,24 @@ def send_reminder(guest, template_name: str) -> bool:
 
         params = []
         if has_header_image:
+            # Image-header reminder templates resend the guest's generated
+            # event pass. The pass contains the QR code, so never submit an
+            # image template without a usable pass image/header parameter.
+            if not guest.pass_image:
+                logger.warning(
+                    "Guest %s has no pass image — skipping image reminder",
+                    guest.id,
+                )
+                return False
             pass_url = _build_pass_url(guest)
-            if pass_url:
-                params.append(HeaderImage.params(image=pass_url))
+            if not pass_url or 'localhost' in pass_url or '127.0.0.1' in pass_url:
+                logger.error(
+                    "Pass URL is not publicly accessible for reminder guest %s: %s",
+                    guest.id,
+                    pass_url,
+                )
+                return False
+            params.append(HeaderImage.params(image=pass_url))
 
         if body_param_values:
             params.append(BodyText.params(*body_param_values))

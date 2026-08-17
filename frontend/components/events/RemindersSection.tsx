@@ -34,6 +34,7 @@ export function RemindersSection({ eventId }: Props) {
   const [customHours, setCustomHours] = useState('')
   const [templateName, setTemplateName] = useState('')
   const [templateMode, setTemplateMode] = useState<'pick' | 'custom'>('pick')
+  const selectedTemplate = templates.find((template) => template.name === templateName)
 
   useEffect(() => {
     Promise.all([
@@ -172,7 +173,9 @@ export function RemindersSection({ eventId }: Props) {
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--ink)', colorScheme: 'dark' }}>
                 <option value="">— Select a template —</option>
                 {templates.map((t) => (
-                  <option key={t.id} value={t.name}>{t.display_name || t.name}</option>
+                  <option key={t.id} value={t.name}>
+                    {t.display_name || t.name} — {t.has_header_image ? 'pass + reminder' : 'reminder only'}
+                  </option>
                 ))}
               </select>
             ) : (
@@ -182,7 +185,13 @@ export function RemindersSection({ eventId }: Props) {
                 style={{ background: 'var(--chip)', border: '1px solid var(--line)', color: 'var(--ink)' }} />
             )}
             <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-2)' }}>
-              Must match an approved template in your Meta WhatsApp Business account.
+              {selectedTemplate
+                ? selectedTemplate.has_header_image
+                  ? 'This image-header template resends each guest’s event pass, including its QR code.'
+                  : 'This message-only template sends the reminder without the event pass or QR code.'
+                : templateMode === 'custom'
+                  ? 'Custom names are treated as message-only unless the template is also registered and marked as an image-header template in Settings.'
+                  : 'Must match an approved template in your Meta WhatsApp Business account.'}
             </p>
           </div>
 
@@ -214,6 +223,10 @@ export function RemindersSection({ eventId }: Props) {
                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded"
                   style={{ background: r.is_active ? 'var(--brand-soft)' : 'var(--chip)', color: r.is_active ? 'var(--brand)' : 'var(--muted)' }}>
                   {r.is_active ? 'Active' : 'Paused'}
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded"
+                  style={{ background: 'var(--chip)', color: 'var(--muted)' }}>
+                  {r.includes_event_pass ? 'Pass + QR' : 'Message only'}
                 </span>
                 {r.logs_sent > 0 && (
                   <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
