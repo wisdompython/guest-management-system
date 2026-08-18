@@ -98,6 +98,8 @@ export const rsvpApi = {
     asoEbiRequested = false,
     asoEbiQuantity = 0,
     plusOneAttending = false,
+    plusOneFullName = '',
+    plusOnePhoneNumber = '',
     celebrantName = '',
   ) =>
     request<{
@@ -112,6 +114,8 @@ export const rsvpApi = {
         aso_ebi_requested: answer === 'yes' && asoEbiRequested,
         aso_ebi_quantity: answer === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
         plus_one_attending: answer === 'yes' && plusOneAttending,
+        plus_one_full_name: answer === 'yes' && plusOneAttending ? plusOneFullName : '',
+        plus_one_phone_number: answer === 'yes' && plusOneAttending ? plusOnePhoneNumber : '',
         celebrant_name: answer === 'yes' ? celebrantName : '',
       }),
     }),

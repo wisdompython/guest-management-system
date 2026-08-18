@@ -53,6 +53,8 @@ export default function AddGuestPage() {
       aso_ebi_requested: asoEbiRequested,
       aso_ebi_quantity: asoEbiRequested ? Number(getValue('aso_ebi_quantity')) : 0,
       plus_one_attending: plusOneAttending,
+      plus_one_full_name: plusOneAttending ? getValue('plus_one_full_name') : '',
+      plus_one_phone_number: plusOneAttending ? getValue('plus_one_phone_number') : '',
       celebrant_name: getValue('celebrant_name'),
       event:        selectedEvent ? selectedEvent.id : null,
       scheduled_send_at: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : null,

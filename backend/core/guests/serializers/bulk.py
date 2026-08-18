@@ -78,9 +78,16 @@ def parse_guest_csv(event, csv_file):
         if raw_plus_one in TRUE_VALUES:
             plus_one_attending = True
             if not event.allow_plus_one:
-                errors.append('Plus ones are not enabled for this event.')
+                errors.append('Plus one is not enabled for this event.')
         elif raw_plus_one not in FALSE_VALUES:
             errors.append("'plus_one_attending' must be yes or no.")
+        plus_one_full_name = row.get('plus_one_full_name', '').strip()
+        plus_one_phone_number = row.get('plus_one_phone_number', '').strip()
+        if plus_one_attending:
+            if not plus_one_full_name:
+                errors.append("'plus_one_full_name' is required when a plus one is attending.")
+            if not plus_one_phone_number:
+                errors.append("'plus_one_phone_number' is required when a plus one is attending.")
 
         celebrant_name = row.get('celebrant_name', '').strip()
         if celebrant_name and not event.collect_celebrant:
@@ -122,6 +129,8 @@ def parse_guest_csv(event, csv_file):
             'aso_ebi_requested': aso_ebi_requested,
             'aso_ebi_quantity': aso_ebi_quantity,
             'plus_one_attending': plus_one_attending,
+            '_plus_one_full_name': plus_one_full_name,
+            '_plus_one_phone_number': plus_one_phone_number,
             'celebrant_name': celebrant_name,
             'scheduled_send_at': event.pass_send_at,
         })

@@ -78,6 +78,7 @@ export default function BulkUploadPage() {
   const requiredCols = eventRequiredCols(selectedEvent)
   const optionalCols = ['email', 'ticket_type', 'table_number', 'seat_number',
     ...(selectedEvent?.collect_aso_ebi ? ['aso_ebi_requested', 'aso_ebi_yards'] : []),
+    ...(selectedEvent?.allow_plus_one ? ['plus_one_attending', 'plus_one_full_name', 'plus_one_phone_number'] : []),
   ].filter(
     (c) => !requiredCols.includes(c)
   )

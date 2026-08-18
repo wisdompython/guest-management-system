@@ -68,6 +68,11 @@ export default function AddEventPage() {
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
     fd.append('color_of_day', (form.elements.namedItem('color_of_day') as HTMLInputElement).value)
+    for (const colourField of ['rsvp_primary_color', 'rsvp_background_color', 'rsvp_card_color', 'rsvp_text_color']) {
+      fd.append(colourField, (form.elements.namedItem(colourField) as HTMLInputElement).value)
+    }
+    const rsvpBackground = (form.elements.namedItem('rsvp_background_image') as HTMLInputElement).files?.[0]
+    if (rsvpBackground) fd.append('rsvp_background_image', rsvpBackground)
     fd.append('ticket_types', JSON.stringify(ticketTypes))
     fd.append('required_fields', JSON.stringify(requiredFields))
     fd.append('whatsapp_enabled', String(whatsappEnabled))

@@ -852,13 +852,24 @@ class PublicRsvpPageApiTests(TestCase):
     def test_public_details_are_available_without_authentication(self):
         self.event.rsvp_message = 'Join us for a beautiful milestone celebration.'
         self.event.color_of_day = 'Burgundy and gold'
-        self.event.save(update_fields=['rsvp_message', 'color_of_day'])
+        self.event.rsvp_primary_color = '#123456'
+        self.event.rsvp_background_color = '#abcdef'
+        self.event.rsvp_card_color = '#fedcba'
+        self.event.rsvp_text_color = '#112233'
+        self.event.save(update_fields=[
+            'rsvp_message', 'color_of_day', 'rsvp_primary_color',
+            'rsvp_background_color', 'rsvp_card_color', 'rsvp_text_color',
+        ])
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['guest_name'], 'Public Guest')
         self.assertEqual(response.data['event_name'], 'Public RSVP Event')
         self.assertEqual(response.data['rsvp_message'], self.event.rsvp_message)
         self.assertEqual(response.data['color_of_day'], 'Burgundy and gold')
+        self.assertEqual(response.data['rsvp_primary_color'], '#123456')
+        self.assertEqual(response.data['rsvp_background_color'], '#abcdef')
+        self.assertEqual(response.data['rsvp_card_color'], '#fedcba')
+        self.assertEqual(response.data['rsvp_text_color'], '#112233')
         self.assertTrue(response.data['can_respond'])
 
     def test_public_details_include_plus_one_configuration(self):
@@ -907,17 +918,81 @@ class PublicRsvpPageApiTests(TestCase):
         self.event.allow_plus_one = True
         self.event.save(update_fields=['allow_plus_one'])
 
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.post(
-                self.url,
-                {'answer': 'yes', 'plus_one_attending': True},
-                format='json',
-            )
+        with patch('rsvp.tasks.send_rsvp_invitation.delay') as mock_invitation:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    self.url,
+                    {
+                        'answer': 'yes',
+                        'plus_one_attending': True,
+                        'plus_one_full_name': 'Named Companion',
+                        'plus_one_phone_number': '+234 800 000 0099',
+                    },
+                    format='json',
+                )
 
         self.assertEqual(response.status_code, 200, response.data)
         self.guest.refresh_from_db()
         self.assertTrue(self.guest.plus_one_attending)
+        plus_one = self.guest.named_plus_one
+        self.assertEqual(plus_one.full_name, 'Named Companion')
+        self.assertEqual(plus_one.phone_number, '2348000000099')
+        plus_one_recipient = RsvpRecipient.objects.get(
+            workflow=self.workflow,
+            guest=plus_one,
+        )
+        self.assertEqual(
+            plus_one_recipient.invitation_status,
+            RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        mock_invitation.assert_called_once_with(plus_one_recipient.id)
         mock_send.assert_called_once_with(self.recipient.id)
+
+    def test_plus_one_details_are_required_before_response_is_consumed(self):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+
+        response = self.client.post(
+            self.url,
+            {'answer': 'yes', 'plus_one_attending': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.recipient.refresh_from_db()
+        self.assertEqual(
+            self.recipient.response_status,
+            RsvpRecipient.ResponseStatus.AWAITING,
+        )
+        self.assertFalse(RsvpResponse.objects.exists())
+
+    def test_plus_one_phone_cannot_duplicate_an_existing_event_guest(self):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        Guest.objects.create(
+            event=self.event,
+            full_name='Existing Guest',
+            phone_number='+234 800 000 0099',
+        )
+
+        response = self.client.post(
+            self.url,
+            {
+                'answer': 'yes',
+                'plus_one_attending': True,
+                'plus_one_full_name': 'Duplicate Companion',
+                'plus_one_phone_number': '2348000000099',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('already belongs', response.data['detail'])
+        self.recipient.refresh_from_db()
+        self.assertEqual(
+            self.recipient.response_status,
+            RsvpRecipient.ResponseStatus.AWAITING,
+        )
 
     def test_plus_one_is_rejected_when_event_does_not_allow_it(self):
         response = self.client.post(

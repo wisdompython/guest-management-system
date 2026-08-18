@@ -106,6 +106,13 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
     fd.append('color_of_day', (form.elements.namedItem('color_of_day') as HTMLInputElement).value)
+    for (const colourField of ['rsvp_primary_color', 'rsvp_background_color', 'rsvp_card_color', 'rsvp_text_color']) {
+      fd.append(colourField, (form.elements.namedItem(colourField) as HTMLInputElement).value)
+    }
+    const rsvpBackground = (form.elements.namedItem('rsvp_background_image') as HTMLInputElement).files?.[0]
+    const clearRsvpBackground = (form.elements.namedItem('clear_rsvp_background_image') as HTMLInputElement | null)?.checked
+    if (rsvpBackground) fd.append('rsvp_background_image', rsvpBackground)
+    else if (clearRsvpBackground) fd.append('rsvp_background_image', '')
     if (fileInputRef.current?.files?.[0]) fd.append('design_template', fileInputRef.current.files[0])
     if (qrTouched) { if (qrZone) { fd.append('qr_zone_x', String(qrZone.x)); fd.append('qr_zone_y', String(qrZone.y)); fd.append('qr_zone_w', String(qrZone.w)); fd.append('qr_zone_h', String(qrZone.h)) } else { fd.append('qr_zone_x', ''); fd.append('qr_zone_y', ''); fd.append('qr_zone_w', ''); fd.append('qr_zone_h', '') } }
     if (nameTouched) { if (nameZone) { fd.append('name_zone_x', String(nameZone.x)); fd.append('name_zone_y', String(nameZone.y)); fd.append('name_zone_w', String(nameZone.w)); fd.append('name_zone_h', String(nameZone.h)) } else { fd.append('name_zone_x', ''); fd.append('name_zone_y', ''); fd.append('name_zone_w', ''); fd.append('name_zone_h', '') } }

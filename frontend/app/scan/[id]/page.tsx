@@ -14,7 +14,7 @@ const TICKET_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 function partyFullyCheckedIn(guest: Guest) {
-  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.plus_one_checked_in)
+  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.has_named_plus_one || guest.plus_one_checked_in)
 }
 
 export default function ScanGuestPage({ params }: { params: Promise<{ id: string }> }) {
@@ -143,8 +143,8 @@ export default function ScanGuestPage({ params }: { params: Promise<{ id: string
       {guest && <GuestInfoCard guest={guest} />}
       <div className="mt-6 grid w-full gap-2">
         {guest && guest.status !== 'checked_in' && <button onClick={() => handleCheckIn('guest')} disabled={state === 'checking_in'} className="w-full rounded-full bg-[var(--brand)] py-4 text-sm font-semibold text-white disabled:opacity-60">{state === 'checking_in' ? 'Checking in…' : 'Check in guest only'}</button>}
-        {guest?.plus_one_attending && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('plus_one')} disabled={state === 'checking_in'} className="w-full rounded-full border border-[var(--brand)] py-4 text-sm font-semibold text-[var(--brand)] disabled:opacity-60">Check in plus-one only</button>}
-        {guest && guest.status !== 'checked_in' && guest.plus_one_attending && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('both')} disabled={state === 'checking_in'} className="w-full rounded-full bg-[var(--ink)] py-4 text-sm font-semibold text-[var(--bg)] disabled:opacity-60">Check in both</button>}
+        {guest?.plus_one_attending && !guest.has_named_plus_one && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('plus_one')} disabled={state === 'checking_in'} className="w-full rounded-full border border-[var(--brand)] py-4 text-sm font-semibold text-[var(--brand)] disabled:opacity-60">Check in plus one only</button>}
+        {guest && guest.status !== 'checked_in' && guest.plus_one_attending && !guest.has_named_plus_one && !guest.plus_one_checked_in && <button onClick={() => handleCheckIn('both')} disabled={state === 'checking_in'} className="w-full rounded-full bg-[var(--ink)] py-4 text-sm font-semibold text-[var(--bg)] disabled:opacity-60">Check in both</button>}
       </div>
       <button
         onClick={() => router.push('/admin/check-in')}
@@ -210,7 +210,7 @@ function GuestInfoCard({ guest, highlight }: { guest: Guest; highlight?: boolean
         {guest.table_number && <InfoRow label="Table" value={guest.table_number} />}
         {guest.seat_number  && <InfoRow label="Seat"  value={guest.seat_number}  />}
         {guest.celebrant_name && <InfoRow label="Celebrant" value={guest.celebrant_name} />}
-        {guest.plus_one_attending && <InfoRow label="Party" value={`Admit 2 · plus-one ${guest.plus_one_checked_in ? 'in' : 'pending'}`} />}
+        {guest.plus_one_attending && <InfoRow label="Plus one" value={guest.has_named_plus_one ? 'Separate invitation and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`} />}
       </div>
     </div>
   )

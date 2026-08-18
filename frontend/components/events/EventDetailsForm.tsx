@@ -115,6 +115,24 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
               <input name="color_of_day" type="text" defaultValue={event?.color_of_day}
                 placeholder="e.g. Burgundy and gold" className={field} />
             </div>
+            <div className="sm:col-span-2 border-t border-[var(--line)] pt-4">
+              <p className="text-sm font-semibold text-[var(--ink)]">Public page appearance</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Choose colours and optional background artwork to match this event.</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ['rsvp_primary_color', 'Accent', event?.rsvp_primary_color || '#8a6f2b'],
+                  ['rsvp_background_color', 'Background', event?.rsvp_background_color || '#f6f4ee'],
+                  ['rsvp_card_color', 'Card', event?.rsvp_card_color || '#ffffff'],
+                  ['rsvp_text_color', 'Text', event?.rsvp_text_color || '#23262e'],
+                ].map(([name, colourLabel, value]) => <label key={name} className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-3 text-xs font-semibold text-[var(--muted)]"><span>{colourLabel}</span><span className="mt-2 flex items-center gap-2"><input name={name} type="color" defaultValue={value} className="h-9 w-12 cursor-pointer rounded border-0 bg-transparent p-0"/><span className="font-mono text-[11px] text-[var(--ink)]">{value}</span></span></label>)}
+              </div>
+              <div className="mt-4">
+                <label className={label}>Page background image <span className="font-normal text-[var(--muted)]">(optional)</span></label>
+                <input name="rsvp_background_image" type="file" accept="image/png,image/jpeg,image/webp" className={`${field} file:mr-3 file:rounded-full file:border-0 file:bg-[var(--brand-soft)] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[var(--brand)]`} />
+                <p className="form-hint">PNG, JPEG, or WebP up to 8 MB. The image fills the page behind the RSVP card.</p>
+                {event?.rsvp_background_image && <div className="mt-3 flex items-center gap-3"><img src={event.rsvp_background_image} alt="Current RSVP background" className="h-16 w-24 rounded-lg object-cover"/><label className="flex items-center gap-2 text-xs text-[var(--muted)]"><input name="clear_rsvp_background_image" type="checkbox"/> Remove current background</label></div>}
+              </div>
+            </div>
           </div>
         </div>
 

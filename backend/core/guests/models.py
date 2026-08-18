@@ -25,6 +25,32 @@ class Event(models.Model):
         blank=True,
         help_text='Optional dress colour or event colour shown on the RSVP page.',
     )
+    rsvp_primary_color = models.CharField(
+        max_length=20,
+        default='#8a6f2b',
+        help_text='Primary accent colour for the public RSVP page.',
+    )
+    rsvp_background_color = models.CharField(
+        max_length=20,
+        default='#f6f4ee',
+        help_text='Page background colour for the public RSVP page.',
+    )
+    rsvp_card_color = models.CharField(
+        max_length=20,
+        default='#ffffff',
+        help_text='Card and form background colour for the public RSVP page.',
+    )
+    rsvp_text_color = models.CharField(
+        max_length=20,
+        default='#23262e',
+        help_text='Primary text colour for the public RSVP page.',
+    )
+    rsvp_background_image = models.ImageField(
+        upload_to='rsvp_backgrounds/',
+        blank=True,
+        null=True,
+        help_text='Optional full-page background image for the public RSVP page.',
+    )
     # Admins upload one design per event; all guest passes are rendered on top of it
     design_template = models.ImageField(upload_to='design_templates/', blank=True, null=True)
 
@@ -116,6 +142,14 @@ class Guest(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='guests')
+    plus_one_of = models.OneToOneField(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='named_plus_one',
+        help_text='Primary guest who supplied this named plus one.',
+    )
     full_name = models.CharField(max_length=255)
     # phone_number is optional at the DB level; required-ness is governed by event.required_fields
     phone_number = models.CharField(max_length=20, blank=True)

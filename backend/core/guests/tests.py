@@ -142,6 +142,38 @@ class EventDeliveryWorkflowTests(TestCase):
         self.assertEqual(response.data['plus_one_count'], 1)
         self.assertEqual(response.data['estimated_guest_count'], 2)
 
+    def test_named_plus_one_is_not_double_counted_after_confirming(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+        from .plus_one import upsert_named_plus_one
+
+        event = make_event(allow_plus_one=True, rsvp_enabled=True)
+        primary = make_guest(event, full_name='Primary', phone_number='2348000000001')
+        plus_one, _, _ = upsert_named_plus_one(
+            primary, 'Named Companion', '2348000000002',
+        )
+        workflow = RsvpWorkflow.objects.create(event=event)
+        RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=primary,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        plus_one_recipient = RsvpRecipient.objects.create(
+            workflow=workflow,
+            guest=plus_one,
+        )
+
+        awaiting_response = self.client.get(f'/api/events/{event.id}/')
+        self.assertEqual(awaiting_response.data['confirmed_count'], 1)
+        self.assertEqual(awaiting_response.data['plus_one_count'], 1)
+        self.assertEqual(awaiting_response.data['estimated_guest_count'], 2)
+
+        plus_one_recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
+        plus_one_recipient.save(update_fields=['response_status'])
+        confirmed_response = self.client.get(f'/api/events/{event.id}/')
+        self.assertEqual(confirmed_response.data['confirmed_count'], 2)
+        self.assertEqual(confirmed_response.data['plus_one_count'], 1)
+        self.assertEqual(confirmed_response.data['estimated_guest_count'], 2)
+
 
 class GuestListFilterTests(TestCase):
     def setUp(self):
@@ -310,6 +342,51 @@ class BulkUploadTests(TestCase):
         self.assertEqual(r.data['successful'], 10)
         self.assertEqual(r.data['failed'], 0)
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 10)
+
+    def test_bulk_upload_creates_named_plus_one_as_linked_guest(self, mock_task):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        response, _ = self._upload(
+            [{
+                'full_name': 'Primary Guest',
+                'phone_number': '2348000000001',
+                'plus_one_attending': 'yes',
+                'plus_one_full_name': 'Named Companion',
+                'plus_one_phone_number': '2348000000002',
+            }],
+            mock_task,
+            extra_cols=[
+                'plus_one_attending', 'plus_one_full_name',
+                'plus_one_phone_number',
+            ],
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['successful'], 1)
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
+        primary = Guest.objects.get(full_name='Primary Guest')
+        self.assertEqual(primary.named_plus_one.full_name, 'Named Companion')
+        self.assertEqual(mock_task.call_count, 2)
+
+    def test_bulk_upload_requires_named_plus_one_details(self, mock_task):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        response, _ = self._upload(
+            [{
+                'full_name': 'Primary Guest',
+                'phone_number': '2348000000001',
+                'plus_one_attending': 'yes',
+            }],
+            mock_task,
+            extra_cols=[
+                'plus_one_attending', 'plus_one_full_name',
+                'plus_one_phone_number',
+            ],
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['failed'], 1)
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 0)
 
     def test_large_upload_2000_guests_uses_bulk_create(self, mock_task):
         """2000-row upload must complete and create all guests via bulk_create."""
@@ -617,6 +694,22 @@ class ScheduledSendCreateTests(TestCase):
         self.assertFalse(kwargs.get('send_whatsapp'))
         guest = Guest.objects.get(pk=r.data['id'])
         self.assertIsNotNone(guest.scheduled_send_at)
+
+    def test_single_guest_create_adds_and_queues_named_plus_one(self, mock_task):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+
+        response = self._create(
+            plus_one_attending=True,
+            plus_one_full_name='Admin Companion',
+            plus_one_phone_number='+234 800 000 0010',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        primary = Guest.objects.get(pk=response.data['id'])
+        self.assertEqual(primary.named_plus_one.full_name, 'Admin Companion')
+        self.assertEqual(primary.named_plus_one.phone_number, '2348000000010')
+        self.assertEqual(mock_task.delay.call_count, 2)
 
     def test_event_default_send_time_is_inherited(self, mock_task):
         self.event.pass_send_at = timezone.now() + timezone.timedelta(hours=3)
@@ -1226,6 +1319,34 @@ class CheckInTests(TestCase):
         self.assertEqual(self.guest.status, Guest.Status.CHECKED_IN)
         self.assertTrue(self.guest.plus_one_checked_in)
 
+    def test_named_plus_one_must_use_their_own_qr(self):
+        from .plus_one import upsert_named_plus_one
+
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        plus_one, _, _ = upsert_named_plus_one(
+            self.guest,
+            'Named Companion',
+            '2348000000010',
+        )
+
+        shared_qr_response = self.client.post(
+            f'/api/guests/{self.guest.id}/check_in/',
+            {'target': 'plus_one'},
+            format='json',
+        )
+        own_qr_response = self.client.post(
+            f'/api/guests/{plus_one.id}/check_in/',
+            {'target': 'guest'},
+            format='json',
+        )
+
+        self.assertEqual(shared_qr_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('separate invitation and QR', shared_qr_response.data['detail'])
+        self.assertEqual(own_qr_response.status_code, status.HTTP_200_OK)
+        plus_one.refresh_from_db()
+        self.assertEqual(plus_one.status, Guest.Status.CHECKED_IN)
+
 
 class GuestPreferencesTests(TestCase):
     def setUp(self):
@@ -1247,13 +1368,17 @@ class GuestPreferencesTests(TestCase):
         self.assertEqual(response.data['celebrant_options'], ['Bride', 'Groom'])
         self.assertTrue(response.data['can_respond'])
 
-    def test_preferences_form_saves_planning_choices_without_rsvp(self):
-        response = self.client.post(self.url, {
-            'plus_one_attending': True,
-            'aso_ebi_requested': True,
-            'aso_ebi_quantity': 4,
-            'celebrant_name': 'Bride',
-        }, format='json')
+    @patch('guests.tasks.generate_guest_assets.delay')
+    def test_preferences_form_saves_planning_choices_without_rsvp(self, mock_assets):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url, {
+                'plus_one_attending': True,
+                'plus_one_full_name': 'Preference Companion',
+                'plus_one_phone_number': '+234 800 000 0099',
+                'aso_ebi_requested': True,
+                'aso_ebi_quantity': 4,
+                'celebrant_name': 'Bride',
+            }, format='json')
 
         self.assertEqual(response.status_code, 200, response.data)
         self.guest.refresh_from_db()
@@ -1261,6 +1386,10 @@ class GuestPreferencesTests(TestCase):
         self.assertEqual(self.guest.aso_ebi_quantity, 4)
         self.assertEqual(self.guest.celebrant_name, 'Bride')
         self.assertIsNotNone(self.guest.preferences_submitted_at)
+        plus_one = self.guest.named_plus_one
+        self.assertEqual(plus_one.full_name, 'Preference Companion')
+        self.assertEqual(plus_one.celebrant_name, 'Bride')
+        mock_assets.assert_called_once_with(str(plus_one.id), send_whatsapp=True)
 
     def test_unconfigured_celebrant_is_rejected_when_options_exist(self):
         response = self.client.post(self.url, {

@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
-    queryset = Guest.objects.select_related('event').all().order_by('-registered_at')
+    queryset = Guest.objects.select_related(
+        'event', 'plus_one_of', 'named_plus_one',
+    ).all().order_by('-registered_at')
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_permissions(self):
@@ -104,12 +106,23 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         guest = serializer.save()
+        from ..plus_one import get_named_plus_one
         from rsvp.services import sync_guest_to_workflow
         sync_guest_to_workflow(guest)
         # If a future send time was requested, generate assets now but hold off
         # on the WhatsApp send — dispatch_scheduled_sends will pick it up later.
         send_now = not (guest.scheduled_send_at and guest.scheduled_send_at > timezone.now())
         generate_guest_assets.delay(str(guest.id), send_whatsapp=send_now)
+        plus_one = get_named_plus_one(guest)
+        if plus_one:
+            sync_guest_to_workflow(plus_one)
+            plus_one_send_now = not (
+                plus_one.scheduled_send_at
+                and plus_one.scheduled_send_at > timezone.now()
+            )
+            generate_guest_assets.delay(
+                str(plus_one.id), send_whatsapp=plus_one_send_now,
+            )
 
     @action(detail=True, methods=['post'], url_path='regenerate_assets')
     def regenerate_assets(self, request, pk=None):
@@ -227,9 +240,20 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
                 )
 
             if target in {'plus_one', 'both'}:
+                from ..plus_one import get_named_plus_one
+                if get_named_plus_one(guest):
+                    return Response(
+                        {
+                            'detail': (
+                                'This named plus one has a separate invitation and QR code. '
+                                'Scan their own pass to check them in.'
+                            ),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 if not guest.plus_one_attending:
                     return Response(
-                        {'detail': 'This guest does not have a plus-one.'},
+                        {'detail': 'This guest does not have a plus one.'},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 if not guest.plus_one_checked_in:
@@ -239,7 +263,7 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
                 elif target == 'plus_one':
                     return Response(
                         {
-                            'detail': 'Plus-one already checked in.',
+                            'detail': 'Plus one already checked in.',
                             'plus_one_checked_in_at': guest.plus_one_checked_in_at,
                         },
                         status=status.HTTP_409_CONFLICT,
@@ -247,7 +271,7 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
             if not update_fields:
                 return Response(
-                    {'detail': 'Guest and plus-one are already checked in.'},
+                    {'detail': 'Guest and plus one are already checked in.'},
                     status=status.HTTP_409_CONFLICT,
                 )
             guest.save(update_fields=update_fields)

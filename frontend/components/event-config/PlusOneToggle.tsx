@@ -12,16 +12,16 @@ export function PlusOneToggle({ enabled, onChange }: Props) {
       style={{ border: '1px solid var(--line)', background: enabled ? 'var(--brand-soft)' : 'var(--bg)' }}
     >
       <div>
-        <p className="text-sm font-semibold text-[var(--ink)]">Allow plus-ones</p>
+        <p className="text-sm font-semibold text-[var(--ink)]">Allow plus one</p>
         <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-          Let confirmed guests indicate one additional attendee on the RSVP page.
+          Collect the plus one’s name and phone number, then send them a personal invitation.
         </p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={enabled}
-        aria-label="Allow plus-ones"
+        aria-label="Allow plus one"
         onClick={() => onChange(!enabled)}
         className="relative mt-0.5 h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors"
         style={{ background: enabled ? 'var(--brand)' : 'var(--line)' }}

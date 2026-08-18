@@ -64,11 +64,28 @@ class EventSerializer(serializers.ModelSerializer):
     def get_plus_one_count(self, obj):
         if not obj.allow_plus_one:
             return 0
-        return self._planning_aggregate(obj)['plus_ones']
+        if obj.rsvp_enabled:
+            return self._planning_aggregate(obj)['plus_ones']
+        named = obj.guests.filter(plus_one_of__isnull=False).count()
+        legacy = obj.guests.filter(
+            plus_one_attending=True,
+            plus_one_of__isnull=True,
+            named_plus_one__isnull=True,
+        ).count()
+        return named + legacy
 
     def get_estimated_guest_count(self, obj):
-        primary_guests = self.get_confirmed_count(obj) if obj.rsvp_enabled else self.get_guest_count(obj)
-        return primary_guests + self.get_plus_one_count(obj)
+        if obj.rsvp_enabled:
+            planning = self._planning_aggregate(obj)
+            return planning['primary'] + planning['plus_ones']
+        # Named plus one entries are real guest records and are already part
+        # of guest_count. Only legacy anonymous plus one flags need adding.
+        legacy = obj.guests.filter(
+            plus_one_attending=True,
+            plus_one_of__isnull=True,
+            named_plus_one__isnull=True,
+        ).count()
+        return self.get_guest_count(obj) + legacy
 
     def _planning_guests(self, obj):
         guests = obj.guests.all()
@@ -83,8 +100,16 @@ class EventSerializer(serializers.ModelSerializer):
         cached = getattr(obj, '_planning_aggregate_cache', None)
         if cached is None:
             cached = self._planning_guests(obj).aggregate(
-                primary=Count('id', distinct=True),
-                plus_ones=Count('id', filter=Q(plus_one_attending=True), distinct=True),
+                confirmed=Count('id', distinct=True),
+                primary=Count('id', filter=Q(plus_one_of__isnull=True), distinct=True),
+                plus_ones=Count(
+                    'id',
+                    filter=Q(
+                        plus_one_of__isnull=True,
+                        plus_one_attending=True,
+                    ),
+                    distinct=True,
+                ),
                 aso_ebi_requests=Count('id', filter=Q(aso_ebi_requested=True), distinct=True),
                 aso_ebi_quantity=Sum(
                     'aso_ebi_quantity', filter=Q(aso_ebi_requested=True), default=0,
@@ -94,14 +119,25 @@ class EventSerializer(serializers.ModelSerializer):
         return cached
 
     def get_confirmed_count(self, obj):
-        return self._planning_aggregate(obj)['primary'] if obj.rsvp_enabled else 0
+        return self._planning_aggregate(obj)['confirmed'] if obj.rsvp_enabled else 0
 
     def get_plus_one_checked_in_count(self, obj):
-        ann = getattr(obj, 'plus_one_checked_in_count_ann', None)
-        return ann if ann is not None else obj.guests.filter(plus_one_checked_in=True).count()
+        named = obj.guests.filter(
+            plus_one_of__isnull=False,
+            status='checked_in',
+        ).count()
+        legacy = obj.guests.filter(
+            plus_one_checked_in=True,
+            named_plus_one__isnull=True,
+        ).count()
+        return named + legacy
 
     def get_total_checked_in_count(self, obj):
-        return self.get_checked_in_count(obj) + self.get_plus_one_checked_in_count(obj)
+        legacy = obj.guests.filter(
+            plus_one_checked_in=True,
+            named_plus_one__isnull=True,
+        ).count()
+        return self.get_checked_in_count(obj) + legacy
 
     def get_aso_ebi_request_count(self, obj):
         return self._planning_aggregate(obj)['aso_ebi_requests']
@@ -120,8 +156,12 @@ class EventSerializer(serializers.ModelSerializer):
             .exclude(celebrant_name='')
             .values('celebrant_name')
             .annotate(
-                guests=Count('id', distinct=True),
-                plus_ones=Count('id', filter=Q(plus_one_attending=True), distinct=True),
+                guests=Count('id', filter=Q(plus_one_of__isnull=True), distinct=True),
+                plus_ones=Count(
+                    'id',
+                    filter=Q(plus_one_of__isnull=True, plus_one_attending=True),
+                    distinct=True,
+                ),
             )
             .order_by('-guests', 'celebrant_name')
         )
@@ -145,6 +185,8 @@ class EventSerializer(serializers.ModelSerializer):
         model = Event
         fields = (
             'id', 'name', 'date', 'venue', 'description', 'rsvp_message', 'color_of_day',
+            'rsvp_primary_color', 'rsvp_background_color', 'rsvp_card_color',
+            'rsvp_text_color', 'rsvp_background_image',
             'design_template',
             'qr_zone_x', 'qr_zone_y', 'qr_zone_w', 'qr_zone_h',
             'name_zone_x', 'name_zone_y', 'name_zone_w', 'name_zone_h',
@@ -164,6 +206,19 @@ class EventSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        for field in (
+            'rsvp_primary_color', 'rsvp_background_color',
+            'rsvp_card_color', 'rsvp_text_color',
+        ):
+            value = attrs.get(field, getattr(self.instance, field, '') if self.instance else '')
+            if value and (
+                len(value) != 7
+                or not value.startswith('#')
+                or any(char not in '0123456789abcdefABCDEF' for char in value[1:])
+            ):
+                raise serializers.ValidationError({
+                    field: 'Enter a six-digit hex colour such as #8a6f2b.',
+                })
         event_date = attrs.get('date') or (self.instance.date if self.instance else None)
         pass_send_at = attrs.get(
             'pass_send_at',
@@ -178,6 +233,14 @@ class EventSerializer(serializers.ModelSerializer):
                 'pass_send_at': 'The scheduled pass time must be before the event date.',
             })
         return attrs
+
+    def validate_rsvp_background_image(self, value):
+        if value.size > 8 * 1024 * 1024:
+            raise serializers.ValidationError('The RSVP background must be 8 MB or smaller.')
+        content_type = getattr(value, 'content_type', '')
+        if content_type and content_type not in {'image/jpeg', 'image/png', 'image/webp'}:
+            raise serializers.ValidationError('Upload a PNG, JPEG, or WebP background image.')
+        return value
 
     @transaction.atomic
     def create(self, validated_data):

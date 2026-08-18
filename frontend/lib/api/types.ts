@@ -114,6 +114,11 @@ export interface Guest {
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   plus_one_attending: boolean;
+  has_named_plus_one: boolean;
+  plus_one_guest_id: string | null;
+  named_plus_one_name: string;
+  is_plus_one: boolean;
+  primary_guest_name: string;
   celebrant_name: string;
   preferences_link: string;
   preferences_submitted_at: string | null;
@@ -149,6 +154,8 @@ export type CreateGuestPayload = Pick<
   'full_name' | 'phone_number' | 'email' | 'ticket_type' | 'table_number' | 'seat_number' | 'aso_ebi_requested' | 'aso_ebi_quantity' | 'plus_one_attending' | 'celebrant_name' | 'event'
 > & {
   scheduled_send_at?: string | null;
+  plus_one_full_name?: string;
+  plus_one_phone_number?: string;
 };
 
 export interface TicketTypeDef {
@@ -164,6 +171,11 @@ export interface Event {
   description: string;
   rsvp_message: string;
   color_of_day: string;
+  rsvp_primary_color: string;
+  rsvp_background_color: string;
+  rsvp_card_color: string;
+  rsvp_text_color: string;
+  rsvp_background_image: string | null;
   design_template: string | null;
   qr_zone_x: number | null;
   qr_zone_y: number | null;
@@ -310,6 +322,8 @@ export interface RsvpRecipient {
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   plus_one_attending: boolean;
+  is_plus_one: boolean;
+  primary_guest_name: string;
   celebrant_name: string;
   has_phone: boolean;
   response_status: RsvpResponseStatus;
@@ -353,6 +367,11 @@ export interface PublicRsvpDetails {
   venue: string;
   rsvp_message: string;
   color_of_day: string;
+  rsvp_primary_color: string;
+  rsvp_background_color: string;
+  rsvp_card_color: string;
+  rsvp_text_color: string;
+  rsvp_background_image: string | null;
   collect_aso_ebi: boolean;
   allow_plus_one: boolean;
   collect_celebrant: boolean;
@@ -360,6 +379,8 @@ export interface PublicRsvpDetails {
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   plus_one_attending: boolean;
+  plus_one_full_name: string;
+  plus_one_phone_number: string;
   celebrant_name: string;
   invitation_image: string | null;
   response_deadline: string | null;
@@ -379,6 +400,8 @@ export interface GuestPreferencesDetails {
   collect_celebrant: boolean;
   celebrant_options: string[];
   plus_one_attending: boolean;
+  plus_one_full_name: string;
+  plus_one_phone_number: string;
   aso_ebi_requested: boolean;
   aso_ebi_quantity: number;
   celebrant_name: string;

@@ -514,6 +514,7 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
             'workflow__invitation_template',
             'workflow__pass_template',
             'guest__event__whatsapp_template',
+            'guest__plus_one_of',
         )
         .all()
     )
@@ -745,7 +746,9 @@ class PublicRsvpResponseView(APIView):
     throttle_scope = 'public_rsvp'
 
     def get_recipient(self, identifier):
-        recipients = RsvpRecipient.objects.select_related('workflow__event', 'guest')
+        recipients = RsvpRecipient.objects.select_related(
+            'workflow__event', 'guest', 'guest__plus_one_of', 'guest__named_plus_one',
+        )
         recipient = recipients.filter(
             Q(public_code=identifier) | Q(legacy_public_code=identifier)
         ).first()
@@ -771,13 +774,32 @@ class PublicRsvpResponseView(APIView):
             'venue': workflow.event.venue,
             'rsvp_message': workflow.event.rsvp_message,
             'color_of_day': workflow.event.color_of_day,
+            'rsvp_primary_color': workflow.event.rsvp_primary_color,
+            'rsvp_background_color': workflow.event.rsvp_background_color,
+            'rsvp_card_color': workflow.event.rsvp_card_color,
+            'rsvp_text_color': workflow.event.rsvp_text_color,
+            'rsvp_background_image': (
+                request.build_absolute_uri(workflow.event.rsvp_background_image.url)
+                if workflow.event.rsvp_background_image else None
+            ),
             'collect_aso_ebi': workflow.event.collect_aso_ebi,
-            'allow_plus_one': workflow.event.allow_plus_one,
+            'allow_plus_one': (
+                workflow.event.allow_plus_one
+                and recipient.guest.plus_one_of_id is None
+            ),
             'collect_celebrant': workflow.event.collect_celebrant,
             'celebrant_options': workflow.event.celebrant_options or [],
             'aso_ebi_requested': recipient.guest.aso_ebi_requested,
             'aso_ebi_quantity': recipient.guest.aso_ebi_quantity,
             'plus_one_attending': recipient.guest.plus_one_attending,
+            'plus_one_full_name': (
+                recipient.guest.named_plus_one.full_name
+                if hasattr(recipient.guest, 'named_plus_one') else ''
+            ),
+            'plus_one_phone_number': (
+                recipient.guest.named_plus_one.phone_number
+                if hasattr(recipient.guest, 'named_plus_one') else ''
+            ),
             'celebrant_name': recipient.guest.celebrant_name,
             'invitation_image': (
                 request.build_absolute_uri(recipient.invitation_image.url)
@@ -826,7 +848,14 @@ class PublicRsvpResponseView(APIView):
             plus_one_attending = False
         if plus_one_attending and not recipient.workflow.event.allow_plus_one:
             return Response(
-                {'detail': 'Plus ones are not enabled for this event.'},
+                {'detail': 'Plus one is not enabled for this event.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        plus_one_full_name = str(request.data.get('plus_one_full_name', '') or '').strip()
+        plus_one_phone_number = str(request.data.get('plus_one_phone_number', '') or '').strip()
+        if plus_one_attending and (not plus_one_full_name or not plus_one_phone_number):
+            return Response(
+                {'detail': 'Enter the full name and WhatsApp phone number of your plus one.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         celebrant_name = str(request.data.get('celebrant_name', '') or '').strip()
@@ -870,11 +899,15 @@ class PublicRsvpResponseView(APIView):
                 'aso_ebi_requested': aso_ebi_requested,
                 'aso_ebi_quantity': aso_ebi_quantity if aso_ebi_requested else 0,
                 'plus_one_attending': plus_one_attending,
+                'plus_one_full_name': plus_one_full_name,
+                'plus_one_phone_number': plus_one_phone_number,
                 'celebrant_name': celebrant_name,
             },
             aso_ebi_requested=aso_ebi_requested,
             aso_ebi_quantity=aso_ebi_quantity if aso_ebi_requested else 0,
             plus_one_attending=plus_one_attending,
+            plus_one_full_name=plus_one_full_name,
+            plus_one_phone_number=plus_one_phone_number,
             celebrant_name=celebrant_name,
         )
         reason = result.get('reason')
@@ -890,4 +923,12 @@ class PublicRsvpResponseView(APIView):
                 'already_responded': True,
                 'response_status': result.get('response_status'),
             })
+        if reason in {
+            'plus_one_name_required', 'plus_one_phone_required',
+            'plus_one_phone_in_use', 'plus_one_cannot_invite',
+        }:
+            return Response(
+                {'detail': result.get('detail', 'The plus one details are invalid.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(result, status=status.HTTP_200_OK if result.get('accepted') else status.HTTP_409_CONFLICT)

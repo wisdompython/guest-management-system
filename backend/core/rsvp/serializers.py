@@ -30,6 +30,13 @@ def build_workflow_stats(workflow):
         invited=Count('id'),
         awaiting=Count('id', filter=Q(response_status=RsvpRecipient.ResponseStatus.AWAITING)),
         confirmed=Count('id', filter=Q(response_status=RsvpRecipient.ResponseStatus.CONFIRMED)),
+        confirmed_primary=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                guest__plus_one_of__isnull=True,
+            ),
+        ),
         declined=Count('id', filter=Q(response_status=RsvpRecipient.ResponseStatus.DECLINED)),
         invitation_delivered=Count(
             'id',
@@ -94,7 +101,7 @@ def build_workflow_stats(workflow):
         counts['plus_ones'] = 0
     counts['response_rate'] = round((responded / invited) * 100, 1) if invited else 0.0
     counts['confirmation_rate'] = round((counts['confirmed'] / invited) * 100, 1) if invited else 0.0
-    counts['estimated_guests'] = counts['confirmed'] + counts['plus_ones']
+    counts['estimated_guests'] = counts.pop('confirmed_primary') + counts['plus_ones']
     return counts
 
 
@@ -307,6 +314,8 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
     aso_ebi_requested = serializers.BooleanField(source='guest.aso_ebi_requested', read_only=True)
     aso_ebi_quantity = serializers.IntegerField(source='guest.aso_ebi_quantity', read_only=True)
     plus_one_attending = serializers.BooleanField(source='guest.plus_one_attending', read_only=True)
+    is_plus_one = serializers.SerializerMethodField()
+    primary_guest_name = serializers.SerializerMethodField()
     celebrant_name = serializers.CharField(source='guest.celebrant_name', read_only=True)
     has_phone = serializers.SerializerMethodField()
 
@@ -323,6 +332,8 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'aso_ebi_requested',
             'aso_ebi_quantity',
             'plus_one_attending',
+            'is_plus_one',
+            'primary_guest_name',
             'celebrant_name',
             'has_phone',
             'response_status',
@@ -346,6 +357,12 @@ class RsvpRecipientSerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = fields
+
+    def get_is_plus_one(self, obj):
+        return obj.guest.plus_one_of_id is not None
+
+    def get_primary_guest_name(self, obj):
+        return obj.guest.plus_one_of.full_name if obj.guest.plus_one_of_id else ''
 
     def get_has_phone(self, obj):
         return bool(obj.guest.phone_number)

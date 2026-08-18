@@ -211,6 +211,8 @@ def record_response(
     aso_ebi_requested: bool = False,
     aso_ebi_quantity: int = 0,
     plus_one_attending: bool = False,
+    plus_one_full_name: str = '',
+    plus_one_phone_number: str = '',
     celebrant_name: str = '',
 ) -> dict:
     """Record the first valid response and queue a pass when appropriate."""
@@ -222,7 +224,7 @@ def record_response(
             recipient = (
                 RsvpRecipient.objects
                 .select_for_update()
-                .select_related('workflow', 'guest')
+                .select_related('workflow', 'workflow__event', 'guest', 'guest__plus_one_of')
                 .get(callback_token=callback_token)
             )
         except RsvpRecipient.DoesNotExist:
@@ -250,6 +252,19 @@ def record_response(
             return {'accepted': False, 'reason': 'invalid_aso_ebi_quantity'}
         if plus_one_attending and not recipient.workflow.event.allow_plus_one:
             return {'accepted': False, 'reason': 'plus_one_not_enabled'}
+        if plus_one_attending:
+            from guests.plus_one import NamedPlusOneError, validate_named_plus_one
+            try:
+                plus_one_full_name, plus_one_phone_number = validate_named_plus_one(
+                    recipient.guest,
+                    plus_one_full_name,
+                    plus_one_phone_number,
+                )
+            except NamedPlusOneError as exc:
+                return {'accepted': False, 'reason': exc.code, 'detail': str(exc)}
+        else:
+            plus_one_full_name = ''
+            plus_one_phone_number = ''
         celebrant_name = str(celebrant_name or '').strip()
         if celebrant_name and not recipient.workflow.event.collect_celebrant:
             return {'accepted': False, 'reason': 'celebrant_not_enabled'}
@@ -271,6 +286,7 @@ def record_response(
             return {'accepted': False, 'reason': 'duplicate'}
 
         now = timezone.now()
+        plus_one_recipient = None
         pass_due = (
             not recipient.workflow.pass_send_at
             or recipient.workflow.pass_send_at <= now
@@ -290,6 +306,19 @@ def record_response(
                 'celebrant_name', 'plus_one_checked_in', 'plus_one_checked_in_at',
                 'preferences_submitted_at',
             ])
+            if plus_one_attending:
+                from guests.plus_one import upsert_named_plus_one
+                plus_one_guest, _, _ = upsert_named_plus_one(
+                    recipient.guest,
+                    plus_one_full_name,
+                    plus_one_phone_number,
+                )
+                plus_one_recipient = sync_guest_to_workflow(plus_one_guest)
+            elif recipient.guest.plus_one_of_id:
+                Guest = recipient.guest.__class__
+                Guest.objects.filter(pk=recipient.guest.plus_one_of_id).update(
+                    plus_one_attending=True,
+                )
             if recipient.workflow.auto_send_pass and pass_due:
                 recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
                 recipient.pass_queued_at = now
@@ -308,6 +337,11 @@ def record_response(
                 'celebrant_name', 'plus_one_checked_in', 'plus_one_checked_in_at',
                 'preferences_submitted_at',
             ])
+            if recipient.guest.plus_one_of_id:
+                Guest = recipient.guest.__class__
+                Guest.objects.filter(pk=recipient.guest.plus_one_of_id).update(
+                    plus_one_attending=False,
+                )
         recipient.responded_at = now
         recipient.save(update_fields=[
             'response_status',
@@ -330,6 +364,11 @@ def record_response(
             'accepted': True,
             'response_status': recipient.response_status,
             'pass_queued': should_queue_pass,
+            'plus_one_invitation_queued': bool(
+                plus_one_recipient
+                and plus_one_recipient.invitation_status
+                == RsvpRecipient.InvitationStatus.QUEUED
+            ),
             'pass_scheduled_for': (
                 recipient.workflow.pass_send_at
                 if answer == RsvpResponse.Answer.YES

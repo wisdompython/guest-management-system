@@ -16,7 +16,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 type ScanState = 'idle' | 'scanning' | 'loading' | 'found' | 'checked_in' | 'duplicate' | 'invalid'
 
 function partyFullyCheckedIn(guest: Guest) {
-  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.plus_one_checked_in)
+  return guest.status === 'checked_in' && (!guest.plus_one_attending || guest.has_named_plus_one || guest.plus_one_checked_in)
 }
 
 export default function CheckInPage() {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useParams } from 'next/navigation'
 
 import { api, PublicRsvpDetails, RsvpResponseStatus } from '@/lib/api'
@@ -48,12 +49,20 @@ export default function PublicRsvpPage() {
   const [asoEbiRequested, setAsoEbiRequested] = useState(false)
   const [asoEbiQuantity, setAsoEbiQuantity] = useState(2)
   const [plusOneAttending, setPlusOneAttending] = useState(false)
+  const [plusOneFullName, setPlusOneFullName] = useState('')
+  const [plusOnePhoneNumber, setPlusOnePhoneNumber] = useState('')
   const [celebrantName, setCelebrantName] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
     api.getPublicRsvp(token)
-      .then((result) => { setDetails(result); setCelebrantName(result.celebrant_name || '') })
+      .then((result) => {
+        setDetails(result)
+        setCelebrantName(result.celebrant_name || '')
+        setPlusOneAttending(result.plus_one_attending)
+        setPlusOneFullName(result.plus_one_full_name || '')
+        setPlusOnePhoneNumber(result.plus_one_phone_number || '')
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'This RSVP invitation could not be loaded.'))
       .finally(() => setLoading(false))
   }, [token])
@@ -61,6 +70,10 @@ export default function PublicRsvpPage() {
   async function respond(response: 'yes' | 'no') {
     if (response === 'yes' && asoEbiRequested && asoEbiQuantity < 1) {
       setError('Choose how many yards of Aso Ebi you need.')
+      return
+    }
+    if (response === 'yes' && plusOneAttending && (!plusOneFullName.trim() || !plusOnePhoneNumber.trim())) {
+      setError('Enter the full name and WhatsApp phone number of your plus one.')
       return
     }
     setSubmitting(response)
@@ -72,6 +85,8 @@ export default function PublicRsvpPage() {
         asoEbiRequested,
         asoEbiQuantity,
         plusOneAttending,
+        plusOneFullName,
+        plusOnePhoneNumber,
         celebrantName,
       )
       setDetails((current) => current ? {
@@ -83,6 +98,8 @@ export default function PublicRsvpPage() {
         aso_ebi_requested: response === 'yes' && asoEbiRequested,
         aso_ebi_quantity: response === 'yes' && asoEbiRequested ? asoEbiQuantity : 0,
         plus_one_attending: response === 'yes' && plusOneAttending,
+        plus_one_full_name: response === 'yes' && plusOneAttending ? plusOneFullName : '',
+        plus_one_phone_number: response === 'yes' && plusOneAttending ? plusOnePhoneNumber : '',
         celebrant_name: response === 'yes' ? celebrantName : '',
       } : current)
     } catch (err) {
@@ -92,8 +109,31 @@ export default function PublicRsvpPage() {
     }
   }
 
+  const themedStyle = details ? {
+    '--bg': details.rsvp_background_color || '#f6f4ee',
+    '--panel': details.rsvp_card_color || '#ffffff',
+    '--panel-2': `color-mix(in srgb, ${details.rsvp_card_color || '#ffffff'} 88%, ${details.rsvp_text_color || '#23262e'})`,
+    '--field': details.rsvp_card_color || '#ffffff',
+    '--ink': details.rsvp_text_color || '#23262e',
+    '--ink-2': details.rsvp_text_color || '#23262e',
+    '--muted': `color-mix(in srgb, ${details.rsvp_text_color || '#23262e'} 68%, transparent)`,
+    '--muted-2': `color-mix(in srgb, ${details.rsvp_text_color || '#23262e'} 48%, transparent)`,
+    '--line': `color-mix(in srgb, ${details.rsvp_text_color || '#23262e'} 16%, transparent)`,
+    '--chip': `color-mix(in srgb, ${details.rsvp_text_color || '#23262e'} 6%, transparent)`,
+    '--brand': details.rsvp_primary_color || '#8a6f2b',
+    '--brand-strong': details.rsvp_primary_color || '#8a6f2b',
+    '--brand-soft': `color-mix(in srgb, ${details.rsvp_primary_color || '#8a6f2b'} 16%, transparent)`,
+    '--sidebar': details.rsvp_card_color || '#ffffff',
+    color: 'var(--ink)',
+    backgroundColor: 'var(--bg)',
+    backgroundImage: details.rsvp_background_image ? `url("${details.rsvp_background_image}")` : undefined,
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
+    backgroundAttachment: 'fixed',
+  } as CSSProperties : undefined
+
   return (
-    <main className="flex min-h-screen items-start justify-center sm:px-4 sm:py-8 lg:items-center lg:px-6 lg:py-12" style={{ background: 'var(--bg)' }}>
+    <main className="flex min-h-screen items-start justify-center sm:px-4 sm:py-8 lg:items-center lg:px-6 lg:py-12" style={themedStyle}>
       <div className="min-w-0 w-full overflow-hidden rounded-none sm:max-w-2xl sm:rounded-[18px] lg:max-w-3xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 24px 70px rgba(0,0,0,0.28)' }}>
         <header className="px-4 py-4 sm:px-7 sm:py-5 lg:px-10" style={{ borderBottom: '1px solid var(--line)', background: 'var(--sidebar)' }}>
           <div className="flex items-center gap-3">
@@ -144,7 +184,7 @@ export default function PublicRsvpPage() {
                 <p className="mx-auto max-w-xl text-center text-base font-semibold leading-6 sm:text-lg">Hi {details.guest_name}, are you attending?</p>
                 <div className="mx-auto mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
                   <button type="button" disabled={!!submitting} onClick={() => setAnswer('yes')} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'yes' ? 'var(--brand)' : 'var(--bg)', border: '1px solid var(--brand)', color: answer === 'yes' ? '#fff' : 'var(--ink)' }}>Yes, I’m Coming</button>
-                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false); setPlusOneAttending(false); setCelebrantName('') }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
+                  <button type="button" disabled={!!submitting} onClick={() => { setAnswer('no'); setAsoEbiRequested(false); setPlusOneAttending(false); setPlusOneFullName(''); setPlusOnePhoneNumber(''); setCelebrantName('') }} className="min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition disabled:opacity-50" style={{ background: answer === 'no' ? 'var(--panel-2)' : 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }}>No, I Can’t Make It</button>
                 </div>
 
                 {details.response_deadline && (
@@ -167,9 +207,10 @@ export default function PublicRsvpPage() {
                 {answer === 'yes' && details.allow_plus_one && (
                   <div className="mx-auto mt-5 max-w-2xl rounded-[12px] p-4 sm:p-5" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
                     <label className="flex cursor-pointer items-start gap-3">
-                      <input type="checkbox" checked={plusOneAttending} onChange={(event) => setPlusOneAttending(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
-                      <span><span className="block text-sm font-semibold">I’m bringing a plus one</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Let the organiser know that one additional guest will attend with you.</span></span>
+                      <input type="checkbox" checked={plusOneAttending} onChange={(event) => { setPlusOneAttending(event.target.checked); if (!event.target.checked) { setPlusOneFullName(''); setPlusOnePhoneNumber('') } }} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+                      <span><span className="block text-sm font-semibold">I’m bringing a plus one</span><span className="mt-1 block text-xs leading-5" style={{ color: 'var(--muted)' }}>Provide their details so they can receive a personal invitation and QR pass.</span></span>
                     </label>
+                    {plusOneAttending && <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><label className="text-xs font-semibold" htmlFor="plus-one-name">Plus one name</label><input id="plus-one-name" value={plusOneFullName} onChange={(event) => setPlusOneFullName(event.target.value)} required placeholder="Full name" className="form-control mt-2" /></div><div><label className="text-xs font-semibold" htmlFor="plus-one-phone">WhatsApp phone number</label><input id="plus-one-phone" type="tel" value={plusOnePhoneNumber} onChange={(event) => setPlusOnePhoneNumber(event.target.value)} required placeholder="e.g. +234 800 000 0000" className="form-control mt-2" /></div></div>}
                   </div>
                 )}
 
@@ -210,5 +251,5 @@ function ResponseCard({ details }: { details: PublicRsvpDetails }) {
       ? 'Please contact the event organiser if you need assistance.'
       : RESPONSE_COPY[details.response_status].body
 
-  return <div className="mt-8 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#ffffff' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{body}</p>{details.response_status === 'confirmed' && details.celebrant_name && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Celebrant: {details.celebrant_name}</p>}{details.response_status === 'confirmed' && details.plus_one_attending && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Plus one included</p>}{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity} yards</p>}</div>
+  return <div className="mt-8 rounded-[12px] px-4 py-5 text-center" style={{ background: details.response_status === 'confirmed' ? 'var(--success-bg)' : 'var(--bg)', border: '1px solid var(--line)' }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ background: details.response_status === 'confirmed' ? 'var(--success)' : 'var(--panel-2)', color: details.response_status === 'confirmed' ? '#ffffff' : 'var(--muted)' }}>{details.response_status === 'confirmed' ? '✓' : '—'}</div><h2 className="mt-3 text-base font-bold">{title}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{body}</p>{details.response_status === 'confirmed' && details.celebrant_name && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Celebrant: {details.celebrant_name}</p>}{details.response_status === 'confirmed' && details.plus_one_attending && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Plus one: {details.plus_one_full_name || 'Invitation queued'}</p>}{details.response_status === 'confirmed' && details.aso_ebi_requested && <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--brand)' }}>Aso Ebi requested: {details.aso_ebi_quantity} yards</p>}</div>
 }

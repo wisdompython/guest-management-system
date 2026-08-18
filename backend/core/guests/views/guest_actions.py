@@ -112,20 +112,25 @@ class GuestBulkExportMixin:
             'full_name', 'email', 'phone_number',
             'ticket_type', 'table_number', 'seat_number',
             'aso_ebi_requested', 'aso_ebi_yards',
-            'plus_one_attending', 'plus_one_checked_in', 'celebrant_name',
+            'plus_one_attending', 'plus_one_full_name', 'plus_one_phone_number',
+            'invited_as_plus_one_of', 'plus_one_checked_in', 'celebrant_name',
             'status', 'registered_at', 'checked_in_at',
             'whatsapp_sent', 'event',
         ]
 
         def row_iter():
             yield columns
-            for g in qs.select_related('event').iterator():
+            for g in qs.select_related('event', 'plus_one_of', 'named_plus_one').iterator():
+                named_plus_one = getattr(g, 'named_plus_one', None)
                 yield safe_csv_row([
                     g.full_name, g.email, g.phone_number,
                     g.ticket_type, g.table_number, g.seat_number,
                     'Yes' if g.aso_ebi_requested else 'No',
                     g.aso_ebi_quantity if g.aso_ebi_requested else 0,
                     'Yes' if g.plus_one_attending else 'No',
+                    named_plus_one.full_name if named_plus_one else '',
+                    named_plus_one.phone_number if named_plus_one else '',
+                    g.plus_one_of.full_name if g.plus_one_of_id else '',
                     'Yes' if g.plus_one_checked_in else 'No',
                     g.celebrant_name,
                     g.get_status_display(),

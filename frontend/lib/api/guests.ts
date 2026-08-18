@@ -33,6 +33,8 @@ export const guestsApi = {
     request<GuestPreferencesDetails>(`/guest-preferences/${token}/`),
   submitGuestPreferences: (token: string, payload: {
     plus_one_attending: boolean
+    plus_one_full_name: string
+    plus_one_phone_number: string
     aso_ebi_requested: boolean
     aso_ebi_quantity: number
     celebrant_name: string

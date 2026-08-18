@@ -36,7 +36,7 @@ export function DuplicateScreen({ guest, onNext }: { guest: Guest; onNext: () =>
         </div>
         <GuestInfoRow label="Ticket" value={guest.ticket_type.toUpperCase()} />
         {guest.celebrant_name && <GuestInfoRow label="Celebrant" value={guest.celebrant_name} />}
-        {guest.plus_one_attending && <GuestInfoRow label="Plus-one" value={guest.plus_one_checked_in ? 'Checked in' : 'Pending'} />}
+        {guest.plus_one_attending && <GuestInfoRow label="Plus one" value={guest.has_named_plus_one ? 'Uses a separate QR' : guest.plus_one_checked_in ? 'Checked in' : 'Pending'} />}
       </div>
       <button onClick={onNext}
         className="w-full max-w-sm font-semibold rounded-sm py-4 text-sm tracking-[0.06em] uppercase active:scale-95 transition-transform"

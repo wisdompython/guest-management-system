@@ -314,40 +314,55 @@ def process_bulk_guest_upload(self, upload_id: int):
             rows_to_create = []
             skipped_report = []
 
-            if upload.replace_existing:
-                rows_to_create = [
-                    {key: value for key, value in row.items() if key != '_csv_row'}
-                    for row in valid_rows
-                ]
-            else:
+            existing_phone_keys = set()
+            if not upload.replace_existing:
                 existing_phone_keys = {
                     _normalise_phone(phone)
                     for phone in Guest.objects.filter(event=locked_event)
                     .exclude(phone_number='')
                     .values_list('phone_number', flat=True)
                 }
-                seen_phone_keys = set(existing_phone_keys)
-                for row in valid_rows:
-                    phone = row.get('phone_number', '')
-                    phone_key = _normalise_phone(phone) if phone else ''
-                    if phone_key and phone_key in seen_phone_keys:
-                        skipped_report.append({
-                            'row': row['_csv_row'],
-                            'full_name': row.get('full_name', ''),
-                            'phone_number': phone,
-                            'reason': (
-                                'A guest with this phone number is already in the event.'
-                                if phone_key in existing_phone_keys else
-                                'This phone number appeared earlier in the same CSV.'
-                            ),
-                        })
-                        continue
-                    if phone_key:
-                        seen_phone_keys.add(phone_key)
-                    rows_to_create.append({
-                        key: value for key, value in row.items() if key != '_csv_row'
+            seen_phone_keys = set(existing_phone_keys)
+            for row in valid_rows:
+                phone = row.get('phone_number', '')
+                plus_one_phone = row.get('_plus_one_phone_number', '')
+                phone_keys = [
+                    _normalise_phone(value)
+                    for value in (phone, plus_one_phone)
+                    if value
+                ]
+                duplicate_key = next(
+                    (key for key in phone_keys if key in seen_phone_keys),
+                    None,
+                )
+                if len(phone_keys) != len(set(phone_keys)):
+                    duplicate_key = phone_keys[0]
+                if duplicate_key:
+                    duplicate_phone = (
+                        plus_one_phone
+                        if _normalise_phone(plus_one_phone) == duplicate_key
+                        else phone
+                    )
+                    skipped_report.append({
+                        'row': row['_csv_row'],
+                        'full_name': row.get('full_name', ''),
+                        'phone_number': duplicate_phone,
+                        'reason': (
+                            'A guest with this phone number is already in the event.'
+                            if duplicate_key in existing_phone_keys else
+                            'This phone number appeared earlier in the same CSV row or file.'
+                        ),
                     })
+                    continue
+                seen_phone_keys.update(phone_keys)
+                rows_to_create.append({
+                    key: value for key, value in row.items() if key != '_csv_row'
+                })
 
+            plus_one_specs = [
+                (row.pop('_plus_one_full_name', ''), row.pop('_plus_one_phone_number', ''))
+                for row in rows_to_create
+            ]
             guest_objects = [Guest(**row) for row in rows_to_create]
             created_guests = []
             replaced = 0
@@ -360,7 +375,29 @@ def process_bulk_guest_upload(self, upload_id: int):
                     guest_objects[start:start + 500],
                     batch_size=500,
                 ))
-            guest_ids = [guest.id for guest in created_guests]
+            named_plus_ones = []
+            for primary, (plus_one_name, plus_one_phone) in zip(
+                created_guests, plus_one_specs,
+            ):
+                if not plus_one_name:
+                    continue
+                named_plus_ones.append(Guest(
+                    event=primary.event,
+                    plus_one_of=primary,
+                    full_name=plus_one_name,
+                    phone_number=_normalise_phone(plus_one_phone),
+                    ticket_type=primary.ticket_type,
+                    table_number=primary.table_number,
+                    celebrant_name=primary.celebrant_name,
+                    scheduled_send_at=primary.scheduled_send_at,
+                ))
+            for start in range(0, len(named_plus_ones), 500):
+                Guest.objects.bulk_create(
+                    named_plus_ones[start:start + 500],
+                    batch_size=500,
+                )
+            all_created_guests = created_guests + named_plus_ones
+            guest_ids = [guest.id for guest in all_created_guests]
             recipients_created = bulk_sync_guests_to_workflow(
                 upload.event_id,
                 guest_ids,
@@ -373,7 +410,7 @@ def process_bulk_guest_upload(self, upload_id: int):
             BulkUpload.objects.filter(pk=upload_id).update(
                 status=final_status,
                 total_rows=total_rows,
-                successful_rows=len(guest_ids),
+                successful_rows=len(created_guests),
                 failed_rows=len(error_report),
                 skipped_rows=len(skipped_report),
                 replaced_rows=replaced,
@@ -404,7 +441,7 @@ def process_bulk_guest_upload(self, upload_id: int):
                 )
                 return {'imported': len(guest_ids), 'reason': str(exc)}
         return {
-            'imported': len(guest_ids),
+            'imported': len(created_guests),
             'failed': len(error_report),
             'skipped': len(skipped_report),
             'replaced': replaced,

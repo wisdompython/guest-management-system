@@ -17,6 +17,7 @@ export function GuestDetailsCard({ guest, showPhone = false }: Props) {
         <dl className="divide-y divide-[var(--line)]">
           {([
             { label: 'Full Name',   value: guest.full_name },
+            guest.is_plus_one ? { label: 'Invited as', value: `Plus one of ${guest.primary_guest_name}` } : null,
             showPhone ? { label: 'Phone', value: guest.phone_number || '—' } : null,
             { label: 'Email',       value: guest.email || '—' },
             { label: 'Event',       value: guest.event_name || '—' },
@@ -25,7 +26,7 @@ export function GuestDetailsCard({ guest, showPhone = false }: Props) {
             { label: 'Seat',        value: guest.seat_number || '—' },
             { label: 'Aso Ebi',     value: guest.aso_ebi_requested ? 'Requested' : 'Not requested' },
             guest.aso_ebi_requested ? { label: 'Aso Ebi amount', value: `${guest.aso_ebi_quantity} yards` } : null,
-            { label: 'Plus-one', value: guest.plus_one_attending ? (guest.plus_one_checked_in ? 'Attending · checked in' : 'Attending · pending') : 'None' },
+            { label: 'Plus one', value: guest.plus_one_attending ? (guest.has_named_plus_one ? guest.named_plus_one_name : guest.plus_one_checked_in ? 'Attending · checked in' : 'Attending · pending') : 'None' },
             guest.celebrant_name ? { label: 'Celebrant', value: guest.celebrant_name } : null,
             { label: 'Preferences', value: guest.preferences_submitted_at ? `Submitted ${new Date(guest.preferences_submitted_at).toLocaleString()}` : 'Not submitted' },
             { label: 'Registered',  value: new Date(guest.registered_at).toLocaleString() },
