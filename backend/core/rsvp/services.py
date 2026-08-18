@@ -223,8 +223,11 @@ def record_response(
         try:
             recipient = (
                 RsvpRecipient.objects
-                .select_for_update()
-                .select_related('workflow', 'workflow__event', 'guest', 'guest__plus_one_of')
+                # Lock only the recipient row. ``guest__plus_one_of`` is a
+                # nullable relation, and PostgreSQL cannot apply FOR UPDATE
+                # to the nullable side of the resulting outer join.
+                .select_for_update(of=('self',))
+                .select_related('workflow', 'workflow__event', 'guest')
                 .get(callback_token=callback_token)
             )
         except RsvpRecipient.DoesNotExist:

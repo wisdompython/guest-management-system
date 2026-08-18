@@ -914,6 +914,22 @@ class PublicRsvpPageApiTests(TestCase):
         mock_send.assert_called_once_with(self.recipient.id)
 
     @patch('rsvp.tasks.send_confirmed_pass.delay')
+    @patch('rsvp.services.RsvpRecipient.objects.select_for_update')
+    def test_response_locks_only_the_recipient_row(self, mock_lock, mock_send):
+        mock_lock.return_value.select_related.return_value.get.return_value = self.recipient
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url, {'answer': 'yes'}, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data['accepted'])
+        mock_lock.assert_called_once_with(of=('self',))
+        mock_lock.return_value.select_related.assert_called_once_with(
+            'workflow', 'workflow__event', 'guest',
+        )
+        mock_send.assert_called_once_with(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
     def test_yes_response_can_include_one_plus_one(self, mock_send):
         self.event.allow_plus_one = True
         self.event.save(update_fields=['allow_plus_one'])
