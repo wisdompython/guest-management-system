@@ -92,7 +92,7 @@ export function UploadForm({
             )}
             {selectedEvent.allow_plus_one && (
               <p className="leading-5" style={{ color: 'var(--muted-2)' }}>
-                When <code>plus_one_attending</code> is <code>yes</code>, both <code>plus_one_full_name</code> and <code>plus_one_phone_number</code> are required. The plus one is imported as a linked guest with a separate invitation.
+                When <code>plus_one_attending</code> is <code>yes</code>, both <code>plus_one_full_name</code> and <code>plus_one_phone_number</code> are required. The plus one is imported as a linked guest with a separate QR pass.
               </p>
             )}
           </div>

@@ -62,7 +62,7 @@ export default function EventWorkspacePage({ params }: { params: Promise<{ id: s
   ]
   const planningMetrics = [
     { label: event.rsvp_enabled ? 'Confirmed' : 'Registered', value: event.rsvp_enabled ? event.confirmed_count : event.guest_count, detail: event.rsvp_enabled ? `${event.guest_count} invited` : 'Primary guests' },
-    { label: 'Plus one', value: event.plus_one_count, detail: event.allow_plus_one ? 'Personal invitations requested' : 'Not enabled' },
+    { label: 'Plus one', value: event.plus_one_count, detail: event.allow_plus_one ? 'Named companions' : 'Not enabled' },
     { label: 'Estimated guests', value: event.estimated_guest_count, detail: event.rsvp_enabled ? 'Confirmed guests including plus one' : 'Registered guests including plus one' },
     { label: 'Checked in', value: event.total_checked_in_count, detail: `${event.plus_one_checked_in_count} attending as plus one` },
     { label: 'Aso Ebi', value: event.aso_ebi_quantity, detail: `${event.aso_ebi_request_count} request${event.aso_ebi_request_count === 1 ? '' : 's'} · yards` },

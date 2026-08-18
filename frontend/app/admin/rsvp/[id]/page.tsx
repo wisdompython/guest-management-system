@@ -205,7 +205,7 @@ export default function RsvpWorkflowDetailPage() {
         {metric('Passes sent', stats.passes_sent, `${stats.confirmed_no_pass} confirmed awaiting pass${stats.passes_failed ? ` · ${stats.passes_failed} failed` : ''}`)}
         {metric('Delivery failures', stats.delivery_failed, `${stats.invitation_failed} invite${stats.invitation_failed === 1 ? '' : 's'} · ${stats.passes_failed} pass${stats.passes_failed === 1 ? '' : 'es'}`, 'var(--danger)', () => { setSegmentFilter('delivery_failed'); setResponseFilter('all'); setPage(1) })}
         {metric('Aso Ebi yards', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}
-        {metric('Plus one', stats.plus_ones, 'Personal invitations requested', 'var(--brand)')}
+        {metric('Plus one', stats.plus_ones, 'Named companions', 'var(--brand)')}
         {metric('Estimated guests', stats.estimated_guests, `${stats.confirmed} confirmed · ${stats.plus_ones} linked as plus one`, 'var(--brand)')}
       </div>
 

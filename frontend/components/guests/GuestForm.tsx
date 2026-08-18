@@ -121,7 +121,7 @@ export function GuestForm({
           <div className="sm:col-span-2 rounded-[14px] border border-[var(--line)] bg-[var(--bg)] p-4">
             <label className="flex cursor-pointer items-start gap-3">
               <input name="plus_one_attending" type="checkbox" checked={plusOneAttending} onChange={(event) => setPlusOneAttending(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
-              <span><span className="block text-sm font-semibold text-[var(--ink)]">Guest is bringing a plus one</span><span className="mt-1 block text-xs text-[var(--muted)]">Add their details so they receive a separate invitation and QR pass.</span></span>
+              <span><span className="block text-sm font-semibold text-[var(--ink)]">Guest is bringing a plus one</span><span className="mt-1 block text-xs text-[var(--muted)]">Add their details so they receive their own QR pass.</span></span>
             </label>
             {plusOneAttending && <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><label className={labelCls}>Plus one name *</label><input name="plus_one_full_name" required placeholder="Full name" className={field} /></div><div><label className={labelCls}>WhatsApp phone number *</label><input name="plus_one_phone_number" type="tel" required placeholder="+234 800 000 0000" className={field} /></div></div>}
           </div>

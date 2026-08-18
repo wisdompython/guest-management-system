@@ -59,7 +59,7 @@ export function GuestFoundScreen({
             </div>
           ))}
           {guest.celebrant_name && <div className="px-5 py-4" style={{ borderColor: 'var(--line)' }}><p className="mb-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-2)]">Celebrant</p><p className="text-sm font-semibold text-[var(--ink)]">{guest.celebrant_name}</p></div>}
-          {guest.plus_one_attending && <div className="px-5 py-4" style={{ borderColor: 'var(--line)' }}><p className="mb-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-2)]">Plus one</p><p className="text-sm font-semibold text-[var(--ink)]">{guest.has_named_plus_one ? 'Separate invitation and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`}</p></div>}
+          {guest.plus_one_attending && <div className="px-5 py-4" style={{ borderColor: 'var(--line)' }}><p className="mb-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-2)]">Plus one</p><p className="text-sm font-semibold text-[var(--ink)]">{guest.has_named_plus_one ? 'Separate pass and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`}</p></div>}
         </div>
       </div>
       <div className="mb-3 grid w-full gap-2">

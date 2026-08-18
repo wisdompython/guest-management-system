@@ -21,7 +21,7 @@ CALLBACK_PATTERN = re.compile(
 
 def sync_guest_to_workflow(guest):
     """Attach a newly-added eligible guest to this event's open RSVP workflow."""
-    if not guest.phone_number:
+    if not guest.phone_number or guest.plus_one_of_id:
         return None
     workflow = RsvpWorkflow.objects.filter(
         event_id=guest.event_id,
@@ -63,6 +63,62 @@ def sync_guest_to_workflow(guest):
     return recipient
 
 
+def queue_plus_one_pass(workflow, guest):
+    """Confirm a named plus one and queue their pass without an RSVP invite."""
+    if not guest.phone_number:
+        return None, False
+
+    now = timezone.now()
+    code_candidate = assign_unique_public_codes([
+        RsvpRecipient(workflow=workflow, guest=guest)
+    ])[0]
+    recipient, created = RsvpRecipient.objects.get_or_create(
+        workflow=workflow,
+        guest=guest,
+        defaults={
+            'public_code': code_candidate.public_code,
+            'response_status': RsvpRecipient.ResponseStatus.CONFIRMED,
+            'invitation_status': RsvpRecipient.InvitationStatus.NOT_SENT,
+            'pass_status': RsvpRecipient.PassStatus.QUEUED,
+            'responded_at': now,
+            'pass_queued_at': now,
+        },
+    )
+
+    queue_pass = created
+    if not created:
+        update_fields = []
+        if recipient.response_status != RsvpRecipient.ResponseStatus.CONFIRMED:
+            recipient.response_status = RsvpRecipient.ResponseStatus.CONFIRMED
+            recipient.responded_at = now
+            update_fields.extend(['response_status', 'responded_at'])
+        if recipient.invitation_status in {
+            RsvpRecipient.InvitationStatus.NOT_SENT,
+            RsvpRecipient.InvitationStatus.QUEUED,
+        }:
+            recipient.invitation_status = RsvpRecipient.InvitationStatus.NOT_SENT
+            recipient.invitation_queued_at = None
+            update_fields.extend(['invitation_status', 'invitation_queued_at'])
+        if recipient.pass_status not in {
+            RsvpRecipient.PassStatus.QUEUED,
+            RsvpRecipient.PassStatus.SENDING,
+            RsvpRecipient.PassStatus.SENT,
+            RsvpRecipient.PassStatus.DELIVERED,
+            RsvpRecipient.PassStatus.READ,
+        }:
+            recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
+            recipient.pass_queued_at = now
+            update_fields.extend(['pass_status', 'pass_queued_at'])
+            queue_pass = True
+        if update_fields:
+            recipient.save(update_fields=[*dict.fromkeys(update_fields), 'updated_at'])
+
+    if queue_pass:
+        from .tasks import send_confirmed_pass
+        transaction.on_commit(lambda: send_confirmed_pass.delay(recipient.id))
+    return recipient, queue_pass
+
+
 def bulk_sync_guests_to_workflow(event_id, guest_ids) -> int:
     """Attach a large imported guest set using bounded queries and one insert."""
     guest_ids = list(guest_ids)
@@ -83,7 +139,7 @@ def bulk_sync_guests_to_workflow(event_id, guest_ids) -> int:
 
     eligible_ids = list(
         Guest.objects
-        .filter(id__in=guest_ids)
+        .filter(id__in=guest_ids, plus_one_of__isnull=True)
         .exclude(phone_number='')
         .values_list('id', flat=True)
     )
@@ -290,6 +346,7 @@ def record_response(
 
         now = timezone.now()
         plus_one_recipient = None
+        plus_one_pass_queued = False
         pass_due = (
             not recipient.workflow.pass_send_at
             or recipient.workflow.pass_send_at <= now
@@ -316,7 +373,10 @@ def record_response(
                     plus_one_full_name,
                     plus_one_phone_number,
                 )
-                plus_one_recipient = sync_guest_to_workflow(plus_one_guest)
+                plus_one_recipient, plus_one_pass_queued = queue_plus_one_pass(
+                    recipient.workflow,
+                    plus_one_guest,
+                )
             elif recipient.guest.plus_one_of_id:
                 Guest = recipient.guest.__class__
                 Guest.objects.filter(pk=recipient.guest.plus_one_of_id).update(
@@ -367,10 +427,8 @@ def record_response(
             'accepted': True,
             'response_status': recipient.response_status,
             'pass_queued': should_queue_pass,
-            'plus_one_invitation_queued': bool(
-                plus_one_recipient
-                and plus_one_recipient.invitation_status
-                == RsvpRecipient.InvitationStatus.QUEUED
+            'plus_one_pass_queued': bool(
+                plus_one_recipient and plus_one_pass_queued
             ),
             'pass_scheduled_for': (
                 recipient.workflow.pass_send_at

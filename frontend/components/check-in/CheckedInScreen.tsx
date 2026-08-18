@@ -36,7 +36,7 @@ export function CheckedInScreen({ guest, onNext }: { guest: Guest; onNext: () =>
         )}
         {guest.event_name && <GuestInfoRow label="Event" value={guest.event_name} />}
         {guest.celebrant_name && <GuestInfoRow label="Celebrant" value={guest.celebrant_name} />}
-        {guest.plus_one_attending && <GuestInfoRow label="Plus one" value={guest.has_named_plus_one ? 'Uses a separate invitation and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`} />}
+        {guest.plus_one_attending && <GuestInfoRow label="Plus one" value={guest.has_named_plus_one ? 'Uses a separate pass and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`} />}
       </div>
       <button onClick={onNext}
         className="w-full max-w-sm font-semibold rounded-sm py-4 text-sm tracking-[0.06em] uppercase active:scale-95 transition-transform"

@@ -115,7 +115,6 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         generate_guest_assets.delay(str(guest.id), send_whatsapp=send_now)
         plus_one = get_named_plus_one(guest)
         if plus_one:
-            sync_guest_to_workflow(plus_one)
             plus_one_send_now = not (
                 plus_one.scheduled_send_at
                 and plus_one.scheduled_send_at > timezone.now()
@@ -245,7 +244,7 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
                     return Response(
                         {
                             'detail': (
-                                'This named plus one has a separate invitation and QR code. '
+                                'This named plus one has a separate pass and QR code. '
                                 'Scan their own pass to check them in.'
                             ),
                         },

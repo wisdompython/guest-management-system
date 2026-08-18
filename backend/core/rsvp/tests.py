@@ -959,10 +959,59 @@ class PublicRsvpPageApiTests(TestCase):
         )
         self.assertEqual(
             plus_one_recipient.invitation_status,
-            RsvpRecipient.InvitationStatus.QUEUED,
+            RsvpRecipient.InvitationStatus.NOT_SENT,
         )
-        mock_invitation.assert_called_once_with(plus_one_recipient.id)
-        mock_send.assert_called_once_with(self.recipient.id)
+        self.assertEqual(
+            plus_one_recipient.response_status,
+            RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+        self.assertEqual(
+            plus_one_recipient.pass_status,
+            RsvpRecipient.PassStatus.QUEUED,
+        )
+        self.assertTrue(response.data['plus_one_pass_queued'])
+        mock_invitation.assert_not_called()
+        self.assertEqual(mock_send.call_count, 2)
+        mock_send.assert_any_call(plus_one_recipient.id)
+        mock_send.assert_any_call(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    @patch('rsvp.tasks.send_rsvp_invitation.delay')
+    def test_plus_one_pass_is_immediate_when_primary_pass_is_scheduled(
+        self,
+        mock_invitation,
+        mock_send,
+    ):
+        self.event.allow_plus_one = True
+        self.event.save(update_fields=['allow_plus_one'])
+        self.workflow.pass_send_at = timezone.now() + timezone.timedelta(hours=4)
+        self.workflow.save(update_fields=['pass_send_at'])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'answer': 'yes',
+                    'plus_one_attending': True,
+                    'plus_one_full_name': 'Immediate Companion',
+                    'plus_one_phone_number': '2348000000099',
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        plus_one_recipient = RsvpRecipient.objects.get(
+            workflow=self.workflow,
+            guest=self.guest.named_plus_one,
+        )
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.HELD)
+        self.assertEqual(
+            plus_one_recipient.pass_status,
+            RsvpRecipient.PassStatus.QUEUED,
+        )
+        mock_invitation.assert_not_called()
+        mock_send.assert_called_once_with(plus_one_recipient.id)
 
     def test_plus_one_details_are_required_before_response_is_consumed(self):
         self.event.allow_plus_one = True

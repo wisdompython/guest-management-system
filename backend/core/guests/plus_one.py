@@ -55,7 +55,7 @@ def validate_named_plus_one(primary_guest, full_name: str, phone_number: str):
 
 
 def upsert_named_plus_one(primary_guest, full_name: str, phone_number: str):
-    """Create or update the independently invited guest linked to a primary guest."""
+    """Create or update the independently ticketed guest linked to a primary guest."""
     # All callers run inside an atomic response/create transaction. Locking the
     # event serialises simultaneous plus-one submissions so two guests cannot
     # claim the same phone number between validation and creation.

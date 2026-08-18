@@ -210,7 +210,7 @@ function GuestInfoCard({ guest, highlight }: { guest: Guest; highlight?: boolean
         {guest.table_number && <InfoRow label="Table" value={guest.table_number} />}
         {guest.seat_number  && <InfoRow label="Seat"  value={guest.seat_number}  />}
         {guest.celebrant_name && <InfoRow label="Celebrant" value={guest.celebrant_name} />}
-        {guest.plus_one_attending && <InfoRow label="Plus one" value={guest.has_named_plus_one ? 'Separate invitation and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`} />}
+        {guest.plus_one_attending && <InfoRow label="Plus one" value={guest.has_named_plus_one ? 'Separate pass and QR' : `Shared pass · ${guest.plus_one_checked_in ? 'checked in' : 'pending'}`} />}
       </div>
     </div>
   )

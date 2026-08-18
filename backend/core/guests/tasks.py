@@ -400,7 +400,7 @@ def process_bulk_guest_upload(self, upload_id: int):
             guest_ids = [guest.id for guest in all_created_guests]
             recipients_created = bulk_sync_guests_to_workflow(
                 upload.event_id,
-                guest_ids,
+                [guest.id for guest in created_guests],
             )
             asset_total = len(guest_ids)
             final_status = (

@@ -139,14 +139,12 @@ class GuestPreferencesView(APIView):
         if guest.plus_one_attending:
             from ..plus_one import upsert_named_plus_one
             from ..tasks import generate_guest_assets
-            from rsvp.services import sync_guest_to_workflow
 
             named_plus_one, _, changed = upsert_named_plus_one(
                 guest,
                 plus_one_full_name,
                 plus_one_phone_number,
             )
-            sync_guest_to_workflow(named_plus_one)
             if changed:
                 plus_one_id = str(named_plus_one.id)
                 transaction.on_commit(

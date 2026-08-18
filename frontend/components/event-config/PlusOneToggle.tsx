@@ -14,7 +14,7 @@ export function PlusOneToggle({ enabled, onChange }: Props) {
       <div>
         <p className="text-sm font-semibold text-[var(--ink)]">Allow plus one</p>
         <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-          Collect the plus one’s name and phone number, then send them a personal invitation.
+          Collect the plus one’s name and phone number, then send their personal QR pass.
         </p>
       </div>
       <button

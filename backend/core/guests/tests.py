@@ -344,8 +344,14 @@ class BulkUploadTests(TestCase):
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 10)
 
     def test_bulk_upload_creates_named_plus_one_as_linked_guest(self, mock_task):
+        from rsvp.models import RsvpWorkflow
+
         self.event.allow_plus_one = True
         self.event.save(update_fields=['allow_plus_one'])
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
         response, _ = self._upload(
             [{
                 'full_name': 'Primary Guest',
@@ -366,6 +372,8 @@ class BulkUploadTests(TestCase):
         self.assertEqual(Guest.objects.filter(event=self.event).count(), 2)
         primary = Guest.objects.get(full_name='Primary Guest')
         self.assertEqual(primary.named_plus_one.full_name, 'Named Companion')
+        self.assertEqual(workflow.recipients.count(), 1)
+        self.assertEqual(workflow.recipients.get().guest_id, primary.id)
         self.assertEqual(mock_task.call_count, 2)
 
     def test_bulk_upload_requires_named_plus_one_details(self, mock_task):
@@ -696,8 +704,14 @@ class ScheduledSendCreateTests(TestCase):
         self.assertIsNotNone(guest.scheduled_send_at)
 
     def test_single_guest_create_adds_and_queues_named_plus_one(self, mock_task):
+        from rsvp.models import RsvpWorkflow
+
         self.event.allow_plus_one = True
         self.event.save(update_fields=['allow_plus_one'])
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
 
         response = self._create(
             plus_one_attending=True,
@@ -709,6 +723,8 @@ class ScheduledSendCreateTests(TestCase):
         primary = Guest.objects.get(pk=response.data['id'])
         self.assertEqual(primary.named_plus_one.full_name, 'Admin Companion')
         self.assertEqual(primary.named_plus_one.phone_number, '2348000000010')
+        self.assertEqual(workflow.recipients.count(), 1)
+        self.assertEqual(workflow.recipients.get().guest_id, primary.id)
         self.assertEqual(mock_task.delay.call_count, 2)
 
     def test_event_default_send_time_is_inherited(self, mock_task):
@@ -1342,7 +1358,7 @@ class CheckInTests(TestCase):
         )
 
         self.assertEqual(shared_qr_response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('separate invitation and QR', shared_qr_response.data['detail'])
+        self.assertIn('separate pass and QR', shared_qr_response.data['detail'])
         self.assertEqual(own_qr_response.status_code, status.HTTP_200_OK)
         plus_one.refresh_from_db()
         self.assertEqual(plus_one.status, Guest.Status.CHECKED_IN)
@@ -1389,6 +1405,27 @@ class GuestPreferencesTests(TestCase):
         plus_one = self.guest.named_plus_one
         self.assertEqual(plus_one.full_name, 'Preference Companion')
         self.assertEqual(plus_one.celebrant_name, 'Bride')
+        mock_assets.assert_called_once_with(str(plus_one.id), send_whatsapp=True)
+
+    @patch('guests.tasks.generate_guest_assets.delay')
+    def test_preferences_plus_one_gets_pass_without_joining_rsvp(self, mock_assets):
+        from rsvp.models import RsvpWorkflow
+
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url, {
+                'plus_one_attending': True,
+                'plus_one_full_name': 'Pass Only Companion',
+                'plus_one_phone_number': '2348000000099',
+            }, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        plus_one = self.guest.named_plus_one
+        self.assertFalse(workflow.recipients.filter(guest=plus_one).exists())
         mock_assets.assert_called_once_with(str(plus_one.id), send_whatsapp=True)
 
     def test_unconfigured_celebrant_is_rejected_when_options_exist(self):
