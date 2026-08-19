@@ -25,7 +25,7 @@ function looksLikeCompleteScan(value: string) {
 }
 
 export default function CheckInPage() {
-  const { isSuperAdmin, isScanner } = useAuth()
+  const { isSuperAdmin } = useAuth()
   const [token, setToken] = useState('')
   const [state, setState] = useState<ScanState>('idle')
   const [guest, setGuest] = useState<Guest | null>(null)
@@ -208,8 +208,7 @@ export default function CheckInPage() {
           </button>
         </form>
 
-        {isScanner && (
-          <div className="mt-6 rounded-xl p-5 sm:p-6" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="mt-6 rounded-xl p-5 sm:p-6" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
             <div className="mb-4 flex items-center gap-3">
               <span className="h-px flex-1" style={{ background: 'var(--line)' }} />
               <span className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-2)' }}>Name search fallback</span>
@@ -268,8 +267,7 @@ export default function CheckInPage() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )
