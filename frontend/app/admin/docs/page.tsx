@@ -17,7 +17,7 @@ const GUIDES: { id: string; title: string; description: string; icon: React.Reac
   { id: 'events',    title: 'Creating an event',          description: 'Set up a new event with a date, venue, and pass design.', icon: Ic.events },
   { id: 'fonts',     title: 'Adding fonts',               description: 'Upload custom typefaces to use on guest passes.', icon: Ic.fonts },
   { id: 'guests',    title: 'Adding guests',               description: 'Add guests one at a time, or bulk-upload a spreadsheet.', icon: Ic.guests },
-  { id: 'checkin',   title: 'Checking guests in',          description: 'Scan QR codes at the door and watch arrivals live.', icon: Ic.scanner },
+  { id: 'checkin',   title: 'Checking guests in',          description: 'Use a connected 2D scanner at the door and watch arrivals live.', icon: Ic.scanner },
   { id: 'whatsapp',  title: 'Sending WhatsApp messages',   description: 'Send guest passes and reminders over WhatsApp.', icon: Ic.whatsapp },
   { id: 'templates', title: 'Managing WhatsApp templates', description: 'Create and preview templates approved in Meta Business.', icon: Ic.templates },
   { id: 'team',      title: 'Managing your team',          description: 'Invite teammates and control what they can see and do.', icon: Ic.team },

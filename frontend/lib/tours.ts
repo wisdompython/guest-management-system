@@ -53,8 +53,8 @@ export const TOURS: Tour[] = [
     id: 'checkin',
     steps: [
       { target: 'nav-checkin',    path: '/admin/check-in', title: 'Scanner stations',      body: 'The Scanner Station is designed for door staff at the event. Open this on a phone or tablet and use it to scan guest QR codes as they arrive.',                                                          placement: 'right'  },
-      { target: 'checkin-title',  path: '/admin/check-in', title: 'QR Check-In',           body: 'This screen uses your device camera to scan QR codes. Point the camera at a guest\'s pass and it will check them in instantly.',                                                                         placement: 'bottom' },
-      { target: 'checkin-camera', path: '/admin/check-in', title: 'Camera viewfinder',     body: 'The camera starts automatically. Align the guest\'s QR code inside the bracket — it detects and looks up the guest in under a second.',                                                                  placement: 'bottom' },
+      { target: 'checkin-title',  path: '/admin/check-in', title: '2D Scanner Check-In',   body: 'This screen is designed for a connected 2D scanner at the door. Scan a guest pass to look up the guest instantly.',                                                                                      placement: 'bottom' },
+      { target: 'checkin-input',  path: '/admin/check-in', title: 'Scanner input',         body: 'The field stays focused for the hardware scanner and accepts a complete pass URL, token, or UUID. Complete QR URLs submit automatically.',                                                               placement: 'bottom' },
       { target: 'nav-dashboard',  path: '/admin/check-in', title: 'Watch arrivals live',   body: 'While the scanner is running at the door, the Dashboard shows a live feed of check-ins and attendance stats. Open it on a separate screen to monitor the event in real time.',                           placement: 'right'  },
     ],
   },
