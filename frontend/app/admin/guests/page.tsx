@@ -313,13 +313,14 @@ export default function GuestsPage() {
       )}
 
       <GuestFilterBar
-        query={query} tokens={tokens} freeText={freeText}
+        tokens={tokens} freeText={freeText}
         filteredCount={filtered.length} totalCount={count} page={page} pageSize={PAGE_SIZE}
         selectedCount={selected.size}
         inputRef={inputRef} onQueryChange={setQuery}
         sort={sort} onSortChange={setSort}
         registeredFrom={registeredFrom} registeredTo={registeredTo}
         onRegisteredFromChange={setRegisteredFrom} onRegisteredToChange={setRegisteredTo}
+        ticketTypes={selectedEvent.ticket_types ?? []}
       />
 
       <div className="flex-1 overflow-auto">

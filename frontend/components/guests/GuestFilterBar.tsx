@@ -1,23 +1,23 @@
 'use client'
 
 import { RefObject } from 'react'
+import type { TicketTypeDef } from '@/lib/api'
 
 type FilterToken = { key: string; value: string }
 
 export type GuestSortKey = '' | 'name' | '-name' | 'registered' | '-registered' | 'checked_in' | '-checked_in'
 
 const SORT_OPTIONS: { value: GuestSortKey; label: string }[] = [
-  { value: '',            label: 'Default order' },
-  { value: '-registered', label: 'Registered (newest)' },
-  { value: 'registered',  label: 'Registered (oldest)' },
+  { value: '',            label: 'Recently added' },
+  { value: '-registered', label: 'Registration: newest first' },
+  { value: 'registered',  label: 'Registration: oldest first' },
   { value: 'name',        label: 'Name (A–Z)' },
   { value: '-name',       label: 'Name (Z–A)' },
-  { value: '-checked_in', label: 'Checked in (newest)' },
-  { value: 'checked_in',  label: 'Checked in (oldest)' },
+  { value: '-checked_in', label: 'Check-in: newest first' },
+  { value: 'checked_in',  label: 'Check-in: oldest first' },
 ]
 
 interface Props {
-  query: string
   tokens: FilterToken[]
   freeText: string
   filteredCount: number
@@ -33,80 +33,143 @@ interface Props {
   registeredTo: string
   onRegisteredFromChange: (v: string) => void
   onRegisteredToChange: (v: string) => void
+  ticketTypes: TicketTypeDef[]
 }
 
 export function GuestFilterBar({
-  query, tokens, freeText, filteredCount, totalCount, page, pageSize, selectedCount, inputRef, onQueryChange,
+  tokens, freeText, filteredCount, totalCount, page, pageSize, selectedCount, inputRef, onQueryChange,
   sort, onSortChange, registeredFrom, registeredTo, onRegisteredFromChange, onRegisteredToChange,
+  ticketTypes,
 }: Props) {
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
   const end   = Math.min(page * pageSize, totalCount)
+  const statusFilter = tokens.find((token) => token.key === 'status')?.value ?? ''
+  const ticketFilter = tokens.find((token) => token.key === 'ticket')?.value ?? ''
+  const whatsappFilter = tokens.find((token) => token.key === 'wa')?.value ?? ''
+  const hasFilters = Boolean(statusFilter || ticketFilter || whatsappFilter || registeredFrom || registeredTo || sort)
+
+  function changeToken(key: string, value: string) {
+    const nextTokens = tokens
+      .filter((token) => token.key !== key)
+      .map((token) => `${token.key}:${token.value}`)
+    if (value) nextTokens.push(`${key}:${value}`)
+    onQueryChange([...nextTokens, freeText].filter(Boolean).join(' '))
+  }
+
+  function clearFilters() {
+    onQueryChange(freeText)
+    onSortChange('')
+    onRegisteredFromChange('')
+    onRegisteredToChange('')
+  }
+
   return (
-    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 px-4 py-2.5"
+    <div className="flex flex-shrink-0 flex-col gap-2.5 px-4 py-3"
       style={{ borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-      <div className="flex min-w-[220px] flex-1 items-center gap-2 px-3 py-1.5"
-        style={{ border: '1px solid var(--line)', background: 'var(--panel-2)' }}>
-        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"
-          style={{ color: 'var(--muted)', flexShrink: 0 }}>
-          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>
-        </svg>
-        <div className="flex flex-wrap items-center gap-1.5 flex-1">
-          {tokens.map((t, i) => (
-            <span key={i} className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono"
-              style={{ background: 'rgba(34,201,160,0.12)', color: 'var(--brand)', border: '1px solid rgba(34,201,160,0.2)' }}>
-              <span style={{ color: 'var(--muted)' }}>{t.key}:</span>{t.value}
-              <button onClick={() => onQueryChange(query.replace(`${t.key}:${t.value}`, '').trim())}
-                className="ml-0.5 leading-none" style={{ color: 'var(--muted)' }}>✕</button>
-            </span>
-          ))}
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-[var(--brand-soft)]"
+          style={{ border: '1px solid var(--line-strong)', background: 'var(--field)' }}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"
+            style={{ color: 'var(--muted)', flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+          </svg>
           <input
             ref={inputRef}
-            value={freeText || tokens.length > 0 ? '' : query}
+            value={freeText}
             onChange={(e) => {
-              const val = e.target.value
-              const prefix = tokens.map((t) => `${t.key}:${t.value}`).join(' ')
-              onQueryChange(prefix ? prefix + ' ' + val : val)
+              const prefix = tokens.map((token) => `${token.key}:${token.value}`).join(' ')
+              onQueryChange([prefix, e.target.value].filter(Boolean).join(' '))
             }}
-            onKeyDown={(e) => {
-              if (e.key === 'Backspace' && !freeText && tokens.length > 0) {
-                const last = tokens[tokens.length - 1]
-                onQueryChange(query.replace(`${last.key}:${last.value}`, '').trim())
-              }
-            }}
-            placeholder={tokens.length === 0 ? 'ticket:patron  status:pending  wa:failed  or search name…' : ''}
-            className="flex-1 min-w-[200px] bg-transparent text-[12px] font-mono focus:outline-none"
-            style={{ color: 'var(--ink)' }}
+            placeholder="Search guests by name or phone number"
+            aria-label="Search guests by name or phone number"
+            className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-[var(--muted-2)] focus:outline-none"
+            style={{ color: 'var(--ink)', caretColor: 'var(--brand)' }}
           />
+          {freeText && (
+            <button onClick={() => onQueryChange(tokens.map((token) => `${token.key}:${token.value}`).join(' '))}
+              aria-label="Clear search" className="flex-shrink-0 px-1 text-sm" style={{ color: 'var(--muted)' }}>✕</button>
+          )}
         </div>
-        {query && (
-          <button onClick={() => onQueryChange('')} className="flex-shrink-0 text-[11px]" style={{ color: 'var(--muted)' }}>✕</button>
+
+        <div className="flex-shrink-0 text-xs tabular-nums" style={{ color: 'var(--muted)' }}>
+          {totalCount > 0 ? `${start}–${end} of ${totalCount}` : `${filteredCount} guests`}
+          {selectedCount > 0 && ` · ${selectedCount} selected`}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <span className="self-center pr-1 text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>Filter by</span>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Guest status</span>
+          <select value={statusFilter} onChange={(e) => changeToken('status', e.target.value)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }}>
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="checked_in">Checked in</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Ticket</span>
+          <select value={ticketFilter} onChange={(e) => changeToken('ticket', e.target.value)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }}>
+            <option value="">All tickets</option>
+            {ticketTypes.map((ticket) => <option key={ticket.value} value={ticket.value}>{ticket.label}</option>)}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>WhatsApp delivery</span>
+          <select value={whatsappFilter} onChange={(e) => changeToken('wa', e.target.value)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }}>
+            <option value="">All delivery states</option>
+            <option value="sent">Sent</option>
+            <option value="failed">Not sent</option>
+          </select>
+        </label>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Registration date</span>
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              <span>From</span>
+              <input type="date" value={registeredFrom} onChange={(e) => onRegisteredFromChange(e.target.value)}
+                aria-label="Registered from date"
+                className="rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+                style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }} />
+            </label>
+            <label className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              <span>To</span>
+              <input type="date" value={registeredTo} onChange={(e) => onRegisteredToChange(e.target.value)}
+                aria-label="Registered to date"
+                className="rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+                style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }} />
+            </label>
+          </div>
+        </div>
+
+        <label className="ml-auto flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Sort by</span>
+          <select value={sort} onChange={(e) => onSortChange(e.target.value as GuestSortKey)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }}>
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
+
+        {hasFilters && (
+          <button onClick={clearFilters}
+            className="rounded-md px-2.5 py-1.5 text-xs font-semibold transition hover:bg-[var(--chip)]"
+            style={{ color: 'var(--brand)' }}>
+            Clear filters
+          </button>
         )}
-        <kbd className="hidden xl:block text-[10px] px-1.5 py-0.5 font-mono flex-shrink-0"
-          style={{ border: '1px solid var(--line)', color: 'var(--muted-2)', background: 'var(--panel)' }}>⌘K</kbd>
-      </div>
-
-      <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-        <span>Registered</span>
-        <input type="date" value={registeredFrom} onChange={(e) => onRegisteredFromChange(e.target.value)}
-          className="px-1.5 py-1 text-[11px] focus:outline-none"
-          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
-        <span>to</span>
-        <input type="date" value={registeredTo} onChange={(e) => onRegisteredToChange(e.target.value)}
-          className="px-1.5 py-1 text-[11px] focus:outline-none"
-          style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }} />
-      </div>
-
-      <select value={sort} onChange={(e) => onSortChange(e.target.value as GuestSortKey)}
-        className="px-2 py-1.5 text-[11px] font-semibold focus:outline-none"
-        style={{ border: '1px solid var(--line)', background: 'var(--panel-2)', color: 'var(--ink)' }}>
-        {SORT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-
-      <div className="text-[11px] tabular-nums" style={{ color: 'var(--muted)' }}>
-        {totalCount > 0 ? `${start}–${end} of ${totalCount}` : `${filteredCount} guests`}
-        {selectedCount > 0 && ` · ${selectedCount} selected`}
       </div>
     </div>
   )
