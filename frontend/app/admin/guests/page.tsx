@@ -52,6 +52,7 @@ export default function GuestsPage() {
   const statusToken = tokens.find((t) => t.key === 'status')?.value ?? ''
   const ticketToken = tokens.find((t) => t.key === 'ticket')?.value ?? ''
   const waToken     = tokens.find((t) => t.key === 'wa')?.value ?? ''
+  const phoneToken  = tokens.find((t) => t.key === 'phone')?.value ?? ''
 
   useEffect(() => {
     api.getEvents().then((items) => {
@@ -62,7 +63,7 @@ export default function GuestsPage() {
   }, [])
 
   // reset to page 1 when filters or event changes
-  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken, waToken, sort, registeredFrom, registeredTo])
+  useEffect(() => { setPage(1) }, [selectedEvent?.id, freeText, statusToken, ticketToken, waToken, phoneToken, sort, registeredFrom, registeredTo])
 
   useEffect(() => {
     if (!selectedEvent) return
@@ -74,6 +75,7 @@ export default function GuestsPage() {
     if (ticketToken) params.ticket_type = ticketToken
     if (waToken === 'failed')                           params.wa_sent = 'false'
     else if (waToken === 'sent' || waToken === 'read' || waToken === 'delivered') params.wa_sent = 'true'
+    if (phoneToken === 'duplicate') params.duplicate_phone = 'true'
     if (sort)           params.ordering          = sort
     if (registeredFrom) params.registered_after  = registeredFrom
     if (registeredTo)   params.registered_before = registeredTo
@@ -81,7 +83,7 @@ export default function GuestsPage() {
       .then((data) => { setGuests(data.results); setCount(data.count); setStats(data.stats ?? null) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, sort, registeredFrom, registeredTo, page])
+  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, phoneToken, sort, registeredFrom, registeredTo, page])
 
   const filtered = guests
 

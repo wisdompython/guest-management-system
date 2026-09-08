@@ -388,6 +388,34 @@ docker compose -f docker-compose.prod.yml exec postgres psql -U postgres -d gues
 docker compose -f docker-compose.prod.yml restart backend
 ```
 
+### Cleaning media for past events
+
+The local `cleanup_past_event_assets.py` maintenance script removes media files belonging to events whose date has passed. It covers pass designs, generated passes, QR codes, RSVP backgrounds/designs, and personalized RSVP invitation images. Event, guest, RSVP, response, and delivery-history records remain in the database; only file fields are cleared. Files shared with a current or future event are preserved.
+
+The script is intentionally listed in `.gitignore`, so `git pull` does not install it on the server. Running it locally only affects the local database and `backend/core/media`. To clean production media, copy the script into the running backend container and execute it there, where it uses the production database and the `media_files` Docker volume.
+
+Always preview the result first:
+
+```bash
+# Run from the project directory on the VPS
+docker cp cleanup_past_event_assets.py "$(docker compose -f docker-compose.prod.yml ps -q backend)":/tmp/cleanup_past_event_assets.py
+docker compose -f docker-compose.prod.yml exec backend python /tmp/cleanup_past_event_assets.py
+```
+
+After checking the listed events, filenames, and total size, clean one past event:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python /tmp/cleanup_past_event_assets.py --event-id 12 --delete
+```
+
+Or clean every event whose date has passed:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python /tmp/cleanup_past_event_assets.py --delete
+```
+
+`--delete` permanently removes the listed media from the server. Without that flag, the command is a read-only preview.
+
 ### Notes
 
 - `GUNICORN_WORKERS` — set to `(2 × CPU cores) + 1`. For a 2-core VPS use `5`

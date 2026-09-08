@@ -46,7 +46,8 @@ export function GuestFilterBar({
   const statusFilter = tokens.find((token) => token.key === 'status')?.value ?? ''
   const ticketFilter = tokens.find((token) => token.key === 'ticket')?.value ?? ''
   const whatsappFilter = tokens.find((token) => token.key === 'wa')?.value ?? ''
-  const hasFilters = Boolean(statusFilter || ticketFilter || whatsappFilter || registeredFrom || registeredTo || sort)
+  const phoneFilter = tokens.find((token) => token.key === 'phone')?.value ?? ''
+  const hasFilters = Boolean(statusFilter || ticketFilter || whatsappFilter || phoneFilter || registeredFrom || registeredTo || sort)
 
   function changeToken(key: string, value: string) {
     const nextTokens = tokens
@@ -129,6 +130,16 @@ export function GuestFilterBar({
             <option value="">All delivery states</option>
             <option value="sent">Sent</option>
             <option value="failed">Not sent</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Phone number</span>
+          <select value={phoneFilter} onChange={(e) => changeToken('phone', e.target.value)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand-soft)]"
+            style={{ border: '1px solid var(--line)', background: 'var(--field)', color: 'var(--ink)' }}>
+            <option value="">All phone numbers</option>
+            <option value="duplicate">Duplicates only</option>
           </select>
         </label>
 

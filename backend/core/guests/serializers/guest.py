@@ -4,6 +4,9 @@ from ..models import Guest
 from .event import CONFIGURABLE_FIELDS, _event_required_fields, _event_valid_ticket_values
 
 
+DUPLICATE_PHONE_MESSAGE = 'Duplicate number.'
+
+
 def _can_see_phone(request) -> bool:
     """Only super admins may see guest phone numbers."""
     return bool(request and request.user and request.user.is_authenticated and request.user.is_super_admin)
@@ -81,11 +84,46 @@ class GuestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('scheduled_send_at must be in the future.')
         return value
 
+    def _validate_unique_phone(self, event, phone_number):
+        """Reject a phone number already assigned to a guest in this event."""
+        from ..whatsapp import _normalise_phone
+
+        phone_key = _normalise_phone(str(phone_number or ''))
+        if not phone_key:
+            return ''
+
+        candidates = Guest.objects.filter(event=event).exclude(phone_number='')
+        if self.instance:
+            candidates = candidates.exclude(pk=self.instance.pk)
+        for existing_phone in candidates.values_list('phone_number', flat=True):
+            if _normalise_phone(existing_phone) == phone_key:
+                raise serializers.ValidationError({
+                    'phone_number': DUPLICATE_PHONE_MESSAGE,
+                })
+        return phone_key
+
     def validate(self, data):
         # On update, merge with existing instance values so partial updates work
         event = data.get('event') or (self.instance.event if self.instance else None)
         if not event:
             return data
+
+        phone_number = data.get(
+            'phone_number',
+            self.instance.phone_number if self.instance else '',
+        )
+        event_changed = bool(
+            self.instance and event.pk != self.instance.event_id
+        )
+        should_validate_phone = (
+            self.instance is None or 'phone_number' in data or event_changed
+        )
+        normalised_phone = (
+            self._validate_unique_phone(event, phone_number)
+            if should_validate_phone else phone_number
+        )
+        if 'phone_number' in data:
+            data['phone_number'] = normalised_phone
 
         required = _event_required_fields(event)
 
@@ -182,6 +220,12 @@ class GuestSerializer(serializers.ModelSerializer):
         plus_one_full_name = validated_data.pop('plus_one_full_name', '')
         plus_one_phone_number = validated_data.pop('plus_one_phone_number', '')
         event = validated_data.get('event')
+        if event:
+            # Serialise individual creates with bulk imports for this event,
+            # then recheck because validation ran before this lock was held.
+            event = event.__class__.objects.select_for_update().get(pk=event.pk)
+            validated_data['event'] = event
+            self._validate_unique_phone(event, validated_data.get('phone_number', ''))
         if event and 'scheduled_send_at' not in validated_data and event.pass_send_at:
             validated_data['scheduled_send_at'] = event.pass_send_at
         guest = super().create(validated_data)
@@ -199,6 +243,16 @@ class GuestSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         plus_one_full_name = validated_data.pop('plus_one_full_name', '')
         plus_one_phone_number = validated_data.pop('plus_one_phone_number', '')
+        event = validated_data.get('event', instance.event)
+        event_changed = event.pk != instance.event_id
+        if 'phone_number' in validated_data or event_changed:
+            event = event.__class__.objects.select_for_update().get(pk=event.pk)
+            if 'event' in validated_data:
+                validated_data['event'] = event
+            self._validate_unique_phone(
+                event,
+                validated_data.get('phone_number', instance.phone_number),
+            )
         guest = super().update(instance, validated_data)
         from ..plus_one import NamedPlusOneError, get_named_plus_one, remove_named_plus_one, upsert_named_plus_one
         try:

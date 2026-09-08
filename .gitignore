@@ -52,3 +52,7 @@ Thumbs.db
 # ── Logs ─────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Local maintenance helpers ────────────────────────────────────────────────
+# Personal dry-run cleanup tool for media belonging to past events.
+cleanup_past_event_assets.py

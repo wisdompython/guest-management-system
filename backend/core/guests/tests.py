@@ -227,6 +227,46 @@ class GuestListFilterTests(TestCase):
         names = {g['full_name'] for g in r.data['results']}
         self.assertEqual(names, {'Bob'})
 
+    def test_duplicate_phone_filter_returns_every_matching_guest_in_event(self):
+        self.g1.phone_number = '+234 800 000 0042'
+        self.g1.save(update_fields=['phone_number'])
+        self.g2.phone_number = '08000000042'
+        self.g2.save(update_fields=['phone_number'])
+        self.g3.phone_number = '2348000000042'
+        self.g3.save(update_fields=['phone_number'])
+        make_guest(
+            self.event_a,
+            full_name='Unique Number',
+            phone_number='2348000000043',
+        )
+
+        response = self.client.get('/api/guests/', {
+            'event': self.event_a.id,
+            'duplicate_phone': 'true',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        names = {guest['full_name'] for guest in response.data['results']}
+        self.assertEqual(names, {'Alice', 'Bob'})
+        self.assertNotIn('Carol', names)
+        self.assertNotIn('Unique Number', names)
+
+    def test_duplicate_phone_filter_does_not_match_number_used_once_per_event(self):
+        self.g1.phone_number = '+234 800 000 0042'
+        self.g1.save(update_fields=['phone_number'])
+        self.g2.phone_number = '2348000000043'
+        self.g2.save(update_fields=['phone_number'])
+        self.g3.phone_number = '08000000042'
+        self.g3.save(update_fields=['phone_number'])
+
+        response = self.client.get('/api/guests/', {
+            'duplicate_phone': 'true',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
     def test_csv_export_escapes_spreadsheet_formulas(self):
         self.g1.full_name = '=HYPERLINK("https://example.com")'
         self.g1.save(update_fields=['full_name'])
@@ -667,6 +707,56 @@ class PastEventWhatsAppGuardTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data['queued'])
         mock_bulk_task.delay.assert_called_once_with(self.future_event.id, False)
+
+
+@patch('guests.views.guests.generate_guest_assets')
+class GuestCreateDuplicatePhoneTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'duplicate-phone-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(name='Duplicate Phone Event')
+
+    def test_create_rejects_existing_event_phone_even_when_name_and_format_differ(
+        self, mock_task,
+    ):
+        make_guest(
+            self.event,
+            full_name='First Guest',
+            phone_number='+234 800 000 0042',
+        )
+
+        response = self.client.post('/api/guests/', {
+            'event': self.event.id,
+            'full_name': 'Completely Different Name',
+            'phone_number': '08000000042',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['phone_number'][0], 'Duplicate number.')
+        self.assertEqual(Guest.objects.filter(event=self.event).count(), 1)
+        mock_task.delay.assert_not_called()
+
+    def test_create_allows_same_phone_in_a_different_event(self, mock_task):
+        other_event = make_event(name='Other Event')
+        make_guest(
+            other_event,
+            full_name='Other Event Guest',
+            phone_number='2348000000042',
+        )
+
+        response = self.client.post('/api/guests/', {
+            'event': self.event.id,
+            'full_name': 'This Event Guest',
+            'phone_number': '+234 800 000 0042',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        created_guest = Guest.objects.get(event=self.event)
+        self.assertEqual(created_guest.phone_number, '2348000000042')
+        mock_task.delay.assert_called_once()
 
 
 @patch('guests.views.guests.generate_guest_assets')

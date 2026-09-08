@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -54,11 +55,48 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         '-checked_in':  '-checked_in_at',
     }
 
+    def _duplicate_phone_guest_ids(self, event_id=None):
+        """Return every guest in an event-scoped duplicate phone group."""
+        cache_key = str(event_id or '')
+        cache = getattr(self, '_duplicate_phone_ids_cache', {})
+        if cache_key in cache:
+            return cache[cache_key]
+
+        from ..whatsapp import _normalise_phone
+
+        candidates = Guest.objects.exclude(phone_number='')
+        if event_id:
+            candidates = candidates.filter(event_id=event_id)
+
+        phone_groups = defaultdict(list)
+        for guest_id, guest_event_id, phone_number in candidates.values_list(
+            'id', 'event_id', 'phone_number',
+        ):
+            phone_key = _normalise_phone(phone_number)
+            if phone_key:
+                # A number reused in two different events is not a duplicate.
+                phone_groups[(guest_event_id, phone_key)].append(guest_id)
+
+        duplicate_ids = [
+            guest_id
+            for group in phone_groups.values()
+            if len(group) > 1
+            for guest_id in group
+        ]
+        cache[cache_key] = duplicate_ids
+        self._duplicate_phone_ids_cache = cache
+        return duplicate_ids
+
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
-        if e := params.get('event'):
-            qs = qs.filter(event_id=e)
+        event_id = params.get('event')
+        if event_id:
+            qs = qs.filter(event_id=event_id)
+        if params.get('duplicate_phone') == 'true':
+            qs = qs.filter(
+                pk__in=self._duplicate_phone_guest_ids(event_id),
+            )
         if search := params.get('search'):
             name_qs = qs.filter(full_name__icontains=search)
             # Only super admins may search by phone number
