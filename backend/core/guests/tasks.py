@@ -85,15 +85,36 @@ def bulk_send_whatsapp_passes(event_id: int, resend: bool = False, guest_ids: li
     from django.conf import settings as django_settings
 
     from .models import Guest
+    from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+    workflow_id = RsvpWorkflow.objects.filter(
+        event_id=event_id,
+    ).values_list('id', flat=True).first()
 
     if guest_ids is None:
         qs = Guest.objects.filter(
             event_id=event_id,
             pass_image__isnull=False,
-        ).exclude(pass_image='').values_list('id', flat=True)
-
-        if not resend:
+        ).exclude(pass_image='')
+        if workflow_id:
+            qs = qs.filter(
+                rsvp_recipients__workflow_id=workflow_id,
+                rsvp_recipients__response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            )
+            if not resend:
+                qs = qs.exclude(rsvp_recipients__pass_status__in=[
+                    RsvpRecipient.PassStatus.SENT,
+                    RsvpRecipient.PassStatus.DELIVERED,
+                    RsvpRecipient.PassStatus.READ,
+                ])
+            qs = qs.exclude(rsvp_recipients__pass_status__in=[
+                RsvpRecipient.PassStatus.FAILED,
+                RsvpRecipient.PassStatus.QUEUED,
+                RsvpRecipient.PassStatus.SENDING,
+            ])
+        elif not resend:
             qs = qs.filter(whatsapp_sent=False)
+        qs = qs.values_list('id', flat=True).distinct()
         guest_ids = [str(guest_id) for guest_id in qs]
 
     now = timezone.now()
@@ -104,8 +125,29 @@ def bulk_send_whatsapp_passes(event_id: int, resend: bool = False, guest_ids: li
     if to_send:
         # Claim so the budget accounting counts these as in flight until sent.
         Guest.objects.filter(id__in=to_send).update(scheduled_send_claimed_at=now)
-        for guest_id in to_send:
-            send_whatsapp_pass.delay(guest_id)
+        if workflow_id:
+            from rsvp.tasks import send_confirmed_pass
+            recipient_rows = list(RsvpRecipient.objects.filter(
+                workflow_id=workflow_id,
+                guest_id__in=to_send,
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+            ).exclude(pass_status__in=[
+                RsvpRecipient.PassStatus.FAILED,
+                RsvpRecipient.PassStatus.QUEUED,
+                RsvpRecipient.PassStatus.SENDING,
+            ]).values_list('id', 'guest_id'))
+            recipient_ids = [row[0] for row in recipient_rows]
+            RsvpRecipient.objects.filter(pk__in=recipient_ids).update(
+                pass_status=RsvpRecipient.PassStatus.QUEUED,
+                pass_queued_at=now,
+                pass_error='',
+                last_error='',
+            )
+            for recipient_id in recipient_ids:
+                send_confirmed_pass.delay(recipient_id)
+        else:
+            for guest_id in to_send:
+                send_whatsapp_pass.delay(guest_id)
 
     if deferred:
         if getattr(django_settings, 'CELERY_TASK_ALWAYS_EAGER', False):

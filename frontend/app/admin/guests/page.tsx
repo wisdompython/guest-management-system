@@ -13,14 +13,20 @@ type FilterToken = { key: string; value: string }
 
 function parseTokens(input: string): { tokens: FilterToken[]; freeText: string } {
   const tokens: FilterToken[] = []
-  let freeText = ''
+  const freeTextParts: string[] = []
+  const hasTrailingSpace = /\s$/.test(input)
   const parts = input.split(/\s+/)
   for (const part of parts) {
+    if (!part) continue
     const m = part.match(/^(\w+):(\S+)$/)
     if (m) tokens.push({ key: m[1], value: m[2] })
-    else freeText += (freeText ? ' ' : '') + part
+    else freeTextParts.push(part)
   }
-  return { tokens, freeText: freeText.trim() }
+  const freeText = freeTextParts.join(' ')
+  return {
+    tokens,
+    freeText: freeText + (hasTrailingSpace && freeText ? ' ' : ''),
+  }
 }
 
 export default function GuestsPage() {
@@ -70,7 +76,7 @@ export default function GuestsPage() {
     setLoading(true)
     setSelected(new Set())
     const params: Record<string, string> = { event: String(selectedEvent.id), page: String(page) }
-    if (freeText)    params.search      = freeText
+    if (freeText.trim()) params.search  = freeText.trim()
     if (statusToken) params.status      = statusToken === 'pending' ? 'registered' : statusToken
     if (ticketToken) params.ticket_type = ticketToken
     if (waToken === 'failed')                           params.wa_sent = 'false'
@@ -251,6 +257,7 @@ export default function GuestsPage() {
             </h1>
             <p className="text-xs" style={{ color: 'var(--muted)' }}>
               {checkedIn} checked in · {pending} pending
+              {selectedEvent.rsvp_workflow_id && stats ? ` · ${stats.awaiting ?? 0} awaiting RSVP · ${stats.failed_delivery ?? 0} failed` : ''}
             </p>
           </div>
         </div>

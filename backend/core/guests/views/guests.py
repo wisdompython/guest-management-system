@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 
 from ..models import Event, Guest
 from ..serializers import GuestSerializer, GuestListSerializer
@@ -55,6 +55,18 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         '-checked_in':  '-checked_in_at',
     }
 
+    def _rsvp_workflow_id(self, event_id):
+        if not event_id:
+            return None
+        cache = getattr(self, '_rsvp_workflow_cache', {})
+        if event_id not in cache:
+            from rsvp.models import RsvpWorkflow
+            cache[event_id] = RsvpWorkflow.objects.filter(
+                event_id=event_id,
+            ).values_list('id', flat=True).first()
+            self._rsvp_workflow_cache = cache
+        return cache[event_id]
+
     def _duplicate_phone_guest_ids(self, event_id=None):
         """Return every guest in an event-scoped duplicate phone group."""
         cache_key = str(event_id or '')
@@ -89,8 +101,27 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+        qs = qs.annotate(
+            _has_rsvp_workflow=Exists(
+                RsvpWorkflow.objects.filter(event_id=OuterRef('event_id')),
+            ),
+            _rsvp_pass_sent=Exists(
+                RsvpRecipient.objects.filter(
+                    guest_id=OuterRef('pk'),
+                    workflow__event_id=OuterRef('event_id'),
+                    response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                    pass_status__in=[
+                        RsvpRecipient.PassStatus.SENT,
+                        RsvpRecipient.PassStatus.DELIVERED,
+                        RsvpRecipient.PassStatus.READ,
+                    ],
+                ),
+            ),
+        )
         params = self.request.query_params
         event_id = params.get('event')
+        workflow_id = self._rsvp_workflow_id(event_id)
         if event_id:
             qs = qs.filter(event_id=event_id)
         if params.get('duplicate_phone') == 'true':
@@ -106,10 +137,27 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
                 qs = name_qs
         if s := params.get('status'):
             qs = qs.filter(status=s)
+            if workflow_id:
+                qs = qs.filter(
+                    rsvp_recipients__workflow_id=workflow_id,
+                    rsvp_recipients__response_status='confirmed',
+                )
         if t := params.get('ticket_type'):
             qs = qs.filter(ticket_type=t)
         wa_sent = params.get('wa_sent')
-        if wa_sent == 'true':
+        if workflow_id:
+            confirmed = Q(
+                rsvp_recipients__workflow_id=workflow_id,
+                rsvp_recipients__response_status='confirmed',
+            )
+            sent = Q(rsvp_recipients__pass_status__in=['sent', 'delivered', 'read'])
+            if params.get('pass_recipients') == '1':
+                qs = qs.filter(confirmed)
+            if wa_sent == 'true':
+                qs = qs.filter(confirmed & sent)
+            elif wa_sent == 'false':
+                qs = qs.filter(confirmed).exclude(sent)
+        elif wa_sent == 'true':
             qs = qs.filter(whatsapp_sent=True)
         elif wa_sent == 'false':
             qs = qs.filter(whatsapp_sent=False)
@@ -125,7 +173,7 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
             qs = qs.filter(checked_in_at__lte=checked_in_before)
         if ordering := self.ORDERING_FIELDS.get(params.get('ordering', '')):
             qs = qs.order_by(ordering)
-        return qs
+        return qs.distinct()
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -133,12 +181,51 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
         # Re-derive the queryset from scratch to avoid composed querysets that
         # Django cannot aggregate over (e.g. union from the search OR filter).
         qs = self.get_queryset()
-        agg = qs.aggregate(
-            checked_in=Count('id', filter=Q(status='checked_in')),
-            pending=Count('id', filter=Q(status='registered')),
-            wa_sent=Count('id', filter=Q(whatsapp_sent=True)),
-            wa_unsent=Count('id', filter=Q(whatsapp_sent=False)),
-        )
+        workflow_id = self._rsvp_workflow_id(request.query_params.get('event'))
+        if workflow_id:
+            confirmed = Q(
+                rsvp_recipients__workflow_id=workflow_id,
+                rsvp_recipients__response_status='confirmed',
+            )
+            sent_pass = confirmed & Q(
+                rsvp_recipients__pass_status__in=['sent', 'delivered', 'read'],
+            )
+            agg = qs.aggregate(
+                checked_in=Count('id', filter=confirmed & Q(status='checked_in'), distinct=True),
+                pending=Count('id', filter=confirmed & Q(status='registered'), distinct=True),
+                wa_sent=Count('id', filter=sent_pass, distinct=True),
+                wa_unsent=Count('id', filter=confirmed & ~Q(
+                    rsvp_recipients__pass_status__in=['sent', 'delivered', 'read'],
+                ), distinct=True),
+                confirmed=Count('id', filter=confirmed, distinct=True),
+                declined=Count('id', filter=Q(
+                    rsvp_recipients__workflow_id=workflow_id,
+                    rsvp_recipients__response_status='declined',
+                ), distinct=True),
+                awaiting=Count('id', filter=Q(
+                    rsvp_recipients__workflow_id=workflow_id,
+                    rsvp_recipients__response_status='awaiting',
+                    rsvp_recipients__invitation_status__in=['delivered', 'read'],
+                ), distinct=True),
+                failed_delivery=Count('id', filter=Q(
+                    rsvp_recipients__workflow_id=workflow_id,
+                    rsvp_recipients__response_status='awaiting',
+                    rsvp_recipients__invitation_status='failed',
+                ), distinct=True),
+                not_sent=Count('id', filter=Q(
+                    rsvp_recipients__workflow_id=workflow_id,
+                    rsvp_recipients__response_status='awaiting',
+                ) & ~Q(rsvp_recipients__invitation_status__in=[
+                    'delivered', 'read', 'failed',
+                ]), distinct=True),
+            )
+        else:
+            agg = qs.aggregate(
+                checked_in=Count('id', filter=Q(status='checked_in')),
+                pending=Count('id', filter=Q(status='registered')),
+                wa_sent=Count('id', filter=Q(whatsapp_sent=True)),
+                wa_unsent=Count('id', filter=Q(whatsapp_sent=False)),
+            )
         response.data['stats'] = agg
         return response
 
@@ -186,6 +273,43 @@ class GuestViewSet(GuestBulkExportMixin, viewsets.ModelViewSet):
                 {'detail': f'"{event.name}" has already ended — passes are not sent for past events.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from rsvp.services import pass_delivery_allowed
+        if not pass_delivery_allowed(guest.id, guest.event_id):
+            return Response(
+                {'detail': 'Only confirmed RSVP guests can receive an event pass.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        from rsvp.models import RsvpRecipient
+        recipient = RsvpRecipient.objects.filter(
+            workflow__event_id=guest.event_id,
+            guest_id=guest.id,
+        ).first()
+        if recipient:
+            if recipient.pass_status == RsvpRecipient.PassStatus.FAILED:
+                return Response(
+                    {'detail': 'This pass previously failed. Use the RSVP Retry failed sends flow.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if recipient.pass_status in {
+                RsvpRecipient.PassStatus.QUEUED,
+                RsvpRecipient.PassStatus.SENDING,
+            }:
+                return Response(
+                    {'detail': 'This RSVP pass is already queued.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            now = timezone.now()
+            recipient.pass_status = RsvpRecipient.PassStatus.QUEUED
+            recipient.pass_queued_at = now
+            recipient.pass_error = ''
+            recipient.last_error = ''
+            recipient.save(update_fields=[
+                'pass_status', 'pass_queued_at', 'pass_error', 'last_error',
+                'updated_at',
+            ])
+            from rsvp.tasks import send_confirmed_pass
+            send_confirmed_pass.delay(recipient.id)
+            return Response({'queued': True, 'guest_id': str(guest.id)})
         try:
             send_whatsapp_pass.delay(str(guest.id))
             return Response({'queued': True, 'guest_id': str(guest.id)})

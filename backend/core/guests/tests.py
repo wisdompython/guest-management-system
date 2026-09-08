@@ -217,6 +217,72 @@ class GuestListFilterTests(TestCase):
         self.assertEqual(stats['wa_sent'], 1)
         self.assertEqual(stats['wa_unsent'], 1)
 
+    def test_rsvp_event_stats_and_pass_filters_use_recipient_state(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+        event = make_event(name='RSVP truth', rsvp_enabled=True)
+        workflow = RsvpWorkflow.objects.create(event=event)
+
+        confirmed_sent = make_guest(event, full_name='Confirmed Sent')
+        confirmed_waiting = make_guest(
+            event, full_name='Confirmed Waiting', status='checked_in',
+        )
+        declined = make_guest(
+            event, full_name='Declined But Registered', whatsapp_sent=True,
+        )
+        awaiting = make_guest(event, full_name='Awaiting Reply')
+        failed = make_guest(event, full_name='Failed Invite')
+        not_sent = make_guest(event, full_name='Not Sent')
+
+        RsvpRecipient.objects.create(
+            workflow=workflow, guest=confirmed_sent,
+            response_status='confirmed', pass_status='delivered',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow, guest=confirmed_waiting,
+            response_status='confirmed', pass_status='held',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow, guest=declined,
+            response_status='declined', pass_status='delivered',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow, guest=awaiting,
+            invitation_status='read',
+        )
+        RsvpRecipient.objects.create(
+            workflow=workflow, guest=failed,
+            invitation_status='failed',
+        )
+        RsvpRecipient.objects.create(workflow=workflow, guest=not_sent)
+
+        response = self.client.get('/api/guests/', {'event': event.id})
+        stats = response.data['stats']
+        self.assertEqual(stats['confirmed'], 2)
+        self.assertEqual(stats['checked_in'], 1)
+        self.assertEqual(stats['pending'], 1)
+        self.assertEqual(stats['declined'], 1)
+        self.assertEqual(stats['awaiting'], 1)
+        self.assertEqual(stats['failed_delivery'], 1)
+        self.assertEqual(stats['not_sent'], 1)
+        self.assertEqual(stats['wa_sent'], 1)
+        self.assertEqual(stats['wa_unsent'], 1)
+
+        pass_list = self.client.get('/api/guests/', {
+            'event': event.id, 'pass_recipients': '1',
+        })
+        self.assertEqual(
+            {row['full_name'] for row in pass_list.data['results']},
+            {'Confirmed Sent', 'Confirmed Waiting'},
+        )
+        unsent = self.client.get('/api/guests/', {
+            'event': event.id, 'wa_sent': 'false',
+        })
+        self.assertEqual(
+            {row['full_name'] for row in unsent.data['results']},
+            {'Confirmed Waiting'},
+        )
+
     def test_search_filter(self):
         r = self.client.get('/api/guests/', {'event': self.event_a.id, 'search': 'ali'})
         names = {g['full_name'] for g in r.data['results']}

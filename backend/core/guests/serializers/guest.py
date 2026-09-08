@@ -12,6 +12,33 @@ def _can_see_phone(request) -> bool:
     return bool(request and request.user and request.user.is_authenticated and request.user.is_super_admin)
 
 
+def _apply_rsvp_pass_truth(instance, data):
+    """Present pass delivery from the RSVP recipient when a workflow exists."""
+    has_workflow = getattr(instance, '_has_rsvp_workflow', None)
+    pass_sent = getattr(instance, '_rsvp_pass_sent', None)
+    if has_workflow is None:
+        from rsvp.models import RsvpRecipient
+        recipient = RsvpRecipient.objects.filter(
+            guest_id=instance.pk,
+            workflow__event_id=instance.event_id,
+        ).only('response_status', 'pass_status').first()
+        has_workflow = recipient is not None
+        pass_sent = bool(
+            recipient
+            and recipient.response_status == RsvpRecipient.ResponseStatus.CONFIRMED
+            and recipient.pass_status in {
+                RsvpRecipient.PassStatus.SENT,
+                RsvpRecipient.PassStatus.DELIVERED,
+                RsvpRecipient.PassStatus.READ,
+            }
+        )
+    if has_workflow:
+        data['whatsapp_sent'] = bool(pass_sent)
+        if not pass_sent and 'whatsapp_sent_at' in data:
+            data['whatsapp_sent_at'] = None
+    return data
+
+
 class GuestSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='event.name', read_only=True)
     preferences_link = serializers.SerializerMethodField()
@@ -74,6 +101,7 @@ class GuestSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        data = _apply_rsvp_pass_truth(instance, data)
         if not _can_see_phone(self.context.get('request')):
             data['phone_number'] = None
         return data
@@ -314,6 +342,7 @@ class GuestListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        data = _apply_rsvp_pass_truth(instance, data)
         if not _can_see_phone(self.context.get('request')):
             data['phone_number'] = None
         return data

@@ -4,7 +4,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Case, DateTimeField, F, Q, When
+from django.db.models.functions import Coalesce, Greatest
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -69,9 +70,13 @@ def _template_changed(last_template_name, configured_template_name):
 
 
 RECIPIENT_DELIVERED_STATUSES = [
-    RsvpRecipient.InvitationStatus.SENT,
     RsvpRecipient.InvitationStatus.DELIVERED,
     RsvpRecipient.InvitationStatus.READ,
+]
+RECIPIENT_SENT_PASS_STATUSES = [
+    RsvpRecipient.PassStatus.SENT,
+    RsvpRecipient.PassStatus.DELIVERED,
+    RsvpRecipient.PassStatus.READ,
 ]
 RECIPIENT_SEGMENTS = {
     'invited_awaiting': dict(
@@ -80,7 +85,7 @@ RECIPIENT_SEGMENTS = {
     ),
     'confirmed_with_pass': dict(
         response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
-        pass_status__in=RECIPIENT_DELIVERED_STATUSES,
+        pass_status__in=RECIPIENT_SENT_PASS_STATUSES,
     ),
     'confirmed_no_pass': dict(
         response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
@@ -95,14 +100,20 @@ def _apply_recipient_filters(recipients, query_params):
     if segment:
         if segment == 'delivery_failed':
             recipients = recipients.filter(
-                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
-                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+                Q(
+                    response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                    invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+                )
+                | Q(
+                    response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                    pass_status=RsvpRecipient.PassStatus.FAILED,
+                )
             )
         elif segment in RECIPIENT_SEGMENTS:
             recipients = recipients.filter(**RECIPIENT_SEGMENTS[segment])
             if segment == 'confirmed_no_pass':
                 recipients = recipients.exclude(
-                    pass_status__in=RECIPIENT_DELIVERED_STATUSES,
+                    pass_status__in=RECIPIENT_SENT_PASS_STATUSES,
                 )
         else:
             errors['segment'] = 'Invalid segment filter.'
@@ -128,8 +139,14 @@ def _apply_recipient_filters(recipients, query_params):
     if delivery_status := query_params.get('delivery_status'):
         if delivery_status == 'failed':
             recipients = recipients.filter(
-                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
-                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+                Q(
+                    response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                    invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+                )
+                | Q(
+                    response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                    pass_status=RsvpRecipient.PassStatus.FAILED,
+                )
             )
         else:
             errors['delivery_status'] = 'Invalid delivery_status filter.'
@@ -137,6 +154,68 @@ def _apply_recipient_filters(recipients, query_params):
     if search := query_params.get('search'):
         recipients = recipients.filter(guest__full_name__icontains=search)
     return recipients, errors
+
+
+def _apply_recipient_ordering(recipients, query_params):
+    """Apply safe, null-last ordering to the RSVP recipient list."""
+    ordering = query_params.get('ordering', 'name')
+    descending = ordering.startswith('-')
+    field = ordering.removeprefix('-')
+
+    if field == 'invitation_sent_at':
+        sent_order = (
+            F('invitation_sent_at').desc(nulls_last=True)
+            if descending else
+            F('invitation_sent_at').asc(nulls_last=True)
+        )
+        return recipients.order_by(sent_order, 'guest__full_name', 'pk')
+
+    if field == 'confirmed_at':
+        recipients = recipients.annotate(
+            _confirmed_at=Case(
+                When(
+                    response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                    then=F('responded_at'),
+                ),
+                default=None,
+                output_field=DateTimeField(),
+            ),
+        )
+        confirmed_order = (
+            F('_confirmed_at').desc(nulls_last=True)
+            if descending else
+            F('_confirmed_at').asc(nulls_last=True)
+        )
+        return recipients.order_by(confirmed_order, 'guest__full_name', 'pk')
+
+    if field == 'last_message_sent_at':
+        recipients = recipients.annotate(
+            _last_message_sent_at=Greatest(
+                Coalesce(
+                    'invitation_sent_at',
+                    'last_reminded_at',
+                    'guest__whatsapp_sent_at',
+                ),
+                Coalesce(
+                    'last_reminded_at',
+                    'invitation_sent_at',
+                    'guest__whatsapp_sent_at',
+                ),
+                Coalesce(
+                    'guest__whatsapp_sent_at',
+                    'invitation_sent_at',
+                    'last_reminded_at',
+                ),
+            ),
+        )
+        message_order = (
+            F('_last_message_sent_at').desc(nulls_last=True)
+            if descending else
+            F('_last_message_sent_at').asc(nulls_last=True)
+        )
+        return recipients.order_by(message_order, 'guest__full_name', 'pk')
+
+    return recipients.order_by('guest__full_name', 'pk')
 
 
 class RsvpWorkflowViewSet(viewsets.ModelViewSet):
@@ -390,15 +469,12 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             )
         workflow.status = RsvpWorkflow.Status.ACTIVE
         workflow.save(update_fields=['status', 'updated_at'])
-        # Re-approve failed sends and clear the dispatch stamp on invitations
-        # that were queued when the workflow paused (their tasks no-op'd), so
-        # queue_workflow_invitations re-dispatches all of them within budget.
+        # Clear the dispatch stamp on invitations that were queued when the
+        # workflow paused (their tasks no-op'd). Failed deliveries are retried
+        # only through the dedicated retry controls.
         workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
-            invitation_status__in=[
-                RsvpRecipient.InvitationStatus.FAILED,
-                RsvpRecipient.InvitationStatus.QUEUED,
-            ],
+            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
         ).update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
             invitation_queued_at=None,
@@ -424,54 +500,13 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
         now = timezone.now()
         cooldown_minutes = settings.RSVP_REMINDER_COOLDOWN_MINUTES
         reminder_cutoff = now - timedelta(minutes=cooldown_minutes)
-        awaiting = workflow.recipients.filter(
+        eligible = workflow.recipients.filter(
             response_status=RsvpRecipient.ResponseStatus.AWAITING,
             reminder_count__lt=settings.RSVP_MAX_REMINDERS,
-        )
-
-        # Failed sends follow the same rules as the single and bulk retry
-        # endpoints: a retryable WhatsApp error must be past its cooldown
-        # unless the configured template has changed since the failure.
-        configured_template = (
-            workflow.invitation_template.name
-            if workflow.invitation_template_id else ''
-        )
-        failed_ids, skipped_cooldown = [], 0
-        failed_rows = awaiting.filter(
-            invitation_status=RsvpRecipient.InvitationStatus.FAILED,
-        ).values(
-            'id', 'invitation_last_template_name', 'invitation_error',
-            'last_error', 'invitation_queued_at', 'invitation_auto_retries',
-        )
-        for row in failed_rows:
-            if not _template_changed(
-                row['invitation_last_template_name'], configured_template,
-            ):
-                retry_at = _retry_available_at(
-                    row['invitation_error'] or row['last_error'],
-                    row['invitation_queued_at'],
-                    row['invitation_auto_retries'],
-                )
-                if retry_at and now < retry_at:
-                    skipped_cooldown += 1
-                    continue
-            failed_ids.append(row['id'])
-
-        eligible = awaiting.filter(
-            Q(
-                pk__in=failed_ids,
-                invitation_status=RsvpRecipient.InvitationStatus.FAILED,
-            )
-            | Q(
-                invitation_status__in=[
-                    RsvpRecipient.InvitationStatus.SENT,
-                    RsvpRecipient.InvitationStatus.DELIVERED,
-                    RsvpRecipient.InvitationStatus.READ,
-                ],
-            ) & (
+            invitation_status__in=RECIPIENT_DELIVERED_STATUSES,
+        ).filter(
                 Q(last_reminded_at__lte=reminder_cutoff)
                 | Q(last_reminded_at__isnull=True, invitation_sent_at__lte=reminder_cutoff)
-            )
         )
         queued = eligible.update(
             invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
@@ -484,7 +519,7 @@ class RsvpWorkflowViewSet(viewsets.ModelViewSet):
             queue_workflow_invitations.delay(workflow.id)
         return Response({
             'queued': queued,
-            'skipped_cooldown': skipped_cooldown,
+            'skipped_cooldown': 0,
             'cooldown_minutes': cooldown_minutes,
             'max_reminders': settings.RSVP_MAX_REMINDERS,
         })
@@ -524,7 +559,9 @@ class RsvpRecipientViewSet(viewsets.ReadOnlyModelViewSet):
         if workflow_id := self.request.query_params.get('workflow'):
             qs = qs.filter(workflow_id=workflow_id)
         qs, filter_errors = _apply_recipient_filters(qs, self.request.query_params)
-        return qs.none() if filter_errors else qs
+        if filter_errors:
+            return qs.none()
+        return _apply_recipient_ordering(qs, self.request.query_params)
 
     BULK_RETRY_MAX_SELECTION = 500
 

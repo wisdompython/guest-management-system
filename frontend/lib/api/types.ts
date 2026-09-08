@@ -139,6 +139,11 @@ export interface GuestListStats {
   pending: number;
   wa_sent: number;
   wa_unsent: number;
+  confirmed?: number;
+  declined?: number;
+  awaiting?: number;
+  failed_delivery?: number;
+  not_sent?: number;
 }
 
 export interface GuestList {
@@ -207,6 +212,8 @@ export interface Event {
   guest_count: number;
   checked_in_count: number;
   confirmed_count: number;
+  passes_sent_count: number;
+  pass_recipient_count: number;
   plus_one_count: number;
   plus_one_checked_in_count: number;
   total_checked_in_count: number;
@@ -265,10 +272,19 @@ export type RsvpWorkflowStatus = 'draft' | 'active' | 'paused' | 'completed';
 export type RsvpResponseStatus = 'awaiting' | 'confirmed' | 'declined';
 export type RsvpInvitationStatus = 'not_sent' | 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 export type RsvpPassStatus = 'held' | 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'not_issued';
+export type RsvpRecipientOrdering =
+  | 'name'
+  | 'invitation_sent_at'
+  | '-invitation_sent_at'
+  | 'confirmed_at'
+  | '-confirmed_at'
+  | 'last_message_sent_at'
+  | '-last_message_sent_at';
 
 export interface RsvpStats {
   invited: number;
   awaiting: number;
+  not_sent: number;
   confirmed: number;
   declined: number;
   invitation_delivered: number;

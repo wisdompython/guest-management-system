@@ -41,6 +41,8 @@ class EventSerializer(serializers.ModelSerializer):
     plus_one_count = serializers.SerializerMethodField()
     estimated_guest_count = serializers.SerializerMethodField()
     confirmed_count = serializers.SerializerMethodField()
+    passes_sent_count = serializers.SerializerMethodField()
+    pass_recipient_count = serializers.SerializerMethodField()
     plus_one_checked_in_count = serializers.SerializerMethodField()
     total_checked_in_count = serializers.SerializerMethodField()
     aso_ebi_request_count = serializers.SerializerMethodField()
@@ -121,6 +123,27 @@ class EventSerializer(serializers.ModelSerializer):
     def get_confirmed_count(self, obj):
         return self._planning_aggregate(obj)['confirmed'] if obj.rsvp_enabled else 0
 
+    def get_passes_sent_count(self, obj):
+        try:
+            workflow = obj.rsvp_workflow
+        except ObjectDoesNotExist:
+            workflow = None
+        if workflow:
+            return workflow.recipients.filter(
+                response_status='confirmed',
+                pass_status__in=['sent', 'delivered', 'read'],
+            ).count()
+        return obj.guests.filter(whatsapp_sent=True).count()
+
+    def get_pass_recipient_count(self, obj):
+        try:
+            workflow = obj.rsvp_workflow
+        except ObjectDoesNotExist:
+            workflow = None
+        if workflow:
+            return workflow.recipients.filter(response_status='confirmed').count()
+        return self.get_guest_count(obj)
+
     def get_plus_one_checked_in_count(self, obj):
         named = obj.guests.filter(
             plus_one_of__isnull=False,
@@ -198,6 +221,7 @@ class EventSerializer(serializers.ModelSerializer):
             'whatsapp_template', 'whatsapp_template_name',
             'pass_send_at', 'create_rsvp_workflow', 'rsvp_workflow_id',
             'is_ended', 'guest_count', 'confirmed_count', 'checked_in_count',
+            'passes_sent_count', 'pass_recipient_count',
             'plus_one_count', 'plus_one_checked_in_count', 'total_checked_in_count',
             'estimated_guest_count', 'aso_ebi_request_count', 'aso_ebi_quantity',
             'preferences_submitted_count', 'celebrant_breakdown', 'created_at',

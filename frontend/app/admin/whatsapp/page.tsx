@@ -283,22 +283,26 @@ export default function WhatsAppPage() {
   useEffect(() => { setPage(1) }, [selectedEvent?.id, search, waFilter])
 
   function buildParams() {
-    const params: Record<string, string> = { event: String(selectedEvent!.id), page: String(page), has_phone: '1' }
+    const params: Record<string, string> = { event: String(selectedEvent!.id), page: String(page), has_phone: '1', pass_recipients: '1' }
     if (search.trim()) params.search = search.trim()
     if (waFilter === 'sent') params.wa_sent = 'true'
     else if (waFilter === 'unsent') params.wa_sent = 'false'
     return params
   }
 
+  function buildStatsParams() {
+    return { event: String(selectedEvent!.id), page_size: '1', has_phone: '1', pass_recipients: '1' }
+  }
+
   useEffect(() => {
     if (!selectedEvent) return
     setGuestsLoading(true)
-    api.getGuests(buildParams())
-      .then((d) => {
+    Promise.all([api.getGuests(buildParams()), api.getGuests(buildStatsParams())])
+      .then(([d, overview]) => {
         setGuests(d.results)
         setCount(d.count)
-        setWaSent(d.stats?.wa_sent ?? 0)
-        setWaUnsent(d.stats?.wa_unsent ?? 0)
+        setWaSent(overview.stats?.wa_sent ?? 0)
+        setWaUnsent(overview.stats?.wa_unsent ?? 0)
       })
       .catch(console.error)
       .finally(() => setGuestsLoading(false))
@@ -311,12 +315,12 @@ export default function WhatsAppPage() {
 
   function refreshGuests() {
     if (!selectedEvent) return
-    api.getGuests(buildParams())
-      .then((d) => {
+    Promise.all([api.getGuests(buildParams()), api.getGuests(buildStatsParams())])
+      .then(([d, overview]) => {
         setGuests(d.results)
         setCount(d.count)
-        setWaSent(d.stats?.wa_sent ?? 0)
-        setWaUnsent(d.stats?.wa_unsent ?? 0)
+        setWaSent(overview.stats?.wa_sent ?? 0)
+        setWaUnsent(overview.stats?.wa_unsent ?? 0)
       })
       .catch(console.error)
   }
@@ -430,14 +434,14 @@ export default function WhatsAppPage() {
                       {ev.guest_count}
                     </td>
                     <td className="px-6 py-4">
-                      {ev.guest_count > 0 ? (
+                      {ev.pass_recipient_count > 0 ? (
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 w-20 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
                             <div className="h-full rounded-full transition-all"
-                              style={{ background: 'var(--brand)', width: `${Math.round((ev.checked_in_count / ev.guest_count) * 100)}%` }} />
+                              style={{ background: 'var(--brand)', width: `${Math.round((ev.passes_sent_count / ev.pass_recipient_count) * 100)}%` }} />
                           </div>
                           <span className="text-xs whitespace-nowrap" style={{ color: 'var(--muted)' }}>
-                            {ev.checked_in_count}/{ev.guest_count}
+                            {ev.passes_sent_count}/{ev.pass_recipient_count}
                           </span>
                         </div>
                       ) : <span className="text-xs" style={{ color: 'var(--muted-2)' }}>—</span>}

@@ -9,6 +9,7 @@ from .models import RsvpRecipient, RsvpWorkflow
 class RsvpStatsSerializer(serializers.Serializer):
     invited = serializers.IntegerField()
     awaiting = serializers.IntegerField()
+    not_sent = serializers.IntegerField()
     confirmed = serializers.IntegerField()
     declined = serializers.IntegerField()
     invitation_delivered = serializers.IntegerField()
@@ -26,9 +27,34 @@ class RsvpStatsSerializer(serializers.Serializer):
 
 
 def build_workflow_stats(workflow):
+    received_invitation_statuses = [
+        RsvpRecipient.InvitationStatus.DELIVERED,
+        RsvpRecipient.InvitationStatus.READ,
+    ]
+    sent_pass_statuses = [
+        RsvpRecipient.PassStatus.SENT,
+        RsvpRecipient.PassStatus.DELIVERED,
+        RsvpRecipient.PassStatus.READ,
+    ]
     counts = workflow.recipients.aggregate(
         invited=Count('id'),
-        awaiting=Count('id', filter=Q(response_status=RsvpRecipient.ResponseStatus.AWAITING)),
+        awaiting=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                invitation_status__in=received_invitation_statuses,
+            ),
+        ),
+        not_sent=Count(
+            'id',
+            filter=(
+                Q(response_status=RsvpRecipient.ResponseStatus.AWAITING)
+                & ~Q(invitation_status__in=(
+                    *received_invitation_statuses,
+                    RsvpRecipient.InvitationStatus.FAILED,
+                ))
+            ),
+        ),
         confirmed=Count('id', filter=Q(response_status=RsvpRecipient.ResponseStatus.CONFIRMED)),
         confirmed_primary=Count(
             'id',
@@ -45,32 +71,45 @@ def build_workflow_stats(workflow):
                 RsvpRecipient.InvitationStatus.READ,
             ]),
         ),
-        invitation_failed=Count('id', filter=Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)),
+        invitation_failed=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+            ),
+        ),
         passes_sent=Count(
             'id',
-            filter=Q(pass_status__in=[
-                RsvpRecipient.PassStatus.SENT,
-                RsvpRecipient.PassStatus.DELIVERED,
-                RsvpRecipient.PassStatus.READ,
-            ]),
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                pass_status__in=sent_pass_statuses,
+            ),
         ),
-        passes_failed=Count('id', filter=Q(pass_status=RsvpRecipient.PassStatus.FAILED)),
+        passes_failed=Count(
+            'id',
+            filter=Q(
+                response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                pass_status=RsvpRecipient.PassStatus.FAILED,
+            ),
+        ),
         delivery_failed=Count(
             'id',
             filter=(
-                Q(invitation_status=RsvpRecipient.InvitationStatus.FAILED)
-                | Q(pass_status=RsvpRecipient.PassStatus.FAILED)
+                Q(
+                    response_status=RsvpRecipient.ResponseStatus.AWAITING,
+                    invitation_status=RsvpRecipient.InvitationStatus.FAILED,
+                )
+                | Q(
+                    response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+                    pass_status=RsvpRecipient.PassStatus.FAILED,
+                )
             ),
             distinct=True,
         ),
         confirmed_no_pass=Count(
             'id',
             filter=Q(response_status=RsvpRecipient.ResponseStatus.CONFIRMED)
-            & ~Q(pass_status__in=[
-                RsvpRecipient.PassStatus.SENT,
-                RsvpRecipient.PassStatus.DELIVERED,
-                RsvpRecipient.PassStatus.READ,
-            ]),
+            & ~Q(pass_status__in=sent_pass_statuses),
         ),
         aso_ebi_requests=Count(
             'id',
