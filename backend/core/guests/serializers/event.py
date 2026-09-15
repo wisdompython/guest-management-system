@@ -35,11 +35,47 @@ class FontSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'uploaded_at')
 
 
+class JsonStringListSerializer(serializers.ListSerializer):
+    """Accept a JSON-encoded string for a nested list field.
+
+    The event create/edit pages submit multipart FormData (they upload an RSVP
+    background image), which cannot express a nested list, so the client sends
+    `locations` as a JSON string. Decoding it here keeps the request's QueryDict
+    untouched — flattening it would stop DRF decoding the other JSON-encoded
+    multipart fields (ticket_types, required_fields, celebrant_options).
+    """
+
+    def get_value(self, dictionary):
+        # ListSerializer.get_value routes HTML/multipart input through
+        # parse_html_list, which expects indexed keys (locations[0]title) and
+        # never sees our JSON string. Take the raw value first when the key
+        # holds a plain string.
+        from rest_framework.fields import empty
+
+        raw = dictionary.get(self.field_name, empty)
+        if isinstance(raw, str):
+            return raw
+        return super().get_value(dictionary)
+
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            import json
+
+            try:
+                data = json.loads(data) or []
+            except json.JSONDecodeError:
+                raise serializers.ValidationError('Could not read the event locations.')
+            if not isinstance(data, list):
+                raise serializers.ValidationError('Event locations must be a list.')
+        return super().to_internal_value(data)
+
+
 class EventLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventLocation
         fields = ('id', 'title', 'venue', 'starts_at', 'notes', 'order')
         read_only_fields = ('id',)
+        list_serializer_class = JsonStringListSerializer
 
     def validate_title(self, value):
         if not value.strip():
@@ -283,34 +319,6 @@ class EventSerializer(serializers.ModelSerializer):
         if content_type and content_type not in {'image/jpeg', 'image/png', 'image/webp'}:
             raise serializers.ValidationError('Upload a PNG, JPEG, or WebP background image.')
         return value
-
-    def to_internal_value(self, data):
-        """Accept locations as a JSON string when posted as multipart form data.
-
-        The event create/edit pages submit FormData (they upload an RSVP
-        background image), which cannot express a nested list, so the client
-        sends `locations` as a JSON-encoded string.
-        """
-        locations = data.get('locations') if hasattr(data, 'get') else None
-        if isinstance(locations, str):
-            import json
-
-            try:
-                parsed = json.loads(locations) or []
-            except json.JSONDecodeError:
-                raise serializers.ValidationError(
-                    {'locations': 'Could not read the event locations.'}
-                )
-            if not isinstance(parsed, list):
-                raise serializers.ValidationError(
-                    {'locations': 'Event locations must be a list.'}
-                )
-            # A QueryDict stores only the last value when a list is assigned,
-            # so build a plain dict before handing the parsed rows back.
-            data = {**data.dict(), 'locations': parsed} if hasattr(data, 'dict') else {
-                **data, 'locations': parsed,
-            }
-        return super().to_internal_value(data)
 
     def validate_locations(self, value):
         if len(value) > MAX_TEMPLATE_LOCATION_SLOTS:

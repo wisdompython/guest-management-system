@@ -2064,3 +2064,51 @@ class EventVenueSummaryTests(TestCase):
         )
         event.refresh_from_db()
         self.assertTrue(event.venue)
+
+
+class EventMultipartJsonFieldTests(TestCase):
+    """The edit form posts several JSON-encoded fields alongside locations."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='json-manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_json_fields_still_parse_when_locations_present(self):
+        import json
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Lady Otunba at 70',
+            'date': base.isoformat(),
+            'venue': 'Civic Centre, Ibadan',
+            'ticket_types': json.dumps([{'value': 'vip', 'label': 'VIP'}]),
+            'required_fields': json.dumps(['phone_number']),
+            'celebrant_options': json.dumps(['Lady Otunba']),
+            'locations': json.dumps([{
+                'title': 'Church Ceremony', 'venue': 'Cathedral',
+                'starts_at': base.isoformat(), 'order': 0,
+            }]),
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertEqual(event.ticket_types, [{'value': 'vip', 'label': 'VIP'}])
+        self.assertEqual(event.required_fields, ['phone_number'])
+        self.assertEqual(event.celebrant_options, ['Lady Otunba'])
+        self.assertEqual(event.locations.count(), 1)
+
+    def test_json_fields_still_parse_without_locations(self):
+        import json
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Simple Party',
+            'date': base.isoformat(),
+            'ticket_types': json.dumps([{'value': 'general', 'label': 'General'}]),
+            'required_fields': json.dumps(['phone_number']),
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertEqual(event.required_fields, ['phone_number'])
