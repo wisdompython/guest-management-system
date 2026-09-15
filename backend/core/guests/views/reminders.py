@@ -100,6 +100,117 @@ class AvailableVarsView(APIView):
         return Response(AVAILABLE_VARS)
 
 
+class TemplateSimulationView(APIView):
+    """Render a template against a real event and guest, exactly as a send would.
+
+    The template builder's static preview uses invented sample values, so it
+    cannot show what a specific event will actually produce — nor catch a
+    template that references a location the event does not have. This runs the
+    same resolver the send path uses and reports the same blocking errors,
+    letting an operator verify a template before any message is queued.
+    """
+
+    permission_classes = [IsEventManagerOrAbove]
+
+    def post(self, request):
+        from ..models import Event, Guest
+        from ..whatsapp import (
+            _resolve_template_params,
+            describe_missing_params,
+            missing_template_params,
+        )
+
+        body_text = request.data.get('body_text') or ''
+        body_params = request.data.get('body_params') or []
+        if not isinstance(body_params, list):
+            return Response(
+                {'detail': 'body_params must be a list.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        event_id = request.data.get('event')
+        if not event_id:
+            return Response(
+                {'detail': 'Choose an event to simulate against.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            event = Event.objects.prefetch_related('locations').get(pk=event_id)
+        except (Event.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {'detail': 'That event could not be found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # A specific guest can be requested; otherwise use any real guest from
+        # the event so the preview reflects genuine data rather than invention.
+        guest_id = request.data.get('guest')
+        guest_qs = Guest.objects.filter(event=event).select_related('event')
+        guest = None
+        if guest_id:
+            guest = guest_qs.filter(pk=guest_id).first()
+            if guest is None:
+                return Response(
+                    {'detail': 'That guest is not on the selected event.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        else:
+            guest = guest_qs.order_by('registered_at').first()
+
+        if guest is None:
+            return Response({
+                'detail': (
+                    'This event has no guests yet, so there is nothing to '
+                    'preview with. Add a guest, then try again.'
+                ),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        values = _resolve_template_params(guest, body_params)
+        missing = missing_template_params(body_params, values)
+
+        rendered = body_text
+        for index, value in enumerate(values, start=1):
+            rendered = rendered.replace(f'{{{{{index}}}}}', value or f'[{body_params[index - 1]}]')
+
+        placeholders = _max_placeholder(body_text)
+        problems = []
+        if placeholders != len(body_params):
+            problems.append(
+                f'The message body has {placeholders} placeholder'
+                f'{"" if placeholders == 1 else "s"} but {len(body_params)} '
+                f'variable{"" if len(body_params) == 1 else "s"} are selected. '
+                'These must match.'
+            )
+        if missing:
+            problems.append(describe_missing_params(event, missing))
+
+        return Response({
+            'rendered': rendered,
+            'would_send': not problems,
+            'problems': problems,
+            'missing_params': missing,
+            'event': {
+                'id': event.id,
+                'name': event.name,
+                'location_count': event.locations.count(),
+            },
+            'guest': {'id': str(guest.id), 'full_name': guest.full_name},
+            'resolved': [
+                {'key': key, 'value': value}
+                for key, value in zip(body_params, values)
+            ],
+        })
+
+
+def _max_placeholder(body_text: str) -> int:
+    """Highest {{n}} used in the body, matching the builder's own counting."""
+    import re
+
+    numbers = [int(match) for match in re.findall(r'\{\{(\d+)\}\}', body_text or '')]
+    return max(numbers) if numbers else 0
+
+
+
 class TemplateCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = TemplateCategorySerializer
     permission_classes = [IsEventManagerOrAbove]

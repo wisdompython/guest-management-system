@@ -168,6 +168,16 @@ export interface TicketTypeDef {
   label: string;
 }
 
+export interface TemplateSimulation {
+  rendered: string;
+  would_send: boolean;
+  problems: string[];
+  missing_params: string[];
+  event: { id: number; name: string; location_count: number };
+  guest: { id: string; full_name: string };
+  resolved: { key: string; value: string }[];
+}
+
 export interface EventLocation {
   id?: number;
   title: string;

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { api, WhatsAppTemplate, TemplateCategory } from '@/lib/api'
 import { useRequireAuth } from '@/lib/auth'
 import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
+import { TemplateSimulator } from '@/components/templates/TemplateSimulator'
 
 const PAGE_SIZE = 20
 
@@ -302,6 +303,7 @@ function TemplateForm({
         </div>
 
       <div className="mx-5 mb-5"><PreviewBubble bodyText={form.body_text} bodyParams={form.body_params} hasHeaderImage={form.has_header_image} /></div>
+      <div className="mx-5 mb-5"><TemplateSimulator bodyText={form.body_text} bodyParams={form.body_params} /></div>
       </section>
 
       <div className="sticky bottom-0 z-10 -mx-2 flex gap-3 border-t border-[var(--line)] bg-[var(--panel)]/95 px-2 py-4 backdrop-blur">

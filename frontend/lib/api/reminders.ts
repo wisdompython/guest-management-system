@@ -1,5 +1,5 @@
 import { request } from './request';
-import type { EventReminder, WhatsAppTemplate, TemplateCategory } from './types';
+import type { EventReminder, WhatsAppTemplate, TemplateCategory, TemplateSimulation } from './types';
 
 export const remindersApi = {
   getReminders: async (eventId: number): Promise<EventReminder[]> => {
@@ -25,6 +25,10 @@ export const remindersApi = {
   },
   getAvailableTemplateVars: () =>
     request<{ key: string; label: string }[]>('/whatsapp-templates/available-vars/'),
+  simulateTemplate: (data: { event: number; guest?: string; body_text: string; body_params: string[] }) =>
+    request<TemplateSimulation>('/whatsapp-templates/simulate/', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
   createWhatsAppTemplate: (data: Omit<WhatsAppTemplate, 'id' | 'created_at' | 'category_name'>) =>
     request<WhatsAppTemplate>('/whatsapp-templates/', { method: 'POST', body: JSON.stringify(data) }),
   updateWhatsAppTemplate: (id: number, data: Partial<Omit<WhatsAppTemplate, 'id' | 'created_at' | 'category_name'>>) =>

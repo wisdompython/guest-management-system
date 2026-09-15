@@ -2112,3 +2112,144 @@ class EventMultipartJsonFieldTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         event = Event.objects.get(pk=response.data['id'])
         self.assertEqual(event.required_fields, ['phone_number'])
+
+
+class TemplateSimulationTests(TestCase):
+    """Running a template against a real event before any message is sent."""
+
+    def setUp(self):
+        from .models import EventLocation
+
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='sim-manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        self.event = Event.objects.create(
+            name='Ada & Tunde Wedding', date=base, venue='TBC',
+        )
+        EventLocation.objects.create(
+            event=self.event, title='Church Ceremony',
+            venue='Cathedral, Ikoyi', starts_at=base, order=0,
+        )
+        EventLocation.objects.create(
+            event=self.event, title='Reception', venue='Eko Hotel',
+            starts_at=base + timezone.timedelta(hours=4), order=1,
+        )
+        self.guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+        )
+
+    def _simulate(self, **body):
+        return self.client.post('/api/whatsapp-templates/simulate/', body, format='json')
+
+    def test_renders_with_real_event_and_guest_data(self):
+        response = self._simulate(
+            event=self.event.id,
+            body_text='Hi {{1}}, join us at {{2}} on {{3}}.',
+            body_params=['guest_name', 'location_1_venue', 'location_1_time'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data['would_send'])
+        self.assertIn('Rita Aivoji', response.data['rendered'])
+        self.assertIn('Cathedral, Ikoyi', response.data['rendered'])
+        self.assertEqual(response.data['guest']['full_name'], 'Rita Aivoji')
+        self.assertEqual(response.data['event']['location_count'], 2)
+
+    def test_reports_missing_location_without_sending(self):
+        response = self._simulate(
+            event=self.event.id,
+            body_text='Hi {{1}}, then {{2}}.',
+            body_params=['guest_name', 'location_3_venue'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['would_send'])
+        self.assertEqual(response.data['missing_params'], ['location_3_venue'])
+        self.assertIn('location 3', ' '.join(response.data['problems']))
+
+    def test_reports_placeholder_count_mismatch(self):
+        response = self._simulate(
+            event=self.event.id,
+            body_text='Hi {{1}}, see you at {{2}} on {{3}}.',
+            body_params=['guest_name'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['would_send'])
+        self.assertIn('placeholder', ' '.join(response.data['problems']))
+
+    def test_resolved_values_are_listed_per_variable(self):
+        response = self._simulate(
+            event=self.event.id,
+            body_text='{{1}} {{2}}',
+            body_params=['location_1_title', 'location_2_title'],
+        )
+        resolved = {row['key']: row['value'] for row in response.data['resolved']}
+        self.assertEqual(resolved['location_1_title'], 'Church Ceremony')
+        self.assertEqual(resolved['location_2_title'], 'Reception')
+
+    def test_specific_guest_can_be_chosen(self):
+        other = Guest.objects.create(
+            event=self.event, full_name='Chidi Okeke', phone_number='08040000000',
+        )
+        response = self._simulate(
+            event=self.event.id, guest=str(other.id),
+            body_text='Hi {{1}}', body_params=['guest_name'],
+        )
+        self.assertEqual(response.data['guest']['full_name'], 'Chidi Okeke')
+        self.assertIn('Chidi Okeke', response.data['rendered'])
+
+    def test_guest_from_another_event_is_rejected(self):
+        other_event = Event.objects.create(
+            name='Other', date=timezone.now() + timezone.timedelta(days=5),
+        )
+        stranger = Guest.objects.create(
+            event=other_event, full_name='Stranger', phone_number='08050000000',
+        )
+        response = self._simulate(
+            event=self.event.id, guest=str(stranger.id),
+            body_text='Hi {{1}}', body_params=['guest_name'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_event_without_guests_explains_itself(self):
+        empty = Event.objects.create(
+            name='Empty', date=timezone.now() + timezone.timedelta(days=5),
+        )
+        response = self._simulate(
+            event=empty.id, body_text='Hi {{1}}', body_params=['guest_name'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no guests', response.data['detail'])
+
+    def test_event_is_required(self):
+        response = self._simulate(body_text='Hi {{1}}', body_params=['guest_name'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unknown_event_returns_404(self):
+        response = self._simulate(
+            event=999999, body_text='Hi {{1}}', body_params=['guest_name'],
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_requires_authentication(self):
+        self.client.force_authenticate(None)
+        response = self._simulate(
+            event=self.event.id, body_text='Hi {{1}}', body_params=['guest_name'],
+        )
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+
+    def test_simulation_never_queues_a_message(self):
+        """The whole point is that it is safe to run repeatedly."""
+        with patch('guests.tasks.send_whatsapp_pass.delay') as mock_send:
+            self._simulate(
+                event=self.event.id,
+                body_text='Hi {{1}}', body_params=['guest_name'],
+            )
+        mock_send.assert_not_called()
+        self.guest.refresh_from_db()
+        self.assertFalse(self.guest.whatsapp_sent)
