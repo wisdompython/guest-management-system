@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from ..models import Guest
+from ..models import Guest, serialize_event_locations
 
 
 class GuestPreferencesView(APIView):
@@ -42,6 +42,7 @@ class GuestPreferencesView(APIView):
             'event_name': event.name,
             'event_date': event.date,
             'venue': event.venue,
+            'locations': serialize_event_locations(event),
             'allow_plus_one': event.allow_plus_one,
             'collect_aso_ebi': event.collect_aso_ebi,
             'collect_celebrant': event.collect_celebrant,

@@ -134,6 +134,76 @@ class Event(models.Model):
         return self.name
 
 
+class EventLocation(models.Model):
+    """One titled venue + time within an event.
+
+    A wedding typically has several (traditional ceremony, church, reception),
+    each at its own place and time, possibly on different days. Events with no
+    locations behave exactly as before, using Event.date and Event.venue.
+    """
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='locations')
+    title = models.CharField(
+        max_length=120,
+        help_text='What this part of the event is called, e.g. "Church Ceremony".',
+    )
+    venue = models.CharField(max_length=255, help_text='Where this part of the event happens.')
+    starts_at = models.DateTimeField(help_text='Full date and time this part of the event begins.')
+    notes = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Optional guest-facing detail, e.g. "Strictly white attire".',
+    )
+    # Explicit ordering — two locations can share a start time, and organisers
+    # sometimes want a listing order that is not chronological.
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'starts_at', 'id']
+
+    def __str__(self):
+        return f'{self.title} — {self.venue}'
+
+
+def serialize_event_locations(event) -> list:
+    """Guest-facing location list, shared by the RSVP and preferences payloads."""
+    return [
+        {
+            'title': location.title,
+            'venue': location.venue,
+            'starts_at': location.starts_at,
+            'notes': location.notes,
+        }
+        for location in event.locations.all()
+    ]
+
+
+def sync_event_anchor(event) -> None:
+    """Point Event.date at the earliest location and summarise Event.venue.
+
+    Event.date stays load-bearing: reminder rules compute their fire time from
+    it (``dispatch_due_reminders``) and scheduled sends filter on it, so it must
+    always represent when the event actually starts. Called explicitly after
+    locations change rather than through a signal, matching how the rest of the
+    codebase sequences its writes.
+    """
+    locations = list(event.locations.all())
+    if not locations:
+        return
+    earliest = min(location.starts_at for location in locations)
+    first = locations[0]
+    updates = {}
+    if event.date != earliest:
+        updates['date'] = earliest
+    summary = first.venue if len(locations) == 1 else f'{first.venue} (+{len(locations) - 1} more)'
+    if event.venue != summary:
+        updates['venue'] = summary
+    if updates:
+        for field, value in updates.items():
+            setattr(event, field, value)
+        Event.objects.filter(pk=event.pk).update(**updates)
+
+
 class Guest(models.Model):
     class Status(models.TextChoices):
         REGISTERED = 'registered', 'Registered'
@@ -279,6 +349,33 @@ class TemplateCategory(models.Model):
         return self.name
 
 
+# How many location slots can be referenced from a WhatsApp template. Meta
+# templates have a fixed placeholder count, so location variables are exposed as
+# numbered slots rather than an open-ended list. Five covers any realistic event
+# while keeping the template variable picker usable.
+MAX_TEMPLATE_LOCATION_SLOTS = 5
+
+# Ordinal words read better than "Location 1" in the template picker.
+_LOCATION_ORDINALS = ['1st', '2nd', '3rd', '4th', '5th']
+
+
+def _build_location_vars():
+    entries = []
+    for index in range(1, MAX_TEMPLATE_LOCATION_SLOTS + 1):
+        ordinal = _LOCATION_ORDINALS[index - 1]
+        entries.extend([
+            (f'location_{index}_title', f'{ordinal} location — title'),
+            (f'location_{index}_venue', f'{ordinal} location — venue'),
+            (f'location_{index}_datetime', f'{ordinal} location — date & time'),
+            (f'location_{index}_date', f'{ordinal} location — date only'),
+            (f'location_{index}_time', f'{ordinal} location — time only'),
+        ])
+    return entries
+
+
+LOCATION_VARS = _build_location_vars()
+
+
 class WhatsAppTemplate(models.Model):
     """Registry of approved Meta WhatsApp templates available for use."""
 
@@ -295,7 +392,7 @@ class WhatsAppTemplate(models.Model):
         ('rsvp_link',   'Guest-specific RSVP link'),
         ('preferences_link', 'Guest preferences link'),
         ('rsvp_deadline', 'RSVP response deadline'),
-    ]
+    ] + LOCATION_VARS
 
     name         = models.CharField(max_length=200, unique=True, help_text="Exact template name as in Meta Business Manager")
     display_name = models.CharField(max_length=200, blank=True, help_text="Friendly label shown in the UI")

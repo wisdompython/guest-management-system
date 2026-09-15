@@ -19,6 +19,28 @@ const VAR_EXAMPLES: Record<string, string> = {
   seat_number:  'Seat 4A',
   rsvp_link:    'https://guestpass.example/funke-adeyoriju-60/rsvp/rita-aivoji-A7kP4m',
   rsvp_deadline: '9th September 2026',
+  ...locationVarExamples(),
+}
+
+/** Preview values for the numbered location slots, e.g. location_1_venue. */
+function locationVarExamples(): Record<string, string> {
+  const samples = [
+    { title: 'Church Ceremony', venue: "St. Saviour's, Ikoyi", date: '20th September 2026', time: '10:00 AM' },
+    { title: 'Reception', venue: 'Eko Hotel Grand Ballroom', date: '20th September 2026', time: '2:00 PM' },
+    { title: 'Traditional Ceremony', venue: 'Ikeja Country Club', date: '19th September 2026', time: '4:00 PM' },
+    { title: 'After Party', venue: 'Hard Rock Cafe, Lagos', date: '20th September 2026', time: '9:00 PM' },
+    { title: 'Thanksgiving Service', venue: "St. Saviour's, Ikoyi", date: '21st September 2026', time: '9:00 AM' },
+  ]
+  const examples: Record<string, string> = {}
+  samples.forEach((sample, index) => {
+    const slot = index + 1
+    examples[`location_${slot}_title`] = sample.title
+    examples[`location_${slot}_venue`] = sample.venue
+    examples[`location_${slot}_datetime`] = `${sample.date} at ${sample.time}`
+    examples[`location_${slot}_date`] = sample.date
+    examples[`location_${slot}_time`] = sample.time
+  })
+  return examples
 }
 
 type FormState = {

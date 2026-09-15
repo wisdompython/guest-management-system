@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import ReadOnlyOrEventManager
 from guests.csv_utils import safe_csv_row
-from guests.models import Event, Guest
+from guests.models import Event, Guest, serialize_event_locations
 
 from .models import RsvpRecipient, RsvpWorkflow, assign_unique_public_codes
 from .serializers import (
@@ -809,6 +809,7 @@ class PublicRsvpResponseView(APIView):
             'event_name': workflow.event.name,
             'event_date': workflow.event.date,
             'venue': workflow.event.venue,
+            'locations': serialize_event_locations(workflow.event),
             'rsvp_message': workflow.event.rsvp_message,
             'color_of_day': workflow.event.color_of_day,
             'rsvp_primary_color': workflow.event.rsvp_primary_color,

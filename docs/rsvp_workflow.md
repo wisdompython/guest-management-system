@@ -76,6 +76,53 @@ An administrator can change both limits by setting `RSVP_MAX_REMINDERS` and
 guests who receive repeated unanswered messages can block the business number,
 which lowers the WhatsApp quality rating for every event on the account.
 
+
+## Events with more than one location
+
+A wedding often happens in several places — a traditional ceremony on Friday, a
+church service on Saturday morning, a reception that afternoon. Add each one
+under **Schedule** on the event form, giving it a name, an address, a date and
+time, and an optional note such as "Strictly white attire".
+
+Up to five parts can be added. An event held in a single place does not need
+this section at all; leave it empty and the event's own date and venue are used
+exactly as before.
+
+The event's main date follows the earliest part automatically, so reminders and
+scheduled pass delivery continue to work without any extra setup.
+
+Guests see the full schedule on the public RSVP page. Each part is listed in the
+order set on the event form, with its own date and time.
+
+### Using locations in WhatsApp messages
+
+Each part of the schedule is available to templates as a numbered set of
+variables — the 1st location is the first one listed on the event form:
+
+- `location_1_title` — e.g. Church Ceremony
+- `location_1_venue` — e.g. St. Saviour's, Ikoyi
+- `location_1_datetime` — e.g. Saturday, 20 September 2026 at 10:00 AM
+- `location_1_date` — e.g. 20th September 2026
+- `location_1_time` — e.g. 10:00 AM
+
+The same five exist for locations 2 to 5. Pick them in the template builder like
+any other variable.
+
+**Important:** a template that uses `location_2_venue` can only be used for
+events that actually have a second location. WhatsApp rejects a message with a
+blank value, so the system checks before sending and stops the message rather
+than letting it fail at Meta. The guest's row then explains what is wrong — for
+example, "This template expects location 3, but this event has 2 locations."
+
+To fix it, either add the missing part to the event's schedule, or switch that
+event to a template that does not refer to it. Because this is a setup problem
+rather than a temporary network fault, the message is not retried automatically;
+it sends once the event or the template is corrected.
+
+If you run events with differing numbers of locations, it is usually simplest to
+keep one template per shape — for example a two-part wedding template and a
+three-part one.
+
 ## Aso Ebi requests
 
 Enable **Collect Aso Ebi requests** in the event's guest setup when the event offers Aso Ebi. A guest who confirms attendance can then choose whether they want Aso Ebi and must enter a quantity of at least one when they do.

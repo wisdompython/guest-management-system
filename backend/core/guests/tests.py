@@ -1642,3 +1642,425 @@ class GuestPreferencesTests(TestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 400)
+
+
+class EventLocationTests(TestCase):
+    """Multiple titled venues/times per event and their template variables."""
+
+    def setUp(self):
+        self.event = Event.objects.create(
+            name='Ada & Tunde Wedding',
+            date=timezone.now() + timezone.timedelta(days=30),
+            venue='To be confirmed',
+        )
+
+    def _add_locations(self):
+        from .models import EventLocation
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        church = EventLocation.objects.create(
+            event=self.event, title='Church Ceremony',
+            venue="St. Saviour's, Ikoyi", starts_at=base, order=0,
+        )
+        reception = EventLocation.objects.create(
+            event=self.event, title='Reception',
+            venue='Eko Hotel Grand Ballroom',
+            starts_at=base + timezone.timedelta(hours=4), order=1,
+        )
+        return church, reception
+
+    def test_locations_order_by_explicit_order_field(self):
+        from .models import EventLocation
+
+        base = timezone.now() + timezone.timedelta(days=10)
+        # Deliberately create the later-ordered row first, and give it an
+        # earlier start time, so only `order` can produce the expected result.
+        EventLocation.objects.create(
+            event=self.event, title='Reception', venue='Ballroom',
+            starts_at=base, order=1,
+        )
+        EventLocation.objects.create(
+            event=self.event, title='Church', venue='Cathedral',
+            starts_at=base + timezone.timedelta(hours=2), order=0,
+        )
+        self.assertEqual(
+            [loc.title for loc in self.event.locations.all()],
+            ['Church', 'Reception'],
+        )
+
+    def test_sync_anchor_points_event_date_at_earliest_location(self):
+        from .models import EventLocation, sync_event_anchor
+
+        early = timezone.now() + timezone.timedelta(days=20)
+        EventLocation.objects.create(
+            event=self.event, title='Traditional', venue='Ikeja Club',
+            starts_at=early, order=0,
+        )
+        EventLocation.objects.create(
+            event=self.event, title='Church', venue='Cathedral',
+            starts_at=early + timezone.timedelta(days=1), order=1,
+        )
+        sync_event_anchor(self.event)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.date, early)
+        # Venue summarises rather than silently showing only the first venue.
+        self.assertIn('Ikeja Club', self.event.venue)
+        self.assertIn('+1 more', self.event.venue)
+
+    def test_sync_anchor_leaves_event_without_locations_untouched(self):
+        from .models import sync_event_anchor
+
+        original_date = self.event.date
+        sync_event_anchor(self.event)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.date, original_date)
+        self.assertEqual(self.event.venue, 'To be confirmed')
+
+    def test_location_template_variables_resolve(self):
+        from .whatsapp import _resolve_template_params
+
+        self._add_locations()
+        guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+        )
+        values = _resolve_template_params(guest, [
+            'guest_name',
+            'location_1_title', 'location_1_venue', 'location_1_time',
+            'location_2_title', 'location_2_venue',
+        ])
+        self.assertEqual(values[0], 'Rita Aivoji')
+        self.assertEqual(values[1], 'Church Ceremony')
+        self.assertEqual(values[2], "St. Saviour's, Ikoyi")
+        self.assertTrue(values[3])  # formatted time, e.g. "10:00 AM"
+        self.assertEqual(values[4], 'Reception')
+        self.assertEqual(values[5], 'Eko Hotel Grand Ballroom')
+
+    def test_missing_location_slot_is_detected(self):
+        from .whatsapp import _resolve_template_params, missing_template_params
+
+        self._add_locations()  # only two locations exist
+        guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+        )
+        body_params = ['guest_name', 'location_3_title', 'location_3_venue']
+        values = _resolve_template_params(guest, body_params)
+        missing = missing_template_params(body_params, values)
+        self.assertEqual(missing, ['location_3_title', 'location_3_venue'])
+
+    def test_missing_slot_message_names_the_shortfall(self):
+        from .whatsapp import describe_missing_params
+
+        self._add_locations()
+        message = describe_missing_params(self.event, ['location_3_title'])
+        self.assertIn('location 3', message)
+        self.assertIn('2 locations', message)
+
+    def test_send_pass_refuses_template_with_unresolvable_location(self):
+        from .models import WhatsAppTemplate
+        from .whatsapp import send_pass
+
+        self._add_locations()
+        template = WhatsAppTemplate.objects.create(
+            name='wedding_pass', body_params=['guest_name', 'location_3_venue'],
+            has_header_image=True,
+        )
+        self.event.whatsapp_template = template
+        self.event.save(update_fields=['whatsapp_template'])
+        guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+            pass_image='passes/test.png',
+        )
+        with override_settings(
+            WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t',
+            WHATSAPP_MEDIA_BASE_URL='https://example.com',
+        ):
+            with patch('guests.whatsapp._get_client') as mock_client:
+                with self.assertRaises(ValueError):
+                    send_pass(guest)
+                # The send must never reach Meta.
+                mock_client.return_value.send_template.assert_not_called()
+
+    def test_unresolvable_template_is_not_retried(self):
+        """A missing location cannot fix itself, so the task must not retry."""
+        from .models import WhatsAppTemplate
+        from .tasks import send_whatsapp_pass
+
+        self._add_locations()
+        template = WhatsAppTemplate.objects.create(
+            name='wedding_pass_2', body_params=['guest_name', 'location_4_venue'],
+            has_header_image=True,
+        )
+        self.event.whatsapp_template = template
+        self.event.save(update_fields=['whatsapp_template'])
+        guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+            pass_image='passes/test.png',
+        )
+        with override_settings(WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t'):
+            with patch('guests.whatsapp.send_pass', side_effect=ValueError('no location 4')):
+                result = send_whatsapp_pass(str(guest.id))
+        self.assertFalse(result['sent'])
+        self.assertIn('no location 4', result['reason'])
+        guest.refresh_from_db()
+        self.assertFalse(guest.whatsapp_sent)
+
+    def test_available_vars_include_location_slots(self):
+        from .models import MAX_TEMPLATE_LOCATION_SLOTS, WhatsAppTemplate
+
+        keys = [key for key, _ in WhatsAppTemplate.AVAILABLE_VARS]
+        self.assertIn('location_1_title', keys)
+        self.assertIn(f'location_{MAX_TEMPLATE_LOCATION_SLOTS}_time', keys)
+        self.assertNotIn(f'location_{MAX_TEMPLATE_LOCATION_SLOTS + 1}_title', keys)
+        # Existing variables must survive unchanged.
+        self.assertIn('guest_name', keys)
+        self.assertIn('venue', keys)
+
+
+class EventLocationApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+    def _payload(self, **overrides):
+        base = timezone.now() + timezone.timedelta(days=30)
+        payload = {
+            'name': 'Ada & Tunde',
+            'date': base.isoformat(),
+            'venue': 'TBC',
+            'locations': [
+                {
+                    'title': 'Church Ceremony',
+                    'venue': "St. Saviour's",
+                    'starts_at': base.isoformat(),
+                    'order': 0,
+                },
+                {
+                    'title': 'Reception',
+                    'venue': 'Eko Hotel',
+                    'starts_at': (base + timezone.timedelta(hours=4)).isoformat(),
+                    'order': 1,
+                },
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_create_event_with_locations(self):
+        response = self.client.post('/api/events/', self._payload(), format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data['locations']), 2)
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertEqual(
+            [loc.title for loc in event.locations.all()],
+            ['Church Ceremony', 'Reception'],
+        )
+
+    def test_update_replaces_locations_and_reanchors_date(self):
+        response = self.client.post('/api/events/', self._payload(), format='json')
+        event_id = response.data['id']
+        earlier = timezone.now() + timezone.timedelta(days=10)
+        response = self.client.patch(
+            f'/api/events/{event_id}/',
+            {'locations': [{
+                'title': 'Traditional Ceremony',
+                'venue': 'Ikeja Country Club',
+                'starts_at': earlier.isoformat(),
+                'order': 0,
+            }]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        event = Event.objects.get(pk=event_id)
+        self.assertEqual(event.locations.count(), 1)
+        self.assertEqual(
+            event.date.replace(microsecond=0), earlier.replace(microsecond=0),
+        )
+
+    def test_omitting_locations_leaves_them_untouched(self):
+        response = self.client.post('/api/events/', self._payload(), format='json')
+        event_id = response.data['id']
+        self.client.patch(
+            f'/api/events/{event_id}/', {'name': 'Renamed'}, format='json',
+        )
+        event = Event.objects.get(pk=event_id)
+        self.assertEqual(event.name, 'Renamed')
+        self.assertEqual(event.locations.count(), 2)
+
+    def test_empty_list_clears_locations(self):
+        response = self.client.post('/api/events/', self._payload(), format='json')
+        event_id = response.data['id']
+        self.client.patch(
+            f'/api/events/{event_id}/', {'locations': []}, format='json',
+        )
+        self.assertEqual(Event.objects.get(pk=event_id).locations.count(), 0)
+
+    def test_too_many_locations_rejected(self):
+        base = timezone.now() + timezone.timedelta(days=30)
+        payload = self._payload(locations=[
+            {
+                'title': f'Part {i}', 'venue': f'Venue {i}',
+                'starts_at': (base + timezone.timedelta(hours=i)).isoformat(),
+                'order': i,
+            }
+            for i in range(6)
+        ])
+        response = self.client.post('/api/events/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_blank_title_rejected(self):
+        base = timezone.now() + timezone.timedelta(days=30)
+        payload = self._payload(locations=[{
+            'title': '   ', 'venue': 'Somewhere', 'starts_at': base.isoformat(),
+        }])
+        response = self.client.post('/api/events/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_event_without_locations_still_works(self):
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Simple Party', 'date': base.isoformat(), 'venue': 'One Place',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['locations'], [])
+        self.assertEqual(response.data['venue'], 'One Place')
+
+
+class EventLocationMultipartTests(TestCase):
+    """The event add/edit pages post multipart FormData, not JSON."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='mp-manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_locations_accepted_as_json_string_in_multipart(self):
+        import json
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Multipart Wedding',
+            'date': base.isoformat(),
+            'venue': 'TBC',
+            'locations': json.dumps([
+                {
+                    'title': 'Church Ceremony',
+                    'venue': 'Cathedral',
+                    'starts_at': base.isoformat(),
+                    'order': 0,
+                },
+                {
+                    'title': 'Reception',
+                    'venue': 'Ballroom',
+                    'starts_at': (base + timezone.timedelta(hours=3)).isoformat(),
+                    'order': 1,
+                },
+            ]),
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertEqual(
+            [loc.title for loc in event.locations.all()],
+            ['Church Ceremony', 'Reception'],
+        )
+
+    def test_malformed_locations_json_rejected(self):
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Broken', 'date': base.isoformat(), 'locations': 'not json',
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_empty_locations_string_clears(self):
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'No Locations', 'date': base.isoformat(), 'locations': '[]',
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['locations'], [])
+
+
+class EventLocationWithUploadTests(TestCase):
+    """Locations must not break the multipart image upload on the same form."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='upload-manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+    def _png(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        buffer = io.BytesIO()
+        Image.new('RGB', (40, 40), (200, 180, 120)).save(buffer, format='PNG')
+        buffer.seek(0)
+        return SimpleUploadedFile('bg.png', buffer.read(), content_type='image/png')
+
+    def test_background_image_survives_locations_parsing(self):
+        import json
+
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Wedding With Art',
+            'date': base.isoformat(),
+            'rsvp_background_image': self._png(),
+            'locations': json.dumps([{
+                'title': 'Church', 'venue': 'Cathedral',
+                'starts_at': base.isoformat(), 'order': 0,
+            }]),
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertEqual(event.locations.count(), 1)
+        # The uploaded file must still have been saved.
+        self.assertTrue(event.rsvp_background_image.name)
+
+
+class EventVenueSummaryTests(TestCase):
+    """Existing venue displays must stay meaningful once locations are used."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='summary-manager', password='pw', role='event_manager',
+        )
+        self.client.force_authenticate(self.user)
+
+    def _create(self, count):
+        base = timezone.now() + timezone.timedelta(days=30)
+        response = self.client.post('/api/events/', {
+            'name': 'Wedding', 'date': base.isoformat(), 'venue': 'TBC',
+            'locations': [
+                {
+                    'title': f'Part {i + 1}', 'venue': f'Venue {i + 1}',
+                    'starts_at': (base + timezone.timedelta(hours=i)).isoformat(),
+                    'order': i,
+                }
+                for i in range(count)
+            ],
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        return Event.objects.get(pk=response.data['id'])
+
+    def test_single_location_venue_reads_as_that_venue(self):
+        event = self._create(1)
+        self.assertEqual(event.venue, 'Venue 1')
+
+    def test_multiple_locations_venue_summarises(self):
+        event = self._create(3)
+        self.assertEqual(event.venue, 'Venue 1 (+2 more)')
+
+    def test_clearing_locations_leaves_last_summary_editable(self):
+        """Removing every location must not wipe the venue to an empty string."""
+        event = self._create(2)
+        self.client.patch(
+            f'/api/events/{event.id}/', {'locations': []}, format='json',
+        )
+        event.refresh_from_db()
+        self.assertTrue(event.venue)

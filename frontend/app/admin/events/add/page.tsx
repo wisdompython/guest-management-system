@@ -6,6 +6,7 @@ import { api, WhatsAppTemplate } from '@/lib/api'
 import { watDateTimeInputToIso } from '@/lib/datetime'
 import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import { EventDetailsForm } from '@/components/events/EventDetailsForm'
+import { LocationDraft, draftsToPayload, validateDrafts } from '@/components/events/EventLocationsSection'
 import { GuestConfigSection } from '@/components/events/GuestConfigSection'
 import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
 
@@ -34,6 +35,7 @@ export default function AddEventPage() {
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(false)
+  const [locations, setLocations] = useState<LocationDraft[]>([])
   const [deliveryFlow, setDeliveryFlow] = useState<'direct' | 'rsvp'>('direct')
   const [passTiming, setPassTiming] = useState<'immediate' | 'scheduled'>('immediate')
   const [passSendAt, setPassSendAt] = useState('')
@@ -54,6 +56,8 @@ export default function AddEventPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!dateValid) { setError('Please set a future date and time for the event.'); setStep(1); return }
+    const locationError = validateDrafts(locations)
+    if (locationError) { setError(locationError); setStep(1); return }
     if (whatsappEnabled && deliveryFlow === 'direct' && passTiming === 'scheduled' && !passSendAt) {
       setError('Choose a date and time for scheduled guest-pass delivery.'); return
     }
@@ -65,6 +69,7 @@ export default function AddEventPage() {
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
     fd.append('date', watDateTimeInputToIso((form.elements.namedItem('date') as HTMLInputElement).value))
     fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
+    fd.append('locations', JSON.stringify(draftsToPayload(locations)))
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
     fd.append('color_of_day', (form.elements.namedItem('color_of_day') as HTMLInputElement).value)
@@ -118,7 +123,7 @@ export default function AddEventPage() {
 
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div className={step === 1 ? 'block' : 'hidden'}>
-          <EventDetailsForm step={1} subtitle="Only the event name and a future date are required." onValidationChange={setDateValid} />
+          <EventDetailsForm step={1} subtitle="Only the event name and a future date are required." onValidationChange={setDateValid} locations={locations} onLocationsChange={setLocations} />
         </div>
 
         <div className={step === 2 ? 'block' : 'hidden'}>

@@ -83,6 +83,13 @@ def send_pass(guest) -> bool:
         if tmpl:
             template_name = tmpl.name
             body_param_values = _resolve_template_params(guest, tmpl.body_params or [])
+            missing = missing_template_params(tmpl.body_params or [], body_param_values)
+            if missing:
+                logger.error(
+                    'Template %s has unresolved variables %s for guest %s — not sending',
+                    tmpl.name, missing, guest.id,
+                )
+                raise ValueError(describe_missing_params(event, missing))
             has_header_image = tmpl.has_header_image
         else:
             # Fall back to global default — image header + guest_name + event_name
@@ -104,6 +111,11 @@ def send_pass(guest) -> bool:
         logger.info("WhatsApp pass sent to guest %s (%s)", guest.id, phone)
         return True
 
+    except ValueError:
+        # Template configuration this send can never satisfy (e.g. it references
+        # a location the event does not have). Propagate so the caller can
+        # surface the explanation instead of a generic failure.
+        raise
     except Exception as exc:
         # Let WhatsAppError propagate so callers (e.g. send_whatsapp_pass) can
         # tell transient failures (worth retrying) from permanent ones.
@@ -138,7 +150,61 @@ def _resolve_template_params(guest, body_params: list) -> list:
         'seat_number':  guest.seat_number or '',
         'preferences_link': build_preferences_url(guest),
     }
+    var_map.update(_resolve_location_params(event))
     return [var_map.get(key, '') for key in body_params]
+
+
+def _resolve_location_params(event) -> dict:
+    """Map location_N_* keys to this event's ordered locations.
+
+    Slots beyond the event's location count are simply absent from the map, so
+    they resolve to '' like any unknown key. ``missing_template_params`` is what
+    stops such a send from reaching Meta.
+    """
+    if not event:
+        return {}
+    values = {}
+    for index, location in enumerate(event.locations.all(), start=1):
+        local_start = timezone.localtime(location.starts_at)
+        values[f'location_{index}_title'] = location.title
+        values[f'location_{index}_venue'] = location.venue
+        values[f'location_{index}_datetime'] = local_start.strftime('%A, %d %B %Y at %I:%M %p')
+        values[f'location_{index}_date'] = _format_ordinal_date(location.starts_at)
+        values[f'location_{index}_time'] = local_start.strftime('%I:%M %p').lstrip('0')
+    return values
+
+
+def missing_template_params(body_params: list, values: list) -> list:
+    """Return the variable keys that resolved to nothing.
+
+    Meta rejects a template send whose body parameter is an empty string, and
+    ``send_whatsapp_pass`` treats that rejection as permanent — so a template
+    referencing a location the event does not have would strand every guest on
+    that event. Callers check this before hitting the API and fail with an
+    explanatory message instead.
+    """
+    return [
+        key for key, value in zip(body_params, values)
+        if not str(value or '').strip()
+    ]
+
+
+def describe_missing_params(event, missing: list) -> str:
+    """Build an operator-facing explanation for unresolved template variables."""
+    location_slots = sorted({
+        int(key.split('_')[1])
+        for key in missing
+        if key.startswith('location_') and key.split('_')[1].isdigit()
+    })
+    if location_slots:
+        have = event.locations.count() if event else 0
+        wanted = max(location_slots)
+        return (
+            f'This template expects location {wanted}, but this event has '
+            f'{have} location{"" if have == 1 else "s"}. Add the missing '
+            f'location to the event, or choose a template that does not use it.'
+        )
+    return 'This template expects values that are empty for this guest: ' + ', '.join(missing)
 
 
 def _format_ordinal_date(value) -> str:
@@ -171,6 +237,13 @@ def send_reminder(guest, template_name: str) -> bool:
         try:
             tmpl = WhatsAppTemplate.objects.get(name=template_name, is_active=True)
             body_param_values = _resolve_template_params(guest, tmpl.body_params or [])
+            missing = missing_template_params(tmpl.body_params or [], body_param_values)
+            if missing:
+                logger.error(
+                    'Reminder template %s has unresolved variables %s for guest %s — not sending',
+                    template_name, missing, guest.id,
+                )
+                return False
             has_header_image = tmpl.has_header_image
         except WhatsAppTemplate.DoesNotExist:
             # Fallback: default param order for unregistered templates

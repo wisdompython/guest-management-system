@@ -38,6 +38,20 @@ def _build_invitation_image_url(recipient) -> str:
     return f"{base.rstrip('/')}{settings.MEDIA_URL}{recipient.invitation_image.name}"
 
 
+def _guard_resolved_params(event, body_params, values):
+    """Refuse a send whose template variables did not all resolve.
+
+    Meta rejects empty body parameters, and the RSVP tasks treat a plain
+    exception as a permanent failure — which is correct here, since a template
+    referencing a location the event lacks cannot succeed on retry.
+    """
+    from guests.whatsapp import describe_missing_params, missing_template_params
+
+    missing = missing_template_params(list(body_params or []), values)
+    if missing:
+        raise ValueError(describe_missing_params(event, missing))
+
+
 def _resolve_invitation_params(recipient) -> list:
     values = []
     for key in recipient.workflow.invitation_template.body_params or []:
@@ -100,6 +114,9 @@ def send_invitation(recipient):
             raise ValueError('The RSVP artwork does not have a public URL.')
         params.append(HeaderImage.params(image=image_url))
     body_values = _resolve_invitation_params(recipient)
+    _guard_resolved_params(
+        guest.event, template.body_params or [], body_values,
+    )
     if body_values:
         params.append(BodyText.params(*body_values))
 
@@ -139,6 +156,7 @@ def send_configured_pass(recipient):
     if template:
         template_name = template.name
         body_values = _resolve_template_params(guest, template.body_params or [])
+        _guard_resolved_params(event, template.body_params or [], body_values)
         has_header_image = template.has_header_image
     else:
         # Global default — image header + guest_name + event_name

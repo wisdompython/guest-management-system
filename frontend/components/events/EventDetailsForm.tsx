@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Event } from '@/lib/api'
 import { toWatDateTimeInput } from '@/lib/datetime'
 import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
+import { EventLocationsSection, LocationDraft } from './EventLocationsSection'
 
 const field = 'form-control'
 const label = 'form-label'
@@ -22,9 +23,11 @@ interface Props {
   step?: number
   onDateChange?: (val: string) => void
   onValidationChange?: (valid: boolean) => void
+  locations?: LocationDraft[]
+  onLocationsChange?: (next: LocationDraft[]) => void
 }
 
-export function EventDetailsForm({ event, localDateValue, subtitle, step, onDateChange, onValidationChange }: Props) {
+export function EventDetailsForm({ event, localDateValue, subtitle, step, onDateChange, onValidationChange, locations, onLocationsChange }: Props) {
   const [minVal] = useState(nowMin)
   const [dateVal, setDateVal] = useState(
     localDateValue ?? (event?.date ? toWatDateTimeInput(event.date) : '')
@@ -93,6 +96,10 @@ export function EventDetailsForm({ event, localDateValue, subtitle, step, onDate
             placeholder="e.g. Eko Hotel, Lagos" className={field} />
           <p className="form-hint">You can leave this blank and add it when confirmed.</p>
         </div>
+
+        {locations && onLocationsChange && (
+          <EventLocationsSection value={locations} onChange={onLocationsChange} />
+        )}
 
         <div className="sm:col-span-2">
           <label className={label}>Description <span className="font-normal text-[var(--muted)]">(optional)</span></label>

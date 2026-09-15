@@ -168,11 +168,21 @@ export interface TicketTypeDef {
   label: string;
 }
 
+export interface EventLocation {
+  id?: number;
+  title: string;
+  venue: string;
+  starts_at: string;
+  notes: string;
+  order?: number;
+}
+
 export interface Event {
   id: number;
   name: string;
   date: string;
   venue: string;
+  locations: EventLocation[];
   description: string;
   rsvp_message: string;
   color_of_day: string;
@@ -381,6 +391,7 @@ export interface PublicRsvpDetails {
   event_name: string;
   event_date: string;
   venue: string;
+  locations: Omit<EventLocation, 'id' | 'order'>[];
   rsvp_message: string;
   color_of_day: string;
   rsvp_primary_color: string;
@@ -411,6 +422,7 @@ export interface GuestPreferencesDetails {
   event_name: string;
   event_date: string;
   venue: string;
+  locations: Omit<EventLocation, 'id' | 'order'>[];
   allow_plus_one: boolean;
   collect_aso_ebi: boolean;
   collect_celebrant: boolean;

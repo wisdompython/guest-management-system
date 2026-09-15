@@ -2272,3 +2272,89 @@ class RsvpGuestSyncTests(TestCase):
         recipient = workflow.recipients.get(guest_id=created.data['id'])
         self.assertEqual(recipient.invitation_status, RsvpRecipient.InvitationStatus.QUEUED)
         mock_invitation.assert_called_once_with(recipient.id)
+
+
+class RsvpLocationTemplateTests(TestCase):
+    """RSVP sends must refuse templates referencing locations the event lacks."""
+
+    def setUp(self):
+        from guests.models import EventLocation
+
+        self.event = Event.objects.create(
+            name='Ada & Tunde Wedding',
+            date=timezone.now() + timezone.timedelta(days=30),
+            venue='TBC',
+            rsvp_enabled=True,
+        )
+        base = timezone.now() + timezone.timedelta(days=30)
+        EventLocation.objects.create(
+            event=self.event, title='Church Ceremony',
+            venue='Cathedral', starts_at=base, order=0,
+        )
+        self.guest = Guest.objects.create(
+            event=self.event, full_name='Rita Aivoji', phone_number='08030000000',
+        )
+
+    def _workflow(self, body_params):
+        template = WhatsAppTemplate.objects.create(
+            name='rsvp_invite_locations', body_params=body_params,
+        )
+        workflow = RsvpWorkflow.objects.create(
+            event=self.event, invitation_template=template,
+            status=RsvpWorkflow.Status.ACTIVE,
+        )
+        return workflow, template
+
+    @override_settings(WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t')
+    def test_invitation_refuses_missing_location_slot(self):
+        workflow, _ = self._workflow(['guest_name', 'location_2_venue'])
+        recipient = RsvpRecipient.objects.create(workflow=workflow, guest=self.guest)
+        with patch('rsvp.whatsapp._get_client') as mock_client:
+            with self.assertRaises(ValueError) as ctx:
+                send_invitation(recipient)
+            mock_client.return_value.send_template.assert_not_called()
+        self.assertIn('location 2', str(ctx.exception))
+
+    @override_settings(WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t')
+    def test_invitation_sends_when_every_location_resolves(self):
+        workflow, _ = self._workflow(['guest_name', 'location_1_venue'])
+        recipient = RsvpRecipient.objects.create(workflow=workflow, guest=self.guest)
+        with patch('rsvp.whatsapp._get_client') as mock_client:
+            mock_client.return_value.send_template.return_value = SimpleNamespace(id='wamid.1')
+            result = send_invitation(recipient)
+        self.assertEqual(result.id, 'wamid.1')
+        sent_params = mock_client.return_value.send_template.call_args.kwargs['params']
+        self.assertTrue(sent_params)
+
+    @override_settings(WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t')
+    def test_send_task_marks_recipient_failed_with_explanation(self):
+        from .tasks import send_rsvp_invitation
+
+        workflow, _ = self._workflow(['guest_name', 'location_3_title'])
+        recipient = RsvpRecipient.objects.create(
+            workflow=workflow, guest=self.guest,
+            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        result = send_rsvp_invitation(recipient.id)
+        self.assertFalse(result['sent'])
+        recipient.refresh_from_db()
+        self.assertEqual(
+            recipient.invitation_status, RsvpRecipient.InvitationStatus.FAILED,
+        )
+        self.assertIn('location 3', recipient.invitation_error)
+
+    @override_settings(WHATSAPP_PHONE_ID='1', WHATSAPP_TOKEN='t')
+    def test_location_failure_is_not_auto_retried(self):
+        """A missing location is permanent — the retry sweep must skip it."""
+        from .tasks import is_retryable_failure
+
+        workflow, _ = self._workflow(['guest_name', 'location_3_title'])
+        recipient = RsvpRecipient.objects.create(
+            workflow=workflow, guest=self.guest,
+            invitation_status=RsvpRecipient.InvitationStatus.QUEUED,
+        )
+        from .tasks import send_rsvp_invitation
+
+        send_rsvp_invitation(recipient.id)
+        recipient.refresh_from_db()
+        self.assertFalse(is_retryable_failure(recipient.invitation_error))

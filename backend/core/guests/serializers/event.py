@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.db.models import Count, Q, Sum
 from rest_framework import serializers
-from ..models import Event, Font
+from ..models import Event, EventLocation, Font, MAX_TEMPLATE_LOCATION_SLOTS, sync_event_anchor
 
 # Guest fields that can be toggled required/optional per event
 CONFIGURABLE_FIELDS = ['full_name', 'phone_number', 'email', 'table_number', 'seat_number']
@@ -35,6 +35,23 @@ class FontSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'uploaded_at')
 
 
+class EventLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventLocation
+        fields = ('id', 'title', 'venue', 'starts_at', 'notes', 'order')
+        read_only_fields = ('id',)
+
+    def validate_title(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Give this location a title, e.g. "Church Ceremony".')
+        return value.strip()
+
+    def validate_venue(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Enter where this part of the event happens.')
+        return value.strip()
+
+
 class EventSerializer(serializers.ModelSerializer):
     guest_count = serializers.SerializerMethodField()
     checked_in_count = serializers.SerializerMethodField()
@@ -53,6 +70,7 @@ class EventSerializer(serializers.ModelSerializer):
     whatsapp_template_name = serializers.CharField(source='whatsapp_template.display_name', read_only=True)
     create_rsvp_workflow = serializers.BooleanField(write_only=True, required=False, default=False)
     rsvp_workflow_id = serializers.SerializerMethodField()
+    locations = EventLocationSerializer(many=True, required=False)
 
     def get_guest_count(self, obj):
         # Use annotation when available (list view), fall back for single-object endpoints.
@@ -207,7 +225,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = (
-            'id', 'name', 'date', 'venue', 'description', 'rsvp_message', 'color_of_day',
+            'id', 'name', 'date', 'venue', 'locations', 'description', 'rsvp_message', 'color_of_day',
             'rsvp_primary_color', 'rsvp_background_color', 'rsvp_card_color',
             'rsvp_text_color', 'rsvp_background_image',
             'design_template',
@@ -266,20 +284,85 @@ class EventSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Upload a PNG, JPEG, or WebP background image.')
         return value
 
+    def to_internal_value(self, data):
+        """Accept locations as a JSON string when posted as multipart form data.
+
+        The event create/edit pages submit FormData (they upload an RSVP
+        background image), which cannot express a nested list, so the client
+        sends `locations` as a JSON-encoded string.
+        """
+        locations = data.get('locations') if hasattr(data, 'get') else None
+        if isinstance(locations, str):
+            import json
+
+            try:
+                parsed = json.loads(locations) or []
+            except json.JSONDecodeError:
+                raise serializers.ValidationError(
+                    {'locations': 'Could not read the event locations.'}
+                )
+            if not isinstance(parsed, list):
+                raise serializers.ValidationError(
+                    {'locations': 'Event locations must be a list.'}
+                )
+            # A QueryDict stores only the last value when a list is assigned,
+            # so build a plain dict before handing the parsed rows back.
+            data = {**data.dict(), 'locations': parsed} if hasattr(data, 'dict') else {
+                **data, 'locations': parsed,
+            }
+        return super().to_internal_value(data)
+
+    def validate_locations(self, value):
+        if len(value) > MAX_TEMPLATE_LOCATION_SLOTS:
+            raise serializers.ValidationError(
+                f'An event can have at most {MAX_TEMPLATE_LOCATION_SLOTS} locations.'
+            )
+        return value
+
+    def _write_locations(self, event, locations_data):
+        """Replace the event's locations, then re-anchor Event.date/venue."""
+        event.locations.all().delete()
+        EventLocation.objects.bulk_create([
+            EventLocation(
+                event=event,
+                title=row['title'],
+                venue=row['venue'],
+                starts_at=row['starts_at'],
+                notes=row.get('notes', ''),
+                # Fall back to submitted order when the client does not send one.
+                order=row.get('order', index),
+            )
+            for index, row in enumerate(locations_data)
+        ])
+        event.refresh_from_db()
+        sync_event_anchor(event)
+
     @transaction.atomic
     def create(self, validated_data):
         create_rsvp_workflow = validated_data.pop('create_rsvp_workflow', False)
+        locations_data = validated_data.pop('locations', None)
         if create_rsvp_workflow:
             validated_data['rsvp_enabled'] = True
             validated_data['preferences_enabled'] = False
             validated_data['pass_send_at'] = None
         event = super().create(validated_data)
+        if locations_data:
+            self._write_locations(event, locations_data)
         if create_rsvp_workflow:
             from rsvp.models import RsvpWorkflow
 
             request = self.context.get('request')
             created_by = request.user if request and request.user.is_authenticated else None
             RsvpWorkflow.objects.create(event=event, created_by=created_by)
+        return event
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # Absent key means "leave locations alone"; an empty list clears them.
+        locations_data = validated_data.pop('locations', None)
+        event = super().update(instance, validated_data)
+        if locations_data is not None:
+            self._write_locations(event, locations_data)
         return event
 
     def validate_ticket_types(self, value):

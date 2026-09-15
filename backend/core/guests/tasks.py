@@ -50,6 +50,12 @@ def send_whatsapp_pass(self, guest_id: str):
 
     try:
         sent = send_pass(guest)
+    except ValueError as exc:
+        # Template configuration the send can never satisfy (e.g. the template
+        # references a location this event does not have). Retrying cannot fix
+        # it — an operator has to change the event or the template.
+        logger.error("Template configuration error for guest %s: %s", guest_id, exc)
+        return {'sent': False, 'reason': str(exc)}
     except Exception as exc:
         # Non-transient errors (bad template name, invalid number, etc.) — don't retry
         from pywa.errors import WhatsAppError

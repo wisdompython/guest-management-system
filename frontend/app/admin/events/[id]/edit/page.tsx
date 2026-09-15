@@ -8,6 +8,7 @@ import type { TicketTypeDef } from '@/components/EventConfigPanel'
 import NameTypographyPanel from '@/components/NameTypographyPanel'
 import type { Zone } from '@/components/PassDesignPanel'
 import { EventDetailsForm } from '@/components/events/EventDetailsForm'
+import { LocationDraft, draftsToPayload, toDrafts, validateDrafts } from '@/components/events/EventLocationsSection'
 import { PassDesignSection } from '@/components/events/PassDesignSection'
 import { GuestConfigSection } from '@/components/events/GuestConfigSection'
 import { FormSectionHeader } from '@/components/ui/FormSectionHeader'
@@ -45,6 +46,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [whatsappTemplate, setWhatsappTemplate] = useState<number | null>(null)
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplate[]>([])
   const [dateValid, setDateValid] = useState(true)
+  const [locations, setLocations] = useState<LocationDraft[]>([])
   const [passTiming, setPassTiming] = useState<'immediate' | 'scheduled'>('immediate')
   const [passSendAt, setPassSendAt] = useState('')
 
@@ -70,6 +72,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setCollectCelebrant(ev.collect_celebrant ?? false)
         setCelebrantOptions(ev.celebrant_options ?? [])
         setWhatsappTemplate(ev.whatsapp_template ?? null)
+        setLocations(toDrafts(ev.locations))
         if (ev.pass_send_at) {
           setPassTiming('scheduled')
           const sendDate = new Date(ev.pass_send_at)
@@ -95,6 +98,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!dateValid) { setError('Please set a future date and time for the event.'); return }
+    const locationError = validateDrafts(locations)
+    if (locationError) { setError(locationError); return }
     if (!rsvpEnabled && whatsappEnabled && passTiming === 'scheduled' && !passSendAt) {
       setError('Choose a date and time for scheduled guest-pass delivery.'); return
     }
@@ -103,6 +108,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     fd.append('name', (form.elements.namedItem('name') as HTMLInputElement).value)
     fd.append('date', watDateTimeInputToIso((form.elements.namedItem('date') as HTMLInputElement).value))
     fd.append('venue', (form.elements.namedItem('venue') as HTMLInputElement).value)
+    fd.append('locations', JSON.stringify(draftsToPayload(locations)))
     fd.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     fd.append('rsvp_message', (form.elements.namedItem('rsvp_message') as HTMLTextAreaElement).value)
     fd.append('color_of_day', (form.elements.namedItem('color_of_day') as HTMLInputElement).value)
@@ -148,7 +154,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       </div>
       {error && <div className="mb-5 rounded-[14px] px-5 py-3.5 text-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <EventDetailsForm step={1} event={event} onValidationChange={setDateValid} />
+        <EventDetailsForm step={1} event={event} onValidationChange={setDateValid} locations={locations} onLocationsChange={setLocations} />
         <GuestConfigSection step={2} ticketTypes={ticketTypes} requiredFields={requiredFields}
           whatsappEnabled={whatsappEnabled} collectAsoEbi={collectAsoEbi} allowPlusOne={allowPlusOne} preferencesEnabled={preferencesEnabled} collectCelebrant={collectCelebrant} celebrantOptions={celebrantOptions} whatsappTemplate={whatsappTemplate} templates={waTemplates}
           onChange={({ ticketTypes: tt, requiredFields: rf, whatsappEnabled: wa, collectAsoEbi: ae, allowPlusOne: po, preferencesEnabled: pe, collectCelebrant: cc, celebrantOptions: co, whatsappTemplate: wt }) => {

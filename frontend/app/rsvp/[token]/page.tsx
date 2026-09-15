@@ -159,11 +159,15 @@ export default function PublicRsvpPage() {
 
             <section aria-labelledby="event-details-heading">
               <h1 id="event-details-heading" className="text-lg font-bold">Event Details</h1>
-              <div className="mt-4 grid divide-y divide-[var(--line)] overflow-hidden rounded-[14px] md:grid-cols-3 md:divide-x md:divide-y-0" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                <DetailRow icon="📅" label="Date" value={new Date(details.event_date).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
-                <DetailRow icon="🕑" label="Time (WAT)" value={new Date(details.event_date).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit', hour12: true })} />
-                {details.venue && <DetailRow icon="📍" label="Venue" value={details.venue} />}
-              </div>
+              {details.locations?.length ? (
+                <ScheduleList locations={details.locations} />
+              ) : (
+                <div className="mt-4 grid divide-y divide-[var(--line)] overflow-hidden rounded-[14px] md:grid-cols-3 md:divide-x md:divide-y-0" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <DetailRow icon="📅" label="Date" value={new Date(details.event_date).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
+                  <DetailRow icon="🕑" label="Time (WAT)" value={new Date(details.event_date).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit', hour12: true })} />
+                  {details.venue && <DetailRow icon="📍" label="Venue" value={details.venue} />}
+                </div>
+              )}
             </section>
 
             <section className="mt-6 text-sm leading-7" style={{ color: 'var(--muted)' }}>
@@ -232,6 +236,43 @@ export default function PublicRsvpPage() {
         ) : null}
       </div>
     </main>
+  )
+}
+
+function formatWatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-GB', {
+    timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
+
+function formatWatTime(value: string) {
+  return new Date(value).toLocaleTimeString('en-GB', {
+    timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+function ScheduleList({ locations }: { locations: PublicRsvpDetails['locations'] }) {
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      {locations.map((location, index) => (
+        <div
+          key={index}
+          className="overflow-hidden rounded-[14px] px-4 py-4 sm:px-5"
+          style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--brand)' }}>
+            {location.title}
+          </p>
+          <p className="mt-2 break-words text-sm font-semibold leading-6">📍 {location.venue}</p>
+          <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>
+            📅 {formatWatDate(location.starts_at)} · 🕑 {formatWatTime(location.starts_at)} (WAT)
+          </p>
+          {location.notes && (
+            <p className="mt-1 text-sm leading-6" style={{ color: 'var(--muted)' }}>{location.notes}</p>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 

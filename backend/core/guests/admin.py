@@ -1,9 +1,15 @@
 from django.contrib import admin
-from .models import Event, Guest, BulkUpload
+from .models import Event, EventLocation, Guest, BulkUpload
+
+
+class EventLocationInline(admin.TabularInline):
+    model = EventLocation
+    extra = 0
 
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+    inlines = [EventLocationInline]
     list_display = ('name', 'date', 'venue', 'collect_aso_ebi', 'pass_send_at', 'guest_count', 'created_at')
     search_fields = ('name', 'venue')
 
