@@ -204,7 +204,7 @@ export default function RsvpWorkflowDetailPage() {
         {metric('Confirmed', stats.confirmed, `${stats.confirmation_rate}% of invitees`, 'var(--success)')}
         {metric('Declined', stats.declined, `${responded} total responses`)}
         {metric('Awaiting', stats.awaiting, 'Delivered/read · eligible for reminders')}
-        {metric('Not sent', stats.not_sent, 'Not delivered yet · excluded from reminders')}
+        {metric('Not delivered yet', stats.not_sent, 'Not sent, queued, sending, or awaiting a delivery receipt')}
         {metric('Passes sent', stats.passes_sent, `${stats.confirmed_no_pass} confirmed awaiting pass${stats.passes_failed ? ` · ${stats.passes_failed} failed` : ''}`)}
         {metric('Delivery failures', stats.delivery_failed, `${stats.invitation_failed} invite${stats.invitation_failed === 1 ? '' : 's'} · ${stats.passes_failed} pass${stats.passes_failed === 1 ? '' : 'es'}`, 'var(--danger)', () => { setSegmentFilter('delivery_failed'); setResponseFilter('all'); setPage(1) })}
         {metric('Aso Ebi yards', stats.aso_ebi_quantity, `${stats.aso_ebi_requests} guest request${stats.aso_ebi_requests === 1 ? '' : 's'}`, 'var(--brand)')}

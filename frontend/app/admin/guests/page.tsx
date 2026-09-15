@@ -49,6 +49,7 @@ export default function GuestsPage() {
   const [deleteError, setDeleteError]   = useState('')
   const [regeneratingAll, setRegeneratingAll] = useState(false)
   const [regenToast, setRegenToast]     = useState('')
+  const [refreshKey, setRefreshKey]     = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 50
@@ -89,7 +90,7 @@ export default function GuestsPage() {
       .then((data) => { setGuests(data.results); setCount(data.count); setStats(data.stats ?? null) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, phoneToken, sort, registeredFrom, registeredTo, page])
+  }, [selectedEvent, freeText, statusToken, ticketToken, waToken, phoneToken, sort, registeredFrom, registeredTo, page, refreshKey])
 
   const filtered = guests
 
@@ -119,6 +120,7 @@ export default function GuestsPage() {
           wa_unsent: Math.max(0, current.wa_unsent - (guest.whatsapp_sent ? 0 : 1)),
         } : current)
       }
+      setRefreshKey((current) => current + 1)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : `Failed to remove ${name}.`)
     } finally {
@@ -136,6 +138,7 @@ export default function GuestsPage() {
       setGuests((prev) => prev.filter((g) => !selected.has(g.id)))
       setCount((c) => c - deleted)
       setSelected(new Set())
+      setRefreshKey((current) => current + 1)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete guests.')
     } finally { setDeleting(null) }
@@ -150,7 +153,9 @@ export default function GuestsPage() {
       await api.deleteAllGuests(selectedEvent.id)
       setGuests([])
       setCount(0)
+      setStats(null)
       setSelected(new Set())
+      setRefreshKey((current) => current + 1)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to clear guests.')
     } finally { setDeleting(null) }
@@ -256,7 +261,7 @@ export default function GuestsPage() {
               <span className="ml-2 text-base font-normal" style={{ color: 'var(--muted)' }}>• {count}</span>
             </h1>
             <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              {checkedIn} checked in · {pending} pending
+              {checkedIn} checked in · {pending} pending check-in
               {selectedEvent.rsvp_workflow_id && stats ? ` · ${stats.awaiting ?? 0} awaiting RSVP · ${stats.failed_delivery ?? 0} failed` : ''}
             </p>
           </div>

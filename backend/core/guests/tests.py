@@ -139,6 +139,8 @@ class EventDeliveryWorkflowTests(TestCase):
 
         self.assertEqual(response.data['guest_count'], 3)
         self.assertEqual(response.data['confirmed_count'], 1)
+        self.assertEqual(response.data['pass_recipient_count'], 1)
+        self.assertEqual(response.data['passes_sent_count'], 0)
         self.assertEqual(response.data['plus_one_count'], 1)
         self.assertEqual(response.data['estimated_guest_count'], 2)
 
@@ -773,6 +775,54 @@ class PastEventWhatsAppGuardTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data['queued'])
         mock_bulk_task.delay.assert_called_once_with(self.future_event.id, False)
+
+
+class RsvpPassSendApiTests(TestCase):
+    def setUp(self):
+        from rsvp.models import RsvpRecipient, RsvpWorkflow
+
+        self.client = APIClient()
+        self.manager = User.objects.create_user(
+            'rsvp-pass-manager', password='pass', role='event_manager',
+        )
+        self.client.force_authenticate(self.manager)
+        self.event = make_event(
+            name='RSVP Pass Event', date=timezone.now() + timezone.timedelta(days=7),
+            rsvp_enabled=True,
+        )
+        self.workflow = RsvpWorkflow.objects.create(event=self.event)
+        self.guest = make_guest(
+            self.event, full_name='Confirmed Guest', pass_image='passes/fake.png',
+        )
+        self.recipient = RsvpRecipient.objects.create(
+            workflow=self.workflow,
+            guest=self.guest,
+            response_status=RsvpRecipient.ResponseStatus.CONFIRMED,
+        )
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_manual_send_queues_the_rsvp_pass_task(self, mock_delay):
+        from rsvp.models import RsvpRecipient
+
+        response = self.client.post(f'/api/guests/{self.guest.id}/send_whatsapp/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.recipient.pass_status, RsvpRecipient.PassStatus.QUEUED)
+        mock_delay.assert_called_once_with(self.recipient.id)
+
+    @patch('rsvp.tasks.send_confirmed_pass.delay')
+    def test_failed_pass_must_use_the_explicit_retry_flow(self, mock_delay):
+        from rsvp.models import RsvpRecipient
+
+        self.recipient.pass_status = RsvpRecipient.PassStatus.FAILED
+        self.recipient.save(update_fields=['pass_status'])
+
+        response = self.client.post(f'/api/guests/{self.guest.id}/send_whatsapp/')
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('retry failed sends', response.data['detail'].lower())
+        mock_delay.assert_not_called()
 
 
 @patch('guests.views.guests.generate_guest_assets')

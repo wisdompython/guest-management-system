@@ -38,6 +38,44 @@ Create two approved WhatsApp templates before configuring a workflow.
 
 Guests added or imported while the workflow is a draft are attached to it automatically. The first valid Yes/No response submitted from the RSVP page is authoritative. Repeated submissions never queue another pass.
 
+## Reminding guests who have not responded
+
+Some guests read the invitation and simply never reply. The **Remind awaiting**
+button on the workflow dashboard sends those guests the RSVP invitation again.
+
+To protect the event's WhatsApp number from being reported as spam, every guest
+has two limits:
+
+- **Three reminders maximum.** After a guest has been reminded three times they
+  are never reminded again, no matter how many times the button is pressed.
+  Their original invitation stays valid and they can still respond at any time.
+- **Six hours between reminders.** A guest who was contacted less than six hours
+  ago is skipped and becomes eligible again once that time has passed.
+
+The button only reminds guests whose invitation actually reached their phone and
+who have not answered yet. A guest is skipped when any of the following is true:
+
+- They have already answered Yes or No.
+- WhatsApp has not yet confirmed the invitation was delivered to their phone.
+- Their invitation failed to send. These are not reminders — use **Retry failed
+  sends** for them instead.
+- They have used all three reminders.
+- They were contacted within the last six hours.
+
+After pressing the button the dashboard reports how many reminders were queued.
+A number lower than the awaiting count is normal and simply means the remaining
+guests were skipped for one of the reasons above. Reminders are delivered in the
+background at the same steady rate as every other message, so they arrive over
+several minutes rather than all at once.
+
+Reminders can only be sent while the workflow is active, and never after the
+response deadline has passed.
+
+An administrator can change both limits by setting `RSVP_MAX_REMINDERS` and
+`RSVP_REMINDER_COOLDOWN_MINUTES` in the environment file. Raise them with care:
+guests who receive repeated unanswered messages can block the business number,
+which lowers the WhatsApp quality rating for every event on the account.
+
 ## Aso Ebi requests
 
 Enable **Collect Aso Ebi requests** in the event's guest setup when the event offers Aso Ebi. A guest who confirms attendance can then choose whether they want Aso Ebi and must enter a quantity of at least one when they do.

@@ -28,7 +28,7 @@ export function StatCards({ loading, checkedIn, total, waSent, eventsCount, atte
       </div>
 
       <div className="p-5" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>Pending</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>Pending check-in</p>
         <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
           {loading ? '--' : total - checkedIn}
         </p>
@@ -38,7 +38,7 @@ export function StatCards({ loading, checkedIn, total, waSent, eventsCount, atte
       </div>
 
       <div className="p-5" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>WA Delivered</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>Passes sent</p>
         <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
           {loading ? '--' : waSent}
           <span className="text-lg font-normal ml-1" style={{ color: 'var(--muted)' }}>/ {total}</span>
